@@ -49,20 +49,33 @@ function simulatePropertySearch(address, radius) {
     searchBtn.disabled = true;
     searchBtn.innerHTML = '<svg class="spinner" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" opacity="0.3" fill="none"/><path d="M12 2C6.47715 2 2 6.47715 2 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg> Searching...';
 
-    setTimeout(() => {
-        searchResults = generateDemoComps(address, radius);
-        updatePropertyResults(searchResults);
-        initializeMap(searchResults);
+    fetch('/api/property/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, radius })
+    })
+        .then(response => response.json())
+        .then(data => {
+            searchResults = data;
+            updatePropertyResults(searchResults);
+            initializeMap(searchResults);
 
-        document.getElementById('export-csv').disabled = false;
-        document.getElementById('export-pdf').disabled = false;
+            document.getElementById('export-csv').disabled = false;
+            document.getElementById('export-pdf').disabled = false;
 
-        searchBtn.disabled = false;
-        searchBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Search Property';
+            searchBtn.disabled = false;
+            searchBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Search Property';
 
-        showNotification('Found ' + searchResults.comparables.length + ' comparable properties!', 'success');
-    }, 1500);
+            showNotification('Found ' + searchResults.comparables.length + ' comparable properties!', 'success');
+        })
+        .catch(error => {
+            console.error('API error:', error);
+            searchBtn.disabled = false;
+            searchBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Search Property';
+            showNotification('Error searching property. Is the server running?', 'error');
+        });
 }
+
 
 function generateDemoComps(address, radius) {
     const baseValue = 300000 + Math.random() * 150000;

@@ -53,52 +53,57 @@ function calculateLoan() {
     const years = getInputValue('loan-term') || 30;
     const extraPayment = getInputValue('extra-payment') || 0;
 
-    const monthlyRate = annualRate / 100 / 12;
-    const numPayments = years * 12;
+    fetch('/api/loan/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            principal: principal,
+            annual_rate: annualRate,
+            years: years,
+            extra_payment: extraPayment
+        })
+    })
+        .then(response => response.json())
+        .then(data => {
+            loanData = {
+                principal: data.principal,
+                annualRate: data.annualRate,
+                years: data.years,
+                extraPayment: data.extraPayment,
+                monthlyPayment: data.monthlyPayment,
+                standardInterest: data.standardInterest,
+                acceleratedInterest: data.acceleratedInterest,
+                interestSavings: data.interestSavings,
+                monthsSaved: data.monthsSaved,
+                standardMonths: data.standardMonths,
+                acceleratedMonths: data.acceleratedMonths
+            };
 
-    // Standard payment calculation
-    const monthlyPayment = monthlyRate > 0
-        ? principal * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1)
-        : principal / numPayments;
+            amortizationSchedule = data.amortizationSchedule;
 
-    // Generate amortization schedules
-    const standardSchedule = generateAmortization(principal, monthlyRate, monthlyPayment, 0);
-    const acceleratedSchedule = generateAmortization(principal, monthlyRate, monthlyPayment, extraPayment);
+            // Update UI
+            document.getElementById('monthly-payment-result').textContent = formatCurrency(data.monthlyPayment);
+            document.getElementById('total-interest').textContent = formatCurrency(data.acceleratedInterest);
+            document.getElementById('interest-savings').textContent = formatCurrency(data.interestSavings);
+            document.getElementById('time-saved').textContent = data.monthsSaved > 0 ? `${Math.floor(data.monthsSaved / 12)}y ${data.monthsSaved % 12}m` : '0 months';
 
-    amortizationSchedule = acceleratedSchedule;
+            // Payoff comparison
+            document.getElementById('standard-payoff-bar').style.width = '100%';
+            document.getElementById('accelerated-payoff-bar').style.width = (data.acceleratedYears / data.standardYears * 100) + '%';
+            document.getElementById('standard-payoff-date').textContent = `${data.standardYears} years`;
+            document.getElementById('accelerated-payoff-date').textContent = `${data.acceleratedYears} years`;
 
-    const standardInterest = standardSchedule.reduce((s, p) => s + p.interest, 0);
-    const acceleratedInterest = acceleratedSchedule.reduce((s, p) => s + p.interest, 0);
-    const interestSavings = standardInterest - acceleratedInterest;
-    const monthsSaved = standardSchedule.length - acceleratedSchedule.length;
+            updateLoanChartFromAPI(data.yearlySummary);
+            updateAmortizationTable();
 
-    loanData = {
-        principal, annualRate, years, extraPayment,
-        monthlyPayment: monthlyPayment + extraPayment,
-        standardInterest, acceleratedInterest, interestSavings, monthsSaved,
-        standardMonths: standardSchedule.length,
-        acceleratedMonths: acceleratedSchedule.length
-    };
-
-    // Update UI
-    document.getElementById('monthly-payment-result').textContent = formatCurrency(monthlyPayment + extraPayment);
-    document.getElementById('total-interest').textContent = formatCurrency(acceleratedInterest);
-    document.getElementById('interest-savings').textContent = formatCurrency(interestSavings);
-    document.getElementById('time-saved').textContent = monthsSaved > 0 ? `${Math.floor(monthsSaved / 12)}y ${monthsSaved % 12}m` : '0 months';
-
-    // Payoff comparison
-    const standardYears = standardSchedule.length / 12;
-    const acceleratedYears = acceleratedSchedule.length / 12;
-    document.getElementById('standard-payoff-bar').style.width = '100%';
-    document.getElementById('accelerated-payoff-bar').style.width = (acceleratedYears / standardYears * 100) + '%';
-    document.getElementById('standard-payoff-date').textContent = `${standardYears.toFixed(1)} years`;
-    document.getElementById('accelerated-payoff-date').textContent = `${acceleratedYears.toFixed(1)} years`;
-
-    updateLoanChart(acceleratedSchedule);
-    updateAmortizationTable();
-
-    showNotification('Loan calculated!', 'success');
+            showNotification('Loan calculated!', 'success');
+        })
+        .catch(error => {
+            console.error('API error:', error);
+            showNotification('Error calculating loan. Is the server running?', 'error');
+        });
 }
+
 
 function generateAmortization(principal, monthlyRate, payment, extra) {
     const schedule = [];
@@ -160,6 +165,58 @@ function updateLoanChart(schedule) {
     const barGap = (chartWidth / yearly.length) * 0.3;
 
     yearly.forEach((data, i) => {
+        const x = padding.left + i * (barWidth + barGap) + barGap / 2;
+        const principalHeight = (data.principal / maxValue) * chartHeight;
+        const interestHeight = (data.interest / maxValue) * chartHeight;
+
+        // Interest (bottom)
+        ctx.fillStyle = '#22c55e';
+        ctx.fillRect(x, padding.top + chartHeight - interestHeight, barWidth, interestHeight);
+
+        // Principal (top)
+        ctx.fillStyle = '#6366f1';
+        ctx.fillRect(x, padding.top + chartHeight - interestHeight - principalHeight, barWidth, principalHeight);
+
+        // Year label
+        ctx.fillStyle = '#6b7280';
+        ctx.font = '10px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Y${data.year}`, x + barWidth / 2, height - 10);
+    });
+
+    // Y-axis labels
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '10px Inter, sans-serif';
+    ctx.textAlign = 'right';
+    for (let i = 0; i <= 4; i++) {
+        const value = (maxValue / 4) * i;
+        const y = padding.top + chartHeight - (chartHeight / 4) * i;
+        ctx.fillText(formatCurrencyShort(value), padding.left - 5, y + 3);
+    }
+}
+
+function updateLoanChartFromAPI(yearlySummary) {
+    const canvas = document.getElementById('loan-canvas');
+    if (!canvas || !yearlySummary || yearlySummary.length === 0) return;
+
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth * 2;
+    canvas.height = canvas.offsetHeight * 2;
+    ctx.scale(2, 2);
+
+    const width = canvas.offsetWidth;
+    const height = canvas.offsetHeight;
+    const padding = { top: 20, right: 20, bottom: 40, left: 60 };
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+
+    ctx.clearRect(0, 0, width, height);
+
+    const maxValue = Math.max(...yearlySummary.map(y => y.principal + y.interest));
+    const barWidth = (chartWidth / yearlySummary.length) * 0.7;
+    const barGap = (chartWidth / yearlySummary.length) * 0.3;
+
+    yearlySummary.forEach((data, i) => {
         const x = padding.left + i * (barWidth + barGap) + barGap / 2;
         const principalHeight = (data.principal / maxValue) * chartHeight;
         const interestHeight = (data.interest / maxValue) * chartHeight;

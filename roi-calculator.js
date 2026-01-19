@@ -48,35 +48,80 @@ function calculateROI() {
     const monthlyExpenses = getInputValue('monthly-expenses') || 0;
     const mortgagePayment = getInputValue('mortgage-payment') || 0;
 
-    const downPayment = purchasePrice * (downPaymentPct / 100);
-    const totalCashInvested = downPayment + closingCosts + rehabCosts;
+    fetch('/api/roi/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            purchase_price: purchasePrice,
+            down_payment_pct: downPaymentPct,
+            closing_costs: closingCosts,
+            rehab_costs: rehabCosts,
+            monthly_rent: monthlyRent,
+            vacancy_rate: vacancyRate,
+            monthly_expenses: monthlyExpenses,
+            mortgage_payment: mortgagePayment
+        })
+    })
+        .then(response => response.json())
+        .then(data => {
+            roiData = {
+                purchasePrice: data.purchasePrice,
+                downPayment: data.downPayment,
+                closingCosts: data.closingCosts,
+                rehabCosts: data.rehabCosts,
+                monthlyRent: data.monthlyRent,
+                vacancyRate: data.vacancyRate,
+                monthlyExpenses: data.monthlyExpenses,
+                mortgagePayment: data.mortgagePayment,
+                totalCashInvested: data.totalCashInvested,
+                noi: data.noi,
+                annualCashFlow: data.annualCashFlow,
+                monthlyCashFlow: data.monthlyCashFlow,
+                capRate: data.capRate,
+                cocReturn: data.cocReturn,
+                breakEvenRent: data.breakEvenRent
+            };
 
-    const effectiveRent = monthlyRent * (1 - vacancyRate / 100);
-    const annualRent = effectiveRent * 12;
-    const annualExpenses = monthlyExpenses * 12;
-    const annualMortgage = mortgagePayment * 12;
+            // Update UI
+            document.getElementById('coc-return').textContent = data.cocReturn.toFixed(2) + '%';
+            document.getElementById('noi-value').textContent = formatCurrency(data.noi) + '/yr';
+            document.getElementById('cap-rate').textContent = data.capRate.toFixed(2) + '%';
+            document.getElementById('cash-flow').textContent = formatCurrency(data.annualCashFlow) + '/yr';
+            document.getElementById('monthly-cash-flow').textContent = formatCurrency(data.monthlyCashFlow) + '/mo';
+            document.getElementById('break-even-rent').textContent = formatCurrency(data.breakEvenRent) + '/mo';
+            document.getElementById('total-invested').textContent = formatCurrency(data.totalCashInvested);
 
-    const noi = annualRent - annualExpenses;
-    const annualCashFlow = noi - annualMortgage;
-    const monthlyCashFlow = annualCashFlow / 12;
+            updateROIChart(data.downPayment, data.closingCosts, data.rehabCosts);
+            updateInsightsFromAPI(data.insights);
+        })
+        .catch(error => {
+            console.error('API error:', error);
+            showNotification('Error calculating ROI. Is the server running?', 'error');
+        });
+}
 
-    const capRate = purchasePrice > 0 ? (noi / purchasePrice) * 100 : 0;
-    const cocReturn = totalCashInvested > 0 ? (annualCashFlow / totalCashInvested) * 100 : 0;
-    const breakEvenRent = (monthlyExpenses + mortgagePayment) / (1 - vacancyRate / 100);
+function updateInsightsFromAPI(insights) {
+    const cocInsight = document.getElementById('insight-coc');
+    const capInsight = document.getElementById('insight-cap');
+    const cashInsight = document.getElementById('insight-cashflow');
 
-    roiData = { purchasePrice, downPayment, closingCosts, rehabCosts, monthlyRent, vacancyRate, monthlyExpenses, mortgagePayment, totalCashInvested, noi, annualCashFlow, monthlyCashFlow, capRate, cocReturn, breakEvenRent };
+    if (cocInsight && insights.coc) {
+        cocInsight.className = 'insight-card ' + (insights.coc.status === 'good' ? 'good' : insights.coc.status === 'warning' ? 'warning' : '');
+        cocInsight.querySelector('.insight-icon').textContent = insights.coc.status === 'good' ? '✓' : insights.coc.status === 'warning' ? '⚠️' : '💡';
+        cocInsight.querySelector('p').textContent = insights.coc.message;
+    }
 
-    // Update UI
-    document.getElementById('coc-return').textContent = cocReturn.toFixed(2) + '%';
-    document.getElementById('noi-value').textContent = formatCurrency(noi) + '/yr';
-    document.getElementById('cap-rate').textContent = capRate.toFixed(2) + '%';
-    document.getElementById('cash-flow').textContent = formatCurrency(annualCashFlow) + '/yr';
-    document.getElementById('monthly-cash-flow').textContent = formatCurrency(monthlyCashFlow) + '/mo';
-    document.getElementById('break-even-rent').textContent = formatCurrency(breakEvenRent) + '/mo';
-    document.getElementById('total-invested').textContent = formatCurrency(totalCashInvested);
+    if (capInsight && insights.cap) {
+        capInsight.className = 'insight-card ' + (insights.cap.status === 'good' ? 'good' : insights.cap.status === 'warning' ? 'warning' : '');
+        capInsight.querySelector('.insight-icon').textContent = insights.cap.status === 'good' ? '✓' : insights.cap.status === 'warning' ? '⚠️' : '💡';
+        capInsight.querySelector('p').textContent = insights.cap.message;
+    }
 
-    updateROIChart(downPayment, closingCosts, rehabCosts);
-    updateInsights(cocReturn, capRate, monthlyCashFlow);
+    if (cashInsight && insights.cashflow) {
+        cashInsight.className = 'insight-card ' + (insights.cashflow.status === 'good' ? 'good' : insights.cashflow.status === 'warning' ? 'warning' : '');
+        cashInsight.querySelector('.insight-icon').textContent = insights.cashflow.status === 'good' ? '✓' : insights.cashflow.status === 'warning' ? '⚠️' : '💡';
+        cashInsight.querySelector('p').textContent = insights.cashflow.message;
+    }
 }
 
 function updateROIChart(downPayment, closingCosts, rehabCosts) {
