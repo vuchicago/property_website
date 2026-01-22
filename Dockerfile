@@ -21,5 +21,5 @@ ENV PATH="/app/.venv/bin:${PATH}"
 
 EXPOSE 7860
 
-CMD ["uv", "run", "streamlit", "run", "backend/app_streamlit.py", "--server.address", "0.0.0.0", "--server.port", "7860"]
+CMD ["uv", "run", "streamlit", "run", "/app/backend/app_streamlit.py", "--server.address", "0.0.0.0", "--server.port", "7860"]
 #CMD ["streamlit", "run", "apps/app_streamlit.py", "--server.address", "0.0.0.0", "--server.port", "7860"]

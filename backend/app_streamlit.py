@@ -20,17 +20,16 @@ st.set_page_config(page_title="Property Taxes Comparables", layout="wide")  # <-
 # Convert degrees to radians
 app_dir = Path(__file__).resolve().parent
 data_path=app_dir
-#%%
-print(data_path)
+
 #%%
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-# os.chdir(data_path) <-- REMOVED to prevent path confusion
+os.chdir(data_path)
 
 # Load data (replace with your actual data loading logic)
 @st.cache_data
 def load_data():
     # Replace with your actual parquet file path
-    parquet_file = data_path / "output_all_1.7M.parquet"
+    parquet_file = "output_all_1.7M.parquet"
     df = pd.read_parquet(parquet_file)
     df = df[df['Nearby Address'].notnull()]
     df['Nearby Address'] = df['Nearby Address'].str.lower()
