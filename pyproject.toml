@@ -1,20 +1,11 @@
 [project]
-name = "property_tax"
+name = "property_tax_appeal_vn"
 requires-python = ">=3.11, <3.13"
 version = "0.1.0"
 description = "A library for Cook County property tax data processing and analysis."
 authors = [
     { name="Vu Nguyen", email="vuchicago@gmail.com" }
 ]
-[tool.setuptools]
-packages = ["property_tax"]
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-license = { file="LICENSE" }
-readme = "README.md"
-
 dependencies = [
     "faicons",
     "shiny",
@@ -33,11 +24,23 @@ dependencies = [
     "matplotlib==3.9.2",
     "datasets",
     "streamlit==1.52.1",
-    "numpy",
+    "streamlit-javascript",
+    "numpy<2.0.0",
     "folium==0.20.0",
     "watchdog==6.0.0",
     "fuzzywuzzy"
 ]
+
+[tool.setuptools]
+packages = ["property_tax_appeal_vn"]
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+license = { file="LICENSE" }
+readme = "README.md"
+
+
 
 
 
