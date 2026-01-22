@@ -1,1 +1,3 @@
-docker build --no-cache -t property_tax:latest /Users/vuchicago/Python/vu-web
+# Build from the project root (one level up from this script)
+cd "$(dirname "$0")/.."
+docker build --no-cache -t property_tax:latest .

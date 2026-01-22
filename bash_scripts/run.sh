@@ -1,2 +1,3 @@
-docker run -p 7860:7860 -v /app/.venv -v /Users/vuchicago/Python/vu-web:/app -w /app property_tax:latest
-#docker run -p 7860:7860 -v /Users/vuchicago/Python/property_tax:/app_shiny -w /app_shiny property_tax:latest
+# Run from the project root
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+docker run -p 7860:7860 -v /app/.venv -v "$PROJECT_ROOT":/app -w /app property_tax:latest
