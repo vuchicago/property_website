@@ -1,0 +1,109 @@
+# ============================================
+# BACKEND / PYTHON - NOT NEEDED FOR STATIC SITE
+# ============================================
+backend/
+property_tax_appeal_vn/
+*.egg-info/
+property_tax.egg-info/
+property_tax_appeal.egg-info/
+property_tax_appeal_vn.egg-info/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyc
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg
+.installed.cfg
+
+# Python environments
+.venv/
+venv/
+ENV/
+env/
+.python-version
+
+# Python config files
+pyproject.toml
+uv.lock
+requirements.txt
+setup.py
+setup.cfg
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Data files (parquet, csv, etc.)
+*.parquet
+*.csv
+*.xlsx
+*.db
+*.sqlite
+
+# ============================================
+# DEVELOPMENT FILES
+# ============================================
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+package-lock.json
+yarn.lock
+
+# Cloudflare
+.wrangler/
+wrangler.toml.backup
+.dev.vars
+.mf/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.production
+
+# Testing
+coverage/
+.nyc_output/
+*.test.js.snap
+
+# Misc
+.cache/
+.temp/
+tmp/
+

@@ -1,6 +1,0 @@
-pyproject.toml
-property_tax_appeal/__init__.py
-property_tax_appeal.egg-info/PKG-INFO
-property_tax_appeal.egg-info/SOURCES.txt
-property_tax_appeal.egg-info/dependency_links.txt
-property_tax_appeal.egg-info/top_level.txt
