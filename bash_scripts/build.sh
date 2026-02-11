@@ -1,1 +1,0 @@
-docker build --no-cache -t property_tax:latest /Users/vuchicago/Python/vu-web
