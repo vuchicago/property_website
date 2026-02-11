@@ -2843,3 +2843,108 @@ textarea {
         color: black !important;
     }
 }
+
+/* ========================================
+   Calculator Mode Toggle
+======================================== */
+.calculator-mode-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--white);
+    border: 2px solid var(--dark-200);
+    border-radius: var(--radius-xl);
+    margin-bottom: var(--space-6);
+    box-shadow: var(--shadow-md);
+}
+
+.toggle-label {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--dark-600);
+}
+
+.toggle-switch {
+    position: relative;
+    width: 60px;
+    height: 32px;
+    background: var(--dark-200);
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    transition: background var(--transition-base);
+}
+
+.toggle-switch.active {
+    background: var(--gradient-royal);
+}
+
+.toggle-slider {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 24px;
+    height: 24px;
+    background: var(--white);
+    border-radius: 50%;
+    transition: transform var(--transition-base);
+    box-shadow: var(--shadow-sm);
+}
+
+.toggle-switch.active .toggle-slider {
+    transform: translateX(28px);
+}
+
+.toggle-icon {
+    width: 20px;
+    height: 20px;
+    color: var(--dark-500);
+}
+
+.calculator-container {
+    position: relative;
+    min-height: 600px;
+}
+
+.calculator-view {
+    display: none;
+}
+
+.calculator-view.active {
+    display: block;
+}
+
+.huggingface-iframe {
+    width: 100%;
+    min-height: 800px;
+    border: none;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
+    background: var(--white);
+}
+
+.iframe-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 800px;
+    background: var(--dark-50);
+    border-radius: var(--radius-xl);
+}
+
+.iframe-loading svg {
+    width: 48px;
+    height: 48px;
+    color: var(--primary);
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}

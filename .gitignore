@@ -1,14 +1,10 @@
-# ============================================
-# BACKEND / PYTHON - NOT NEEDED FOR STATIC SITE
-# ============================================
+# Backend / Python
 backend/
 property_tax_appeal_vn/
 *.egg-info/
 property_tax.egg-info/
 property_tax_appeal.egg-info/
 property_tax_appeal_vn.egg-info/
-
-# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -30,14 +26,12 @@ wheels/
 *.egg
 .installed.cfg
 
-# Python environments
+# Python environments and config
 .venv/
 venv/
 ENV/
 env/
 .python-version
-
-# Python config files
 pyproject.toml
 uv.lock
 requirements.txt
@@ -49,16 +43,12 @@ Dockerfile
 docker-compose.yml
 .dockerignore
 
-# Data files (parquet, csv, etc.)
+# Data files
 *.parquet
 *.csv
 *.xlsx
 *.db
 *.sqlite
-
-# ============================================
-# DEVELOPMENT FILES
-# ============================================
 
 # Node
 node_modules/
@@ -75,35 +65,28 @@ wrangler.toml.backup
 .dev.vars
 .mf/
 
-# OS
+# OS and editor files
 .DS_Store
 Thumbs.db
 *.swp
 *.swo
 *~
-
-# IDE
 .vscode/
 .idea/
 *.sublime-*
 
-# Logs
+# Logs and environment
 *.log
 logs/
-
-# Environment
 .env
 .env.local
 .env.*.local
 .env.production
 
-# Testing
+# Testing and cache
 coverage/
 .nyc_output/
 *.test.js.snap
-
-# Misc
 .cache/
 .temp/
 tmp/
-

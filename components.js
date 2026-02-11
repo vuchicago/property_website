@@ -373,11 +373,63 @@ class A11y {
 }
 
 // ========================================
+// Calculator Mode Toggle Component
+// ========================================
+class CalculatorToggle {
+    static init() {
+        const toggle = document.getElementById('calc-mode-toggle');
+        if (!toggle) return;
+
+        toggle.addEventListener('click', () => {
+            CalculatorToggle.toggleMode();
+        });
+
+        // Load saved preference
+        const savedMode = localStorage.getItem('calculator-mode') || 'local';
+        if (savedMode === 'huggingface') {
+            CalculatorToggle.setMode('huggingface');
+        }
+    }
+
+    static toggleMode() {
+        const toggle = document.getElementById('calc-mode-toggle');
+        const isHuggingFace = toggle.classList.contains('active');
+
+        if (isHuggingFace) {
+            CalculatorToggle.setMode('local');
+        } else {
+            CalculatorToggle.setMode('huggingface');
+        }
+    }
+
+    static setMode(mode) {
+        const toggle = document.getElementById('calc-mode-toggle');
+        const localCalc = document.getElementById('local-calculator');
+        const hfCalc = document.getElementById('huggingface-calculator');
+
+        if (mode === 'huggingface') {
+            toggle.classList.add('active');
+            localCalc?.classList.remove('active');
+            hfCalc?.classList.add('active');
+            localStorage.setItem('calculator-mode', 'huggingface');
+            A11y.announce('Switched to Hugging Face calculator');
+        } else {
+            toggle.classList.remove('active');
+            localCalc?.classList.add('active');
+            hfCalc?.classList.remove('active');
+            localStorage.setItem('calculator-mode', 'local');
+            A11y.announce('Switched to local calculator');
+        }
+    }
+}
+
+// ========================================
 // Initialize Components
 // ========================================
 document.addEventListener('DOMContentLoaded', function () {
     Tooltip.init();
     A11y.init();
+    CalculatorToggle.init();
 
     // Load shared URL data if present
     if (window.location.search) {
@@ -399,3 +451,5 @@ window.FormValidator = FormValidator;
 window.ShareSave = ShareSave;
 window.PrintHelper = PrintHelper;
 window.A11y = A11y;
+window.CalculatorToggle = CalculatorToggle;
+
