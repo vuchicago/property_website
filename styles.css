@@ -2302,6 +2302,11 @@ textarea {
         padding-top: calc(80px + var(--space-12));
     }
 
+    .hero .container {
+        flex-direction: column !important;
+        gap: var(--space-8) !important;
+    }
+
     .hero-content {
         padding: 0 var(--container-padding);
         max-width: 100%;
