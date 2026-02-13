@@ -89,7 +89,30 @@ const updateMenu = (ulElement, user, elementId) => {
 
         if (user) {
                 // User is logged in
-                li.innerHTML = `<a href="#" onclick="handleLogout(event)">Logout (${user.email})</a>`;
+                import('./appeal.js').then(module => {
+                        // Ensure modal open function is available globally or attached to window if needed for inline onclick, 
+                        // OR better yet, attach event listener after element creation.
+                        window.openAppealModal = module.openAppealModal;
+                });
+
+                const appealBtn = document.createElement('a');
+                appealBtn.href = "#";
+                appealBtn.className = "btn btn-sm btn-primary";
+                appealBtn.style.marginRight = "1rem";
+                appealBtn.style.padding = "0.5rem 1rem";
+                appealBtn.innerHTML = "Appeal my property tax";
+                appealBtn.onclick = (e) => {
+                        e.preventDefault();
+                        if (window.openAppealModal) window.openAppealModal();
+                };
+
+                const logoutLink = document.createElement('a');
+                logoutLink.href = "#";
+                logoutLink.onclick = (e) => window.handleLogout(e);
+                logoutLink.textContent = `Logout (${user.email})`;
+
+                li.appendChild(appealBtn);
+                li.appendChild(logoutLink);
         } else {
                 // User is logged out
                 li.innerHTML = `<a href="login.html" class="btn btn-sm btn-primary" style="padding: 0.5rem 1rem; color: white;">Login</a>`;
