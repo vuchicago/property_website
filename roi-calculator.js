@@ -3,102 +3,18 @@ let roiData = null;
 
 document.addEventListener('DOMContentLoaded', function () {
     initROICalculator();
-    calculateROI(); // Initial calculation
 });
 
 function initROICalculator() {
-    const inputs = ['purchase-price', 'down-payment', 'closing-costs', 'rehab-costs', 'monthly-rent', 'vacancy-rate', 'monthly-expenses', 'mortgage-payment'];
+    // We are using the Hugging Face iframe for calculations now.
+    // Keeping this file for potential future client-side enhancements or export features
+    // that might interact with the iframe if postMessage is implemented.
 
-    inputs.forEach(id => {
-        const el = document.getElementById(id);
-        el?.addEventListener('input', calculateROI);
-    });
-
-    document.getElementById('roi-export-csv')?.addEventListener('click', exportROIToCSV);
-    document.getElementById('roi-export-pdf')?.addEventListener('click', exportROIToPDF);
-
-    // Share and Print buttons
-    document.getElementById('share-results')?.addEventListener('click', () => {
-        if (!roiData) { showNotification('Calculate ROI first', 'error'); return; }
-        const url = ShareSave.generateShareUrl('roi-calculator', {
-            'purchase-price': roiData.purchasePrice,
-            'down-payment': roiData.downPayment / roiData.purchasePrice * 100,
-            'closing-costs': roiData.closingCosts,
-            'rehab-costs': roiData.rehabCosts,
-            'monthly-rent': roiData.monthlyRent,
-            'vacancy-rate': roiData.vacancyRate,
-            'monthly-expenses': roiData.monthlyExpenses,
-            'mortgage-payment': roiData.mortgagePayment
-        });
-        ShareSave.copyToClipboard(url);
-    });
-
-    document.getElementById('print-results')?.addEventListener('click', () => {
-        PrintHelper.print('main-content');
-    });
+    // Legacy event listeners removed to prevent "Server not running" errors.
 }
 
-function calculateROI() {
-    const purchasePrice = getInputValue('purchase-price') || 0;
-    const downPaymentPct = getInputValue('down-payment') || 0;
-    const closingCosts = getInputValue('closing-costs') || 0;
-    const rehabCosts = getInputValue('rehab-costs') || 0;
-    const monthlyRent = getInputValue('monthly-rent') || 0;
-    const vacancyRate = getInputValue('vacancy-rate') || 0;
-    const monthlyExpenses = getInputValue('monthly-expenses') || 0;
-    const mortgagePayment = getInputValue('mortgage-payment') || 0;
+// Function removed: calculateROI (using iframe instead)
 
-    fetch('/api/roi/calculate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            purchase_price: purchasePrice,
-            down_payment_pct: downPaymentPct,
-            closing_costs: closingCosts,
-            rehab_costs: rehabCosts,
-            monthly_rent: monthlyRent,
-            vacancy_rate: vacancyRate,
-            monthly_expenses: monthlyExpenses,
-            mortgage_payment: mortgagePayment
-        })
-    })
-        .then(response => response.json())
-        .then(data => {
-            roiData = {
-                purchasePrice: data.purchasePrice,
-                downPayment: data.downPayment,
-                closingCosts: data.closingCosts,
-                rehabCosts: data.rehabCosts,
-                monthlyRent: data.monthlyRent,
-                vacancyRate: data.vacancyRate,
-                monthlyExpenses: data.monthlyExpenses,
-                mortgagePayment: data.mortgagePayment,
-                totalCashInvested: data.totalCashInvested,
-                noi: data.noi,
-                annualCashFlow: data.annualCashFlow,
-                monthlyCashFlow: data.monthlyCashFlow,
-                capRate: data.capRate,
-                cocReturn: data.cocReturn,
-                breakEvenRent: data.breakEvenRent
-            };
-
-            // Update UI
-            document.getElementById('coc-return').textContent = data.cocReturn.toFixed(2) + '%';
-            document.getElementById('noi-value').textContent = formatCurrency(data.noi) + '/yr';
-            document.getElementById('cap-rate').textContent = data.capRate.toFixed(2) + '%';
-            document.getElementById('cash-flow').textContent = formatCurrency(data.annualCashFlow) + '/yr';
-            document.getElementById('monthly-cash-flow').textContent = formatCurrency(data.monthlyCashFlow) + '/mo';
-            document.getElementById('break-even-rent').textContent = formatCurrency(data.breakEvenRent) + '/mo';
-            document.getElementById('total-invested').textContent = formatCurrency(data.totalCashInvested);
-
-            updateROIChart(data.downPayment, data.closingCosts, data.rehabCosts);
-            updateInsightsFromAPI(data.insights);
-        })
-        .catch(error => {
-            console.error('API error:', error);
-            showNotification('Error calculating ROI. Is the server running?', 'error');
-        });
-}
 
 function updateInsightsFromAPI(insights) {
     const cocInsight = document.getElementById('insight-coc');

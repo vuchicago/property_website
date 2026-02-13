@@ -80,18 +80,26 @@ const updateNavigation = (user) => {
 const updateMenu = (ulElement, user, elementId) => {
         if (!ulElement) return;
 
-        // Remove existing auth links
-        const existingAuthLink = document.getElementById(elementId);
-        if (existingAuthLink) existingAuthLink.remove();
+        // Try to find existing auth link OR the static placeholder
+        let li = document.getElementById(elementId);
+        const placeholder = document.getElementById('auth-link-placeholder');
 
-        const li = document.createElement('li');
-        li.id = elementId;
+        // If we have a placeholder and no dynamic link yet, use the placeholder as our li
+        if (!li && placeholder) {
+                li = placeholder;
+                li.id = elementId; // Re-assign ID so we can find it later
+        } else if (!li) {
+                // Create new if neither exists (fallback)
+                li = document.createElement('li');
+                li.id = elementId;
+                ulElement.appendChild(li);
+        }
+
+        li.innerHTML = ''; // Clear current content
 
         if (user) {
                 // User is logged in
                 import('./appeal.js').then(module => {
-                        // Ensure modal open function is available globally or attached to window if needed for inline onclick, 
-                        // OR better yet, attach event listener after element creation.
                         window.openAppealModal = module.openAppealModal;
                 });
 
@@ -117,8 +125,6 @@ const updateMenu = (ulElement, user, elementId) => {
                 // User is logged out
                 li.innerHTML = `<a href="login.html" class="btn btn-sm btn-primary" style="padding: 0.5rem 1rem; color: white;">Login</a>`;
         }
-
-        ulElement.appendChild(li);
 };
 
 // Global logout handler for onclick attribute
