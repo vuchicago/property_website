@@ -65,6 +65,10 @@
                 <li><a href="#deadlines">Appeal Deadlines</a></li>
                 <li><a href="#faq">FAQ</a></li>
                 <li><a href="#contact">Contact</a></li>
+                <li id="auth-link-placeholder">
+                    <a href="login.html" class="btn btn-sm btn-primary"
+                        style="padding: 0.5rem 1rem; color: white;">Login</a>
+                </li>
             </ul>
             <div class="nav-actions">
                 <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
@@ -938,8 +942,13 @@
     <!-- Leaflet JS for maps -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="components.js"></script>
+    <script type="module" src="components.js"></script>
+    <script type="module" src="auth.js"></script>
+    <script type="module" src="appeal.js"></script>
     <script src="app.js"></script>
+    <script src="property-tax.js"></script>
+    <script src="roi-calculator.js"></script>
+    <script src="loan-tool.js"></script>
 </body>
 
 </html>
