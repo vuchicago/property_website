@@ -120,7 +120,7 @@ async function handleAppealPayment() {
         btn.disabled = true;
 
         // Redirect to the provided Stripe Payment Link
-        const STRIPE_LINK = "https://buy.stripe.com/test_5kQfZj9fBeWe6MK9074Rq00";
+        const STRIPE_LINK = "https://buy.stripe.com/cNi8wRfEm3xD5yy6STgA802";
 
         // Optional: Pass address as a query param if supported by your Stripe wrapper or just rely on Stripe form
         // window.open(`${STRIPE_LINK}?client_reference_id=${encodeURIComponent(address)}`, '_blank');

@@ -63,13 +63,10 @@
                 <li><a href="property-tax.html">Property Tax Tool</a></li>
                 <li><a href="roi-calculator.html">ROI Calculator</a></li>
                 <li><a href="loan-tool.html">Loan Tool</a></li>
-                <li><a href="#deadlines">Appeal Deadlines</a></li>
+                <!-- Removed Appeal Deadlines as per request -->
                 <li><a href="#faq">FAQ</a></li>
                 <li><a href="#contact">Contact</a></li>
-                <li id="auth-link-placeholder">
-                    <a href="login.html" class="btn btn-sm btn-primary"
-                        style="padding: 0.5rem 1rem; color: white;">Login</a>
-                </li>
+                <!-- Removed Login placeholder as per request -->
             </ul>
             <div class="nav-actions">
                 <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
@@ -84,13 +81,15 @@
                             stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                 </button>
-                <a href="#contact" class="cta-btn">
-                    <span>Get Started</span>
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                </a>
+                <div id="auth-action-container">
+                    <a href="login.html" class="cta-btn" id="header-auth-btn">
+                        <span>Login</span>
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </a>
+                </div>
                 <button class="mobile-toggle" id="mobile-toggle" aria-label="Toggle Menu">
                     <span></span>
                     <span></span>
@@ -944,7 +943,10 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script type="module" src="components.js"></script>
-    <script type="module" src="auth.js"></script>
+    <script type="module">
+        import { initAuthUI } from './auth.js';
+        initAuthUI();
+    </script>
     <script type="module" src="appeal.js"></script>
     <script src="app.js"></script>
     <script src="property-tax.js"></script>
