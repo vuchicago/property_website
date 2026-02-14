@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Appeal Submitted - Cook County Tax Compare</title>
+        <link rel="stylesheet" href="styles.css">
+        <script src="https://js.stripe.com/v3/"></script>
+</head>
+
+<body>
+        <div class="container"
+                style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; text-align: center;">
+                <div id="status">
+                        <h2>Checking payment status...</h2>
+                </div>
+                <a href="index.html" class="btn btn-primary" style="margin-top: 2rem;">Return to Dashboard</a>
+        </div>
+
+        <script>
+                document.addEventListener('DOMContentLoaded', async () => {
+                        let stripe;
+                        try {
+                                const configRes = await fetch('/api/config');
+                                const { publishableKey } = await configRes.json();
+                                if (publishableKey) stripe = Stripe(publishableKey);
+                        } catch (e) {
+                                console.error("Could not load Stripe config", e);
+                        }
+
+                        if (!stripe) {
+                                document.getElementById('status').innerText = 'Configuration Error: Could not load payment system.';
+                                return;
+                        }
+
+                        const clientSecret = new URLSearchParams(window.location.search).get(
+                                'payment_intent_client_secret'
+                        );
+
+                        if (!clientSecret) {
+                                // If using sessions, it might be session_id
+                                const sessionId = new URLSearchParams(window.location.search).get('session_id');
+                                if (sessionId) {
+                                        // Check status via our API
+                                        const res = await fetch(`/api/session-status?session_id=${sessionId}`);
+                                        const data = await res.json();
+                                        if (data.status === 'complete' || data.payment_status === 'paid') {
+                                                document.getElementById('status').innerHTML = `
+                             <h2 style="color: var(--success);">Payment Successful!</h2>
+                             <p>Your property tax appeal request has been submitted.</p>
+                             <p>You will receive a confirmation email shortly.</p>
+                         `;
+                                                return;
+                                        }
+                                }
+                                return;
+                        }
+
+                        // If using payment intents directly (less likely with checkout sessions)
+                        const { paymentIntent } = await stripe.retrievePaymentIntent(clientSecret);
+
+                        switch (paymentIntent.status) {
+                                case 'succeeded':
+                                        document.getElementById('status').innerHTML = `
+                        <h2 style="color: var(--success);">Payment Successful!</h2>
+                        <p>Your property tax appeal request has been submitted.</p>
+                    `;
+                                        break;
+                                case 'processing':
+                                        document.getElementById('status').innerText = "Payment processing. We'll update you when payment is received.";
+                                        break;
+                                case 'requires_payment_method':
+                                        document.getElementById('status').innerText = 'Payment failed. Please try another payment method.';
+                                        break;
+                                default:
+                                        document.getElementById('status').innerText = 'Something went wrong.';
+                                        break;
+                        }
+                });
+        </script>
+</body>
+
+</html>

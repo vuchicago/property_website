@@ -54,7 +54,7 @@ function createAppealModalHTML() {
                 <!-- Hidden fields for user info if needed later -->
                 <div class="modal-actions">
                     <button type="submit" class="btn btn-primary btn-full" id="pay-appeal-btn">
-                        Pay $20 & Submit Appeal
+                        Pay $99 & Submit Appeal
                     </button>
                     <p class="secure-note">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
@@ -90,7 +90,24 @@ function closeAppealModal() {
         }
 }
 
-function handleAppealPayment() {
+// Initialize Stripe
+let stripe;
+
+async function getStripe() {
+        if (stripe) return stripe;
+        try {
+                const res = await fetch('/api/config');
+                const { publishableKey } = await res.json();
+                if (!publishableKey) throw new Error('Missing Publishable Key');
+                stripe = Stripe(publishableKey);
+                return stripe;
+        } catch (err) {
+                console.error('Failed to load Stripe config:', err);
+                return null;
+        }
+}
+
+async function handleAppealPayment() {
         const address = document.getElementById('appeal-address').value;
         if (!address) {
                 alert("Please enter your property address.");
@@ -102,13 +119,11 @@ function handleAppealPayment() {
         btn.innerHTML = 'Redirecting...';
         btn.disabled = true;
 
-        // TODO: Replace with your actual Stripe Payment Link
-        // You can pass the address as a prefilled field if your Stripe link supports it,
-        // or rely on Stripe to collect the address (billing address).
-        // For now, we will just redirect to a placeholder.
+        // Redirect to the provided Stripe Payment Link
+        const STRIPE_LINK = "https://buy.stripe.com/test_5kQfZj9fBeWe6MK9074Rq00";
 
-        // Example with prefilled email if we had it: ?prefilled_email=${userEmail}
-        const STRIPE_LINK = "https://buy.stripe.com/test_placeholder";
+        // Optional: Pass address as a query param if supported by your Stripe wrapper or just rely on Stripe form
+        // window.open(`${STRIPE_LINK}?client_reference_id=${encodeURIComponent(address)}`, '_blank');
 
         setTimeout(() => {
                 window.open(STRIPE_LINK, '_blank');
