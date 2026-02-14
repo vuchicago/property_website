@@ -3,6 +3,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
 
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
 // Firebase Configuration
 const firebaseConfig = {
         apiKey: "AIzaSyC_dBdm2F3zkzlP_540C4QgLAZhnb9a9Sc",
@@ -18,10 +20,12 @@ const firebaseConfig = {
 let app;
 let auth;
 let analytics;
+let db;
 
 try {
         app = initializeApp(firebaseConfig);
         auth = getAuth(app);
+        db = getFirestore(app);
         // Explicitly set persistence to local (it keeps the user logged in even after browser restart)
         setPersistence(auth, browserLocalPersistence).catch(error => {
                 console.error("Firebase persistence error:", error);
@@ -30,6 +34,8 @@ try {
 } catch (error) {
         console.error("Firebase initialization failed:", error);
 }
+
+export { app, auth, db };
 
 // Authentication Functions
 export const loginUser = async (email, password) => {
@@ -75,16 +81,25 @@ const updateNavigation = (user) => {
                 updateAuthButton(desktopContainer, user);
         }
 
-        // Mobile Nav (keep list item logic or update similarly? User said "top menu bar" so maybe mobile needs update too?)
-        // Let's assume mobile menu should also rely on a similar button or keep simple login link.
-        // For consistency, let's keep mobile simple for now but remove the "Appeal Deadlines" from mobile html too if needed.
+        // Mobile Nav
         const mobileMenu = document.getElementById('mobile-menu');
         if (mobileMenu) {
                 const mobileNavLinks = mobileMenu.querySelector('ul');
-                // We'll leave mobile mostly as is but ensure it has a login/logout option
-                // The previous logic used 'mobile-auth-link' which might not exist if we removed the placeholder.
-                // We should check if we need to inject it.
                 updateMobileMenu(mobileNavLinks, user);
+        }
+
+        // Dashboard Visibility
+        const dashboard = document.getElementById('user-dashboard');
+        if (dashboard) {
+                if (user) {
+                        dashboard.style.display = 'block';
+                        // Load history
+                        import('./history.js').then(module => {
+                                module.loadAppealHistory();
+                        }).catch(err => console.error("Failed to load history module:", err));
+                } else {
+                        dashboard.style.display = 'none';
+                }
         }
 };
 

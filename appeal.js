@@ -114,22 +114,53 @@ async function handleAppealPayment() {
                 return;
         }
 
+        // Get current user
+        const { auth } = await import('./auth.js');
+        const user = auth.currentUser;
+
+        if (!user) {
+                // Should be logged in to see this, but safe guard
+                alert("Please log in to continue.");
+                window.location.href = 'login.html';
+                return;
+        }
+
         const btn = document.getElementById('pay-appeal-btn');
         const originalText = btn.innerHTML;
-        btn.innerHTML = 'Redirecting...';
+        btn.innerHTML = 'Processing...';
         btn.disabled = true;
 
-        // Redirect to the provided Stripe Payment Link
-        const STRIPE_LINK = "https://buy.stripe.com/cNi8wRfEm3xD5yy6STgA802";
+        try {
+                // Call our API to create a session
+                const response = await fetch('/api/create-checkout-session', {
+                        method: 'POST',
+                        headers: {
+                                'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                                propertyAddress: address,
+                                userId: user.uid
+                                // priceId is handled on backend default or env
+                        })
+                });
 
-        // Optional: Pass address as a query param if supported by your Stripe wrapper or just rely on Stripe form
-        // window.open(`${STRIPE_LINK}?client_reference_id=${encodeURIComponent(address)}`, '_blank');
+                const data = await response.json();
 
-        setTimeout(() => {
-                window.open(STRIPE_LINK, '_blank');
+                if (data.error) {
+                        throw new Error(data.error);
+                }
+
+                if (data.url) {
+                        // Redirect to Stripe Checkout
+                        window.location.href = data.url;
+                } else {
+                        throw new Error("No checkout URL returned");
+                }
+
+        } catch (error) {
+                console.error("Payment initiation failed:", error);
+                alert("Failed to start payment: " + error.message);
                 btn.innerHTML = originalText;
                 btn.disabled = false;
-                closeAppealModal();
-                alert("Redirecting to payment provider. Please complete your payment to finalize the appeal.");
-        }, 1000);
+        }
 }

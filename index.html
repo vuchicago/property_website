@@ -205,6 +205,23 @@
         </div>
     </section>
 
+    <!-- User Dashboard (Hidden by default, shown when logged in) -->
+    <section id="user-dashboard" class="dashboard-section" style="display: none;">
+        <div class="container">
+            <div class="section-header left">
+                <span class="section-badge">My Account</span>
+                <h2>Appeal History</h2>
+                <p>Track the status of your property tax appeals.</p>
+            </div>
+
+            <div class="dashboard-card">
+                <div id="appeal-history-list">
+                    <!-- History items will be loaded here by history.js -->
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Features Grid -->
     <section id="features" class="features">
         <div class="container">
@@ -720,7 +737,7 @@
                     <div class="faq-answer">
                         <p>Filing an appeal directly with the Cook County Assessor's Office is completely free. You do
                             not need to hire a lawyer to file an appeal, especially for residential properties. Our
-                            tools provide the data you need to file yourself.</p>
+                            tools provide the data you need to file yourself or we can do it for you for just $99</p>
                     </div>
                 </div>
                 <div class="faq-item animate-on-scroll delay-200">

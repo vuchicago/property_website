@@ -1,8 +1,5 @@
-
-import Stripe from 'stripe';
-
 export const onRequestGet = async (context) => {
-        const stripe = new Stripe(context.env.STRIPE_SECRET_KEY || context.env.STRIPE_API_KEY);
+        const STRIPE_KEY = context.env.STRIPE_SECRET_KEY || context.env.STRIPE_API_KEY;
         const { searchParams } = new URL(context.request.url);
         const sessionId = searchParams.get('session_id');
 
@@ -14,11 +11,24 @@ export const onRequestGet = async (context) => {
         }
 
         try {
-                const session = await stripe.checkout.sessions.retrieve(sessionId);
+                const response = await fetch(`https://api.stripe.com/v1/checkout/sessions/${sessionId}`, {
+                        headers: {
+                                'Authorization': `Bearer ${STRIPE_KEY}`
+                        }
+                });
+
+                const session = await response.json();
+
+                if (!response.ok) {
+                        throw new Error(session.error?.message || 'Failed to retrieve session');
+                }
 
                 return new Response(JSON.stringify({
                         status: session.status,
-                        customer_email: session.customer_details?.email
+                        payment_status: session.payment_status,
+                        customer_email: session.customer_details?.email,
+                        metadata: session.metadata,
+                        client_reference_id: session.client_reference_id
                 }), {
                         headers: { 'Content-Type': 'application/json' }
                 });

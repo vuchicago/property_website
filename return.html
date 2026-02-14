@@ -18,64 +18,77 @@
                 <a href="index.html" class="btn btn-primary" style="margin-top: 2rem;">Return to Dashboard</a>
         </div>
 
-        <script>
+        <script type="module">
+                import { auth, db } from './auth.js';
+                import { doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+                import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
                 document.addEventListener('DOMContentLoaded', async () => {
-                        let stripe;
+                        const statusDiv = document.getElementById('status');
+                        const sessionId = new URLSearchParams(window.location.search).get('session_id');
+
+                        if (!sessionId) {
+                                statusDiv.innerText = 'Error: No session ID found.';
+                                return;
+                        }
+
                         try {
-                                const configRes = await fetch('/api/config');
-                                const { publishableKey } = await configRes.json();
-                                if (publishableKey) stripe = Stripe(publishableKey);
-                        } catch (e) {
-                                console.error("Could not load Stripe config", e);
-                        }
+                                // 1. Verify Payment with Backend
+                                const res = await fetch(`/api/session-status?session_id=${sessionId}`);
+                                const data = await res.json();
 
-                        if (!stripe) {
-                                document.getElementById('status').innerText = 'Configuration Error: Could not load payment system.';
-                                return;
-                        }
+                                if (data.status === 'complete' || data.payment_status === 'paid') {
 
-                        const clientSecret = new URLSearchParams(window.location.search).get(
-                                'payment_intent_client_secret'
-                        );
+                                        // 2. Wait for User Auth
+                                        onAuthStateChanged(auth, async (user) => {
+                                                if (user) {
+                                                        try {
+                                                                // 3. Record in Firestore (Prevent duplicates by using sessionId as Doc ID)
+                                                                const appealRef = doc(db, "users", user.uid, "appeals", sessionId);
 
-                        if (!clientSecret) {
-                                // If using sessions, it might be session_id
-                                const sessionId = new URLSearchParams(window.location.search).get('session_id');
-                                if (sessionId) {
-                                        // Check status via our API
-                                        const res = await fetch(`/api/session-status?session_id=${sessionId}`);
-                                        const data = await res.json();
-                                        if (data.status === 'complete' || data.payment_status === 'paid') {
-                                                document.getElementById('status').innerHTML = `
-                             <h2 style="color: var(--success);">Payment Successful!</h2>
-                             <p>Your property tax appeal request has been submitted.</p>
-                             <p>You will receive a confirmation email shortly.</p>
-                         `;
-                                                return;
-                                        }
+                                                                await setDoc(appealRef, {
+                                                                        propertyAddress: data.metadata?.propertyAddress || 'Unknown Address',
+                                                                        status: 'pending', // internal status for our processing
+                                                                        stripeSessionId: sessionId,
+                                                                        amount: data.amount_total || 9900, // Default or from session
+                                                                        paymentStatus: data.payment_status,
+                                                                        createdAt: serverTimestamp(),
+                                                                        fullData: data // optional debugging
+                                                                }, { merge: true });
+
+                                                                statusDiv.innerHTML = `
+                                    <h2 style="color: var(--success); margin-bottom: 1rem;">Payment Successful!</h2>
+                                    <p class="lead">Your appeal for <strong>${data.metadata?.propertyAddress}</strong> has been submitted.</p>
+                                    <p>We have recorded your request and are processing it.</p>
+                                    <div style="margin-top: 2rem;">
+                                        <a href="index.html" class="btn btn-primary" style="margin-right: 1rem;">Go to Dashboard</a>
+                                    </div>
+                                `;
+                                                        } catch (dbError) {
+                                                                console.error("Database write failed:", dbError);
+                                                                statusDiv.innerHTML = `
+                                    <h2 style="color: var(--success);">Payment Successful</h2>
+                                    <p>However, we encountered an error saving your record locally.</p>
+                                    <p>Please contact support with Reference ID: ${sessionId}</p>
+                                `;
+                                                        }
+                                                } else {
+                                                        // User not logged in? (Shouldn't happen if flow is correct, but maybe session cookie lost?)
+                                                        // We can prompt login or just say "Please contact support".
+                                                        statusDiv.innerHTML = `
+                                <h2 style="color: var(--success);">Payment Successful!</h2>
+                                <p>Please log in to view your appeal history.</p>
+                            `;
+                                                }
+                                        });
+
+                                } else {
+                                        statusDiv.innerHTML = `<h2>Payment Incomplete</h2><p>Status: ${data.status}</p>`;
                                 }
-                                return;
-                        }
 
-                        // If using payment intents directly (less likely with checkout sessions)
-                        const { paymentIntent } = await stripe.retrievePaymentIntent(clientSecret);
-
-                        switch (paymentIntent.status) {
-                                case 'succeeded':
-                                        document.getElementById('status').innerHTML = `
-                        <h2 style="color: var(--success);">Payment Successful!</h2>
-                        <p>Your property tax appeal request has been submitted.</p>
-                    `;
-                                        break;
-                                case 'processing':
-                                        document.getElementById('status').innerText = "Payment processing. We'll update you when payment is received.";
-                                        break;
-                                case 'requires_payment_method':
-                                        document.getElementById('status').innerText = 'Payment failed. Please try another payment method.';
-                                        break;
-                                default:
-                                        document.getElementById('status').innerText = 'Something went wrong.';
-                                        break;
+                        } catch (err) {
+                                console.error("Verification failed:", err);
+                                statusDiv.innerText = 'An error occurred verifying your payment.';
                         }
                 });
         </script>
