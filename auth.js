@@ -1,7 +1,9 @@
 // Firebase Authentication Logic
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
+
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // Firebase Configuration
 const firebaseConfig = {
@@ -18,14 +20,22 @@ const firebaseConfig = {
 let app;
 let auth;
 let analytics;
+let db;
 
 try {
         app = initializeApp(firebaseConfig);
         auth = getAuth(app);
+        db = getFirestore(app);
+        // Explicitly set persistence to local (it keeps the user logged in even after browser restart)
+        setPersistence(auth, browserLocalPersistence).catch(error => {
+                console.error("Firebase persistence error:", error);
+        });
         analytics = getAnalytics(app);
 } catch (error) {
         console.error("Firebase initialization failed:", error);
 }
+
+export { app, auth, db };
 
 // Authentication Functions
 export const loginUser = async (email, password) => {
@@ -65,37 +75,36 @@ export const initAuthUI = () => {
 };
 
 const updateNavigation = (user) => {
-        // Desktop Nav
-        const navLinks = document.getElementById('nav-links');
-        updateMenu(navLinks, user, 'desktop-auth-link');
+        // Desktop Nav Action Button
+        const desktopContainer = document.getElementById('auth-action-container');
+        if (desktopContainer) {
+                updateAuthButton(desktopContainer, user);
+        }
 
         // Mobile Nav
         const mobileMenu = document.getElementById('mobile-menu');
         if (mobileMenu) {
                 const mobileNavLinks = mobileMenu.querySelector('ul');
-                updateMenu(mobileNavLinks, user, 'mobile-auth-link');
+                updateMobileMenu(mobileNavLinks, user);
+        }
+
+        // Dashboard Visibility
+        const dashboard = document.getElementById('user-dashboard');
+        if (dashboard) {
+                if (user) {
+                        dashboard.style.display = 'block';
+                        // Load history
+                        import('./history.js').then(module => {
+                                module.loadAppealHistory();
+                        }).catch(err => console.error("Failed to load history module:", err));
+                } else {
+                        dashboard.style.display = 'none';
+                }
         }
 };
 
-const updateMenu = (ulElement, user, elementId) => {
-        if (!ulElement) return;
-
-        // Try to find existing auth link OR the static placeholder
-        let li = document.getElementById(elementId);
-        const placeholder = document.getElementById('auth-link-placeholder');
-
-        // If we have a placeholder and no dynamic link yet, use the placeholder as our li
-        if (!li && placeholder) {
-                li = placeholder;
-                li.id = elementId; // Re-assign ID so we can find it later
-        } else if (!li) {
-                // Create new if neither exists (fallback)
-                li = document.createElement('li');
-                li.id = elementId;
-                ulElement.appendChild(li);
-        }
-
-        li.innerHTML = ''; // Clear current content
+const updateAuthButton = (container, user) => {
+        container.innerHTML = ''; // Clear current
 
         if (user) {
                 // User is logged in
@@ -103,27 +112,68 @@ const updateMenu = (ulElement, user, elementId) => {
                         window.openAppealModal = module.openAppealModal;
                 });
 
+                // Create Appeal Button
                 const appealBtn = document.createElement('a');
                 appealBtn.href = "#";
-                appealBtn.className = "btn btn-sm btn-primary";
-                appealBtn.style.marginRight = "1rem";
-                appealBtn.style.padding = "0.5rem 1rem";
-                appealBtn.innerHTML = "Appeal my property tax";
+                appealBtn.className = "cta-btn"; // Use same style as original "Get Started"
+                appealBtn.style.marginRight = "10px";
+                // appealBtn.style.backgroundColor = "var(--primary)"; // Ensure it looks active
+                appealBtn.innerHTML = `
+            <span>Appeal Now</span>
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        `;
                 appealBtn.onclick = (e) => {
                         e.preventDefault();
                         if (window.openAppealModal) window.openAppealModal();
                 };
 
-                const logoutLink = document.createElement('a');
-                logoutLink.href = "#";
-                logoutLink.onclick = (e) => window.handleLogout(e);
-                logoutLink.textContent = `Logout (${user.email})`;
+                // Create Logout Button (smaller or icon?)
+                const logoutBtn = document.createElement('a');
+                logoutBtn.href = "#";
+                logoutBtn.className = "btn btn-sm btn-secondary";
+                logoutBtn.style.marginLeft = "0.5rem";
+                logoutBtn.textContent = "Logout";
+                logoutBtn.onclick = (e) => window.handleLogout(e);
 
-                li.appendChild(appealBtn);
-                li.appendChild(logoutLink);
+                container.style.display = 'flex';
+                container.style.alignItems = 'center';
+
+                container.appendChild(appealBtn);
+                container.appendChild(logoutBtn);
+
         } else {
-                // User is logged out
-                li.innerHTML = `<a href="login.html" class="btn btn-sm btn-primary" style="padding: 0.5rem 1rem; color: white;">Login</a>`;
+                // User is logged out - Show "Login" (formerly Get Started functionality)
+                container.innerHTML = `
+            <a href="login.html" class="cta-btn">
+                <span>Login</span>
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </a>
+        `;
+        }
+};
+
+const updateMobileMenu = (ulElement, user) => {
+        if (!ulElement) return;
+        let li = document.getElementById('mobile-auth-link');
+        if (!li) {
+                li = document.createElement('li');
+                li.id = 'mobile-auth-link';
+                ulElement.appendChild(li);
+        }
+
+        li.innerHTML = '';
+        if (user) {
+                li.innerHTML = `<a href="#" onclick="window.handleLogout(event)">Logout (${user.email})</a>`;
+                // Add appeal link to mobile menu too if desired
+                const appealLi = document.createElement('li');
+                appealLi.innerHTML = `<a href="#" onclick="import('./appeal.js').then(m=>m.openAppealModal())">Appeal Now</a>`;
+                ulElement.insertBefore(appealLi, li);
+        } else {
+                li.innerHTML = `<a href="login.html">Login</a>`;
         }
 };
 
