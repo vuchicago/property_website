@@ -18,100 +18,69 @@
                 <a href="index.html" class="btn btn-primary" style="margin-top: 2rem;">Return to Dashboard</a>
         </div>
 
-        <script type="module">
-                import { auth, db } from './auth.js';
-                import { doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-                import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { auth } from './auth.js';
 
-                document.addEventListener('DOMContentLoaded', async () => {
-                        const statusDiv = document.getElementById('status');
-                        const sessionId = new URLSearchParams(window.location.search).get('session_id');
+        document.addEventListener('DOMContentLoaded', async () => {
+        const statusDiv = document.getElementById('status');
+        const sessionId = new URLSearchParams(window.location.search).get('session_id');
 
-                        if (!sessionId) {
-                                statusDiv.innerText = 'Error: No session ID found.';
-                                return;
-                        }
+        if (!sessionId) {
+        statusDiv.innerText = 'Error: No session ID found.';
+        return;
+        }
 
-                        try {
-                                // 1. Verify Payment
-                                let data = { status: 'unknown' };
+        try {
+        // 1. Verify Payment & Record in D1 (Backend)
+        let data = { status: 'unknown' };
 
-                                if (sessionId.startsWith('mock_session_')) {
-                                        // Mock verification for local testing
-                                        data = {
-                                                status: 'complete',
-                                                payment_status: 'paid',
-                                                metadata: { propertyAddress: '123 Mock St (Local Test)' },
-                                                amount_total: 9900
-                                        };
-                                        // Simulate delay
-                                        await new Promise(r => setTimeout(r, 800));
-                                } else {
-                                        // Real backend verification
-                                        const res = await fetch(`/api/session-status?session_id=${sessionId}`);
-                                        if (!res.ok) {
-                                                // If backend is missing (local dev), we can't verify really.
-                                                // But we shouldn't crash.
-                                                throw new Error(`Verification API failed: ${res.status}`);
-                                        }
-                                        data = await res.json();
-                                }
+        if (sessionId.startsWith('mock_session_')) {
+        // Mock verification for local testing
+        data = {
+        status: 'complete',
+        payment_status: 'paid',
+        metadata: { propertyAddress: '123 Mock St (Local Test)' },
+        amount_total: 9900,
+        db_status: 'mock_recorded'
+        };
+        // Simulate delay
+        await new Promise(r => setTimeout(r, 800));
+        } else {
+        // Real backend verification
+        const res = await fetch(`/api/session-status?session_id=${sessionId}`);
+        if (!res.ok) {
+        throw new Error(`Verification API failed: ${res.status}`);
+        }
+        data = await res.json();
+        }
 
-                                if (data.status === 'complete' || data.payment_status === 'paid') {
+        if (data.status === 'complete' || data.payment_status === 'paid') {
 
-                                        // 2. Wait for User Auth
-                                        onAuthStateChanged(auth, async (user) => {
-                                                if (user) {
-                                                        try {
-                                                                // 3. Record in Firestore (Prevent duplicates by using sessionId as Doc ID)
-                                                                const appealRef = doc(db, "users", user.uid, "appeals", sessionId);
+        // Payment verified and recorded by backend
+        if (data.db_status && data.db_status.startsWith('error')) {
+        console.error("Database recording error:", data.db_status);
+        }
 
-                                                                await setDoc(appealRef, {
-                                                                        propertyAddress: data.metadata?.propertyAddress || 'Unknown Address',
-                                                                        status: 'pending', // internal status for our processing
-                                                                        stripeSessionId: sessionId,
-                                                                        amount: data.amount_total || 9900, // Default or from session
-                                                                        paymentStatus: data.payment_status,
-                                                                        createdAt: serverTimestamp(),
-                                                                        fullData: data // optional debugging
-                                                                }, { merge: true });
+        statusDiv.innerHTML = `
+        <h2 style="color: var(--success); margin-bottom: 1rem;">Payment Successful!</h2>
+        <p class="lead">Your appeal for <strong>${data.metadata?.propertyAddress || 'your property'}</strong> has been
+                submitted.</p>
+        <p class="lead" style="font-size: 0.9em; color: #666;">Ref: ${sessionId}</p>
+        <p>We have recorded your request and are processing it.</p>
+        <div style="margin-top: 2rem;">
+                <a href="index.html" class="btn btn-primary" style="margin-right: 1rem;">Go to Dashboard</a>
+        </div>
+        `;
 
-                                                                statusDiv.innerHTML = `
-                                    <h2 style="color: var(--success); margin-bottom: 1rem;">Payment Successful!</h2>
-                                    <p class="lead">Your appeal for <strong>${data.metadata?.propertyAddress}</strong> has been submitted.</p>
-                                    <p class="lead" style="font-size: 0.9em; color: #666;">Ref: ${sessionId}</p>
-                                    <p>We have recorded your request and are processing it.</p>
-                                    <div style="margin-top: 2rem;">
-                                        <a href="index.html" class="btn btn-primary" style="margin-right: 1rem;">Go to Dashboard</a>
-                                    </div>
-                                `;
-                                                        } catch (dbError) {
-                                                                console.error("Database write failed:", dbError);
-                                                                statusDiv.innerHTML = `
-                                    <h2 style="color: var(--success);">Payment Successful</h2>
-                                    <p>However, we encountered an error saving your record locally.</p>
-                                    <p>Please contact support with Reference ID: ${sessionId}</p>
-                                `;
-                                                        }
-                                                } else {
-                                                        // User not logged in? (Shouldn't happen if flow is correct, but maybe session cookie lost?)
-                                                        // We can prompt login or just say "Please contact support".
-                                                        statusDiv.innerHTML = `
-                                <h2 style="color: var(--success);">Payment Successful!</h2>
-                                <p>Please log in to view your appeal history.</p>
-                            `;
-                                                }
-                                        });
+        } else {
+        statusDiv.innerHTML = `<h2>Payment Incomplete</h2>
+        <p>Status: ${data.status}</p>`;
+        }
 
-                                } else {
-                                        statusDiv.innerHTML = `<h2>Payment Incomplete</h2><p>Status: ${data.status}</p>`;
-                                }
-
-                        } catch (err) {
-                                console.error("Verification failed:", err);
-                                statusDiv.innerText = 'An error occurred verifying your payment.';
-                        }
-                });
+        } catch (err) {
+        console.error("Verification failed:", err);
+        statusDiv.innerText = 'An error occurred verifying your payment.';
+        }
+        });
         </script>
 </body>
 

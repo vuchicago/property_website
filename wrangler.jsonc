@@ -3,5 +3,15 @@
         "compatibility_date": "2026-02-01",
         "assets": {
                 "directory": "./"
+        },
+        "d1_databases": [
+                {
+                        "binding": "DB",
+                        "database_name": "appeal_db",
+                        "database_id": "appeal_db"
+                }
+        ],
+        "observability": {
+                "enabled": true
         }
 }

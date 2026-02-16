@@ -3,8 +3,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
 
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
 // Firebase Configuration
 const firebaseConfig = {
         apiKey: "AIzaSyC_dBdm2F3zkzlP_540C4QgLAZhnb9a9Sc",
@@ -20,12 +18,10 @@ const firebaseConfig = {
 let app;
 let auth;
 let analytics;
-let db;
 
 try {
         app = initializeApp(firebaseConfig);
         auth = getAuth(app);
-        db = getFirestore(app);
         // Explicitly set persistence to local (it keeps the user logged in even after browser restart)
         setPersistence(auth, browserLocalPersistence).catch(error => {
                 console.error("Firebase persistence error:", error);
@@ -35,7 +31,7 @@ try {
         console.error("Firebase initialization failed:", error);
 }
 
-export { app, auth, db };
+export { app, auth };
 
 // Authentication Functions
 export const loginUser = async (email, password) => {
@@ -187,3 +183,4 @@ window.handleLogout = async (e) => {
                 alert('Logout failed: ' + result.error);
         }
 };
+
