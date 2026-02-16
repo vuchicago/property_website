@@ -54,7 +54,7 @@ function createAppealModalHTML() {
                 <!-- Hidden fields for user info if needed later -->
                 <div class="modal-actions">
                     <button type="submit" class="btn btn-primary btn-full" id="pay-appeal-btn">
-                        Pay $20 & Submit Appeal
+                        Pay $99 & Submit Appeal
                     </button>
                     <p class="secure-note">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
@@ -90,31 +90,77 @@ function closeAppealModal() {
         }
 }
 
-function handleAppealPayment() {
+// Initialize Stripe
+let stripe;
+
+async function getStripe() {
+        if (stripe) return stripe;
+        try {
+                const res = await fetch('/api/config');
+                const { publishableKey } = await res.json();
+                if (!publishableKey) throw new Error('Missing Publishable Key');
+                stripe = Stripe(publishableKey);
+                return stripe;
+        } catch (err) {
+                console.error('Failed to load Stripe config:', err);
+                return null;
+        }
+}
+
+async function handleAppealPayment() {
         const address = document.getElementById('appeal-address').value;
         if (!address) {
                 alert("Please enter your property address.");
                 return;
         }
 
+        // Get current user
+        const { auth } = await import('./auth.js');
+        const user = auth.currentUser;
+
+        if (!user) {
+                // Should be logged in to see this, but safe guard
+                alert("Please log in to continue.");
+                window.location.href = 'login.html';
+                return;
+        }
+
         const btn = document.getElementById('pay-appeal-btn');
         const originalText = btn.innerHTML;
-        btn.innerHTML = 'Redirecting...';
+        btn.innerHTML = 'Processing...';
         btn.disabled = true;
 
-        // TODO: Replace with your actual Stripe Payment Link
-        // You can pass the address as a prefilled field if your Stripe link supports it,
-        // or rely on Stripe to collect the address (billing address).
-        // For now, we will just redirect to a placeholder.
+        try {
+                // Call our API to create a session
+                const response = await fetch('/api/create-checkout-session', {
+                        method: 'POST',
+                        headers: {
+                                'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                                propertyAddress: address,
+                                userId: user.uid
+                                // priceId is handled on backend default or env
+                        })
+                });
 
-        // Example with prefilled email if we had it: ?prefilled_email=${userEmail}
-        const STRIPE_LINK = "https://buy.stripe.com/test_placeholder";
+                const data = await response.json();
 
-        setTimeout(() => {
-                window.open(STRIPE_LINK, '_blank');
+                if (data.error) {
+                        throw new Error(data.error);
+                }
+
+                if (data.url) {
+                        // Redirect to Stripe Checkout
+                        window.location.href = data.url;
+                } else {
+                        throw new Error("No checkout URL returned");
+                }
+
+        } catch (error) {
+                console.error("Payment initiation failed:", error);
+                alert("Failed to start payment: " + error.message);
                 btn.innerHTML = originalText;
                 btn.disabled = false;
-                closeAppealModal();
-                alert("Redirecting to payment provider. Please complete your payment to finalize the appeal.");
-        }, 1000);
+        }
 }
