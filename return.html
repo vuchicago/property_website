@@ -33,9 +33,29 @@
                         }
 
                         try {
-                                // 1. Verify Payment with Backend
-                                const res = await fetch(`/api/session-status?session_id=${sessionId}`);
-                                const data = await res.json();
+                                // 1. Verify Payment
+                                let data = { status: 'unknown' };
+
+                                if (sessionId.startsWith('mock_session_')) {
+                                        // Mock verification for local testing
+                                        data = {
+                                                status: 'complete',
+                                                payment_status: 'paid',
+                                                metadata: { propertyAddress: '123 Mock St (Local Test)' },
+                                                amount_total: 9900
+                                        };
+                                        // Simulate delay
+                                        await new Promise(r => setTimeout(r, 800));
+                                } else {
+                                        // Real backend verification
+                                        const res = await fetch(`/api/session-status?session_id=${sessionId}`);
+                                        if (!res.ok) {
+                                                // If backend is missing (local dev), we can't verify really.
+                                                // But we shouldn't crash.
+                                                throw new Error(`Verification API failed: ${res.status}`);
+                                        }
+                                        data = await res.json();
+                                }
 
                                 if (data.status === 'complete' || data.payment_status === 'paid') {
 
@@ -59,6 +79,7 @@
                                                                 statusDiv.innerHTML = `
                                     <h2 style="color: var(--success); margin-bottom: 1rem;">Payment Successful!</h2>
                                     <p class="lead">Your appeal for <strong>${data.metadata?.propertyAddress}</strong> has been submitted.</p>
+                                    <p class="lead" style="font-size: 0.9em; color: #666;">Ref: ${sessionId}</p>
                                     <p>We have recorded your request and are processing it.</p>
                                     <div style="margin-top: 2rem;">
                                         <a href="index.html" class="btn btn-primary" style="margin-right: 1rem;">Go to Dashboard</a>
