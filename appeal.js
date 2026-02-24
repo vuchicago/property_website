@@ -144,14 +144,7 @@ async function handleAppealPayment() {
                         const text = await response.text();
                         console.error("API Error Response:", text);
 
-                        // Fallback for local testing or static deployment if API is missing (404)
-                        if (response.status === 404) {
-                                const useMock = confirm("Backend API not found (404). This is expected if running locally without Cloudflare Functions.\n\nUse Mock Payment flow for testing?");
-                                if (useMock) {
-                                        mockPaymentFlow(address, user.uid);
-                                        return;
-                                }
-                        }
+                        // Handle 404 naturally via the throw new Error below
 
                         throw new Error(`Server returned ${response.status}: ${text || response.statusText}`);
                 }
