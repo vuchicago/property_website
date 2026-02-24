@@ -19,7 +19,7 @@ export const onRequestPost = async (context) => {
                         });
                 }
 
-                const PRICE_ID = priceId || context.env.STRIPE_PRICE_ID || 'price_H5ggYJDq';
+                const PRICE_ID = priceId || context.env.STRIPE_PRICE_ID || 'price_1T0bF2RrARHriB9TIqHffgW0';
                 const DOMAIN = context.env.YOUR_DOMAIN || new URL(context.request.url).origin;
 
                 // Construct form-urlencoded body manually for nested params
