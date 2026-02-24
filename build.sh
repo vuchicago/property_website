@@ -8,5 +8,6 @@ cp *.html *.css *.js dist/
 
 # If there are any subdirectories that need to be public, add them here
 # cp -r assets/ dist/assets/
+cp -r functions/ dist/functions/
 
 echo "Build complete. Output directory ready for Pages deploy."
