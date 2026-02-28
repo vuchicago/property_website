@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS user_addresses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   customer_id TEXT NOT NULL,
   address TEXT NOT NULL,
+  email TEXT NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(customer_id, address)
 );
