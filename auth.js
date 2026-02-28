@@ -113,7 +113,6 @@ const updateAuthButton = (container, user) => {
                 appealBtn.href = "#";
                 appealBtn.className = "cta-btn"; // Use same style as original "Get Started"
                 appealBtn.style.marginRight = "10px";
-                // appealBtn.style.backgroundColor = "var(--primary)"; // Ensure it looks active
                 appealBtn.innerHTML = `
             <span>Appeal Now</span>
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -123,6 +122,20 @@ const updateAuthButton = (container, user) => {
                 appealBtn.onclick = (e) => {
                         e.preventDefault();
                         if (window.openAppealModal) window.openAppealModal();
+                };
+
+                // Create Account History Button
+                const historyBtn = document.createElement('a');
+                historyBtn.href = "#user-dashboard";
+                historyBtn.className = "btn btn-sm btn-secondary";
+                historyBtn.style.marginLeft = "0.5rem";
+                historyBtn.textContent = "Account History";
+                historyBtn.onclick = (e) => {
+                        e.preventDefault();
+                        const dashboard = document.getElementById('user-dashboard');
+                        if (dashboard) {
+                                dashboard.scrollIntoView({ behavior: 'smooth' });
+                        }
                 };
 
                 // Create Logout Button (smaller or icon?)
@@ -137,6 +150,7 @@ const updateAuthButton = (container, user) => {
                 container.style.alignItems = 'center';
 
                 container.appendChild(appealBtn);
+                container.appendChild(historyBtn);
                 container.appendChild(logoutBtn);
 
         } else {
