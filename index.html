@@ -210,13 +210,52 @@
         <div class="container">
             <div class="section-header left">
                 <span class="section-badge">My Account</span>
-                <h2>Appeal History</h2>
-                <p>Track the status of your property tax appeals.</p>
+                <h2>Dashboard</h2>
+                <p>Manage your properties and track your tax appeals.</p>
             </div>
 
-            <div class="dashboard-card">
-                <div id="appeal-history-list">
-                    <!-- History items will be loaded here by history.js -->
+            <div class="dashboard-layout" style="display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap;">
+                <!-- Address Book Side -->
+                <div class="address-book-panel dashboard-card" style="flex: 1; min-width: 300px;">
+                    <h3>My Properties</h3>
+                    <p class="text-sm text-muted mb-4">Add your property addresses to track them.</p>
+
+                    <form id="add-address-form" style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+                        <input type="text" id="new-property-address" placeholder="Enter Chicago address..." required
+                            style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                        <button type="submit" class="btn btn-primary" id="add-address-btn"
+                            style="padding: 0.5rem 1rem;">Add</button>
+                    </form>
+
+                    <ul id="address-list" class="address-list"
+                        style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem;">
+                        <!-- Addresses loaded here -->
+                    </ul>
+                </div>
+
+                <!-- Appeal Details Side -->
+                <div class="appeal-details-panel dashboard-card" style="flex: 2; min-width: 300px; display: none;"
+                    id="appeal-details-container">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
+                        <div>
+                            <h3 id="selected-address-title">Selected Address</h3>
+                            <p class="text-sm text-muted">Appeal history for this property</p>
+                        </div>
+                        <div class="stats-badge"
+                            style="background: var(--bg-secondary); padding: 0.5rem 1rem; border-radius: var(--radius-full); font-size: 0.875rem; font-weight: 500;">
+                            Total Appeals: <span id="total-appeals-count">0</span>
+                        </div>
+                    </div>
+
+                    <div id="appeal-history-list">
+                        <!-- History items will be loaded here by history.js -->
+                    </div>
+                </div>
+
+                <div class="dashboard-card" id="no-address-selected-msg"
+                    style="flex: 2; min-width: 300px; display: flex; justify-content: center; align-items: center; min-height: 200px; color: var(--text-muted);">
+                    Select an address to view its appeal history.
                 </div>
             </div>
         </div>

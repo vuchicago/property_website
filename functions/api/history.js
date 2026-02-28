@@ -26,7 +26,11 @@ export const onRequestGet = async (context) => {
                 const mappedResults = results.map(row => ({
                         id: row.transaction_id,
                         propertyAddress: row.property_address,
-                        status: row.payment_status === 'paid' ? 'pending' : 'failed', // pending appeal logic
+                        status: row.payment_status === 'paid' ? (row.appeal_status || 'Pending') : 'Failed',
+                        paymentStatus: row.payment_status,
+                        paymentDate: row.payment_date,
+                        appealStatus: row.appeal_status,
+                        appealDate: row.appeal_date,
                         createdAt: row.created_at,
                         amount: row.payment_amount
                 }));
