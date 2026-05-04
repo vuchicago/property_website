@@ -45,13 +45,15 @@ async function getFirebaseJwks() {
 export async function requireFirebaseUser(request) {
         const header = request.headers.get('authorization') || '';
         const match = header.match(/^Bearer\s+(.+)$/i);
+        const fallbackToken = request.headers.get('x-firebase-auth');
+        const tokenValue = match?.[1] || fallbackToken;
 
-        if (!match) {
+        if (!tokenValue) {
                 return { response: jsonResponse({ error: 'Missing authorization token' }, 401) };
         }
 
         try {
-                const token = match[1];
+                const token = tokenValue;
                 const parts = token.split('.');
                 if (parts.length !== 3) {
                         throw new Error('Invalid token format');

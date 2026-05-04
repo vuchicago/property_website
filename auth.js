@@ -66,18 +66,50 @@ export const onAuthUserChanged = (callback) => {
         return onAuthStateChanged(auth, callback);
 };
 
-export const getCurrentUserToken = async () => {
-        if (!auth?.currentUser) {
-                throw new Error('You must be logged in to continue.');
+export const waitForAuthUser = async () => {
+        if (!auth) {
+                throw new Error('Authentication is not initialized.');
         }
 
-        return auth.currentUser.getIdToken();
+        if (auth.currentUser) {
+                return auth.currentUser;
+        }
+
+        return new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                        unsubscribe();
+                        reject(new Error('Please log in again before continuing.'));
+                }, 8000);
+
+                const unsubscribe = onAuthStateChanged(auth, (user) => {
+                        if (!user) return;
+                        clearTimeout(timeout);
+                        unsubscribe();
+                        resolve(user);
+                }, (error) => {
+                        clearTimeout(timeout);
+                        unsubscribe();
+                        reject(error);
+                });
+        });
+};
+
+export const getCurrentUserToken = async () => {
+        const user = await waitForAuthUser();
+        const token = await user.getIdToken();
+
+        if (!token) {
+                throw new Error('Could not verify your login. Please log in again.');
+        }
+
+        return token;
 };
 
 export const authFetch = async (url, options = {}) => {
         const token = await getCurrentUserToken();
         const headers = new Headers(options.headers || {});
         headers.set('Authorization', `Bearer ${token}`);
+        headers.set('X-Firebase-Auth', token);
 
         return fetch(url, {
                 ...options,
