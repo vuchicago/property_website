@@ -1,25 +1,20 @@
-export const onRequestGet = async (context) => {
-        const url = new URL(context.request.url);
-        const userId = url.searchParams.get('userId');
+import { requireFirebaseUser, jsonResponse } from './_auth.js';
 
-        if (!userId) {
-                return new Response(JSON.stringify({ error: 'Missing userId' }), {
-                        status: 400,
-                        headers: { 'Content-Type': 'application/json' }
-                });
+export const onRequestGet = async (context) => {
+        const { user, response } = await requireFirebaseUser(context.request);
+
+        if (response) {
+                return response;
         }
 
         if (!context.env.DB) {
-                return new Response(JSON.stringify({ error: 'Database not configured' }), {
-                        status: 500,
-                        headers: { 'Content-Type': 'application/json' }
-                });
+                return jsonResponse({ error: 'Database not configured' }, 500);
         }
 
         try {
                 const { results } = await context.env.DB.prepare(
                         "SELECT * FROM appeals WHERE customer_id = ? ORDER BY created_at DESC"
-                ).bind(userId).all();
+                ).bind(user.uid).all();
 
                 // Transform to align with frontend expectations if possible, or frontend adapts.
                 // History.js expects: propertyAddress, status, date (created_at)
@@ -35,13 +30,8 @@ export const onRequestGet = async (context) => {
                         amount: row.payment_amount
                 }));
 
-                return new Response(JSON.stringify(mappedResults), {
-                        headers: { 'Content-Type': 'application/json' }
-                });
+                return jsonResponse(mappedResults);
         } catch (err) {
-                return new Response(JSON.stringify({ error: err.message }), {
-                        status: 500,
-                        headers: { 'Content-Type': 'application/json' }
-                });
+                return jsonResponse({ error: err.message }, 500);
         }
 }

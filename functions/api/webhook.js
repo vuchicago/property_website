@@ -81,6 +81,15 @@ export const onRequestPost = async (context) => {
                                 )
                                         .bind(transactionId, customerId, customerEmail, propertyAddress, paymentAmount, paymentStatus)
                                         .run();
+
+                                if (paymentStatus === 'paid' && customerId && propertyAddress) {
+                                        await context.env.DB.prepare(
+                                                `INSERT OR IGNORE INTO user_addresses (customer_id, address, email)
+                                                 VALUES (?, ?, ?)`
+                                        )
+                                                .bind(customerId, propertyAddress, customerEmail || '')
+                                                .run();
+                                }
                         } else {
                                 console.error('D1 database (DB) binding not available — could not save appeal record.');
                         }

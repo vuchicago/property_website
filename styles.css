@@ -30,6 +30,9 @@
     --dark-100: hsl(222, 10%, 93%);
     --dark-50: hsl(222, 10%, 97%);
     --white: #ffffff;
+    --border-color: var(--dark-200);
+    --bg-secondary: var(--dark-50);
+    --text-muted: var(--dark-500);
 
     /* Typography */
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -385,6 +388,65 @@ ol {
 
 .btn-full {
     width: 100%;
+}
+
+.text-muted {
+    color: var(--text-muted);
+}
+
+.text-sm {
+    font-size: var(--font-size-sm);
+}
+
+.text-xs {
+    font-size: var(--font-size-xs);
+}
+
+.mb-4 {
+    margin-bottom: var(--space-4);
+}
+
+.dashboard-section,
+.account-shell {
+    background: var(--dark-50);
+}
+
+.dashboard-card {
+    background: var(--white);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    padding: var(--space-6);
+}
+
+.status-badge {
+    border-radius: var(--radius-full);
+    display: inline-flex;
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    line-height: 1;
+    padding: var(--space-2) var(--space-3);
+    text-transform: uppercase;
+}
+
+.status-success {
+    background: hsl(142, 71%, 93%);
+    color: hsl(142, 72%, 29%);
+}
+
+.status-pending {
+    background: hsl(38, 92%, 92%);
+    color: hsl(32, 95%, 32%);
+}
+
+.status-error {
+    background: hsl(0, 72%, 94%);
+    color: hsl(0, 72%, 38%);
+}
+
+.status-neutral {
+    background: var(--dark-100);
+    color: var(--dark-600);
 }
 
 .btn-lg {

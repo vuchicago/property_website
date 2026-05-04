@@ -63,7 +63,9 @@
 [data-theme="dark"] .feature-card,
 [data-theme="dark"] .sidebar-card,
 [data-theme="dark"] .input-card,
-[data-theme="dark"] .result-card {
+[data-theme="dark"] .result-card,
+[data-theme="dark"] .dashboard-card,
+[data-theme="dark"] .summary-tile {
     background: hsl(222, 30%, 15%);
     border-color: hsl(222, 20%, 22%);
 }
