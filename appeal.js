@@ -115,7 +115,7 @@ async function handleAppealPayment() {
         }
 
         // Get current user
-        const { auth } = await import('./auth.js');
+        const { auth, authFetch } = await import('./auth.js');
         const user = auth.currentUser;
 
         if (!user) {
@@ -130,12 +130,11 @@ async function handleAppealPayment() {
         btn.disabled = true;
 
         try {
-                const response = await fetch('/api/create-checkout-session', {
+                const response = await authFetch('/api/create-checkout-session', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                                propertyAddress: address,
-                                userId: user.uid
+                                propertyAddress: address
                         })
                 });
 

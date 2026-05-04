@@ -1,4 +1,4 @@
-import { auth } from './auth.js';
+import { auth, authFetch } from './auth.js';
 
 let userAddresses = [];
 let allAppeals = [];
@@ -9,17 +9,18 @@ export async function loadAppealHistory() {
 
         // Load both addresses and appeals
         await Promise.all([
-                fetchAddresses(user.uid),
-                fetchAppeals(user.uid)
+                fetchAddresses(),
+                fetchAppeals()
         ]);
 
+        renderAccountSummary(user);
         renderAddressList();
-        setupAddAddressForm(user.uid);
+        setupAddAddressForm();
 }
 
-async function fetchAddresses(userId) {
+async function fetchAddresses() {
         try {
-                const response = await fetch(`/api/addresses?userId=${userId}`);
+                const response = await authFetch('/api/addresses');
                 if (!response.ok) throw new Error('Failed to fetch addresses');
                 userAddresses = await response.json();
         } catch (error) {
@@ -27,13 +28,27 @@ async function fetchAddresses(userId) {
         }
 }
 
-async function fetchAppeals(userId) {
+async function fetchAppeals() {
         try {
-                const response = await fetch(`/api/history?userId=${userId}`);
+                const response = await authFetch('/api/history');
                 if (!response.ok) throw new Error('Failed to fetch appeals');
                 allAppeals = await response.json();
         } catch (error) {
                 console.error("Error fetching appeals:", error);
+        }
+}
+
+function renderAccountSummary(user) {
+        const emailEl = document.getElementById('account-email');
+        const propertyCountEl = document.getElementById('property-count');
+        const appealCountEl = document.getElementById('appeal-count');
+        const pendingCountEl = document.getElementById('pending-appeal-count');
+
+        if (emailEl) emailEl.textContent = user.email || 'Signed in';
+        if (propertyCountEl) propertyCountEl.textContent = userAddresses.length;
+        if (appealCountEl) appealCountEl.textContent = allAppeals.length;
+        if (pendingCountEl) {
+                pendingCountEl.textContent = allAppeals.filter(appeal => (appeal.appealStatus || appeal.status || '').toLowerCase() === 'pending').length;
         }
 }
 
@@ -43,6 +58,7 @@ function renderAddressList() {
 
         if (userAddresses.length === 0) {
                 listContainer.innerHTML = '<li class="text-sm text-muted">No addresses added yet.</li>';
+                showEmptyDetailsPanel();
                 return;
         }
 
@@ -51,9 +67,11 @@ function renderAddressList() {
                 // Count appeals for this address
                 const appealCount = allAppeals.filter(a => a.propertyAddress === addrObj.address).length;
 
+                const safeAddress = escapeHtml(addrObj.address);
+
                 html += `
-            <li class="address-item" style="padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s;" data-address="${addrObj.address}">
-                <div style="font-weight: 500; margin-bottom: 0.25rem;">${addrObj.address}</div>
+            <li class="address-item" style="padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s;" data-address="${safeAddress}">
+                <div style="font-weight: 500; margin-bottom: 0.25rem;">${safeAddress}</div>
                 <div class="text-xs text-muted">${appealCount} appeal(s)</div>
             </li>
         `;
@@ -78,6 +96,17 @@ function renderAddressList() {
         });
 }
 
+function showEmptyDetailsPanel() {
+        const detailsPanel = document.getElementById('appeal-details-container');
+        const emptyPanel = document.getElementById('no-address-selected-msg');
+
+        if (detailsPanel) detailsPanel.style.display = 'none';
+        if (emptyPanel) {
+                emptyPanel.style.display = 'flex';
+                emptyPanel.textContent = 'Add a property to start tracking appeal activity.';
+        }
+}
+
 function selectAddress(address) {
         document.getElementById('no-address-selected-msg').style.display = 'none';
         const detailsPanel = document.getElementById('appeal-details-container');
@@ -99,7 +128,7 @@ function renderAppeals(appeals, address) {
                 historyContainer.innerHTML = `
             <div style="text-align: center; padding: 2rem 0; color: var(--text-muted);">
                 <p>No appeals found for this property.</p>
-                <button class="btn btn-primary appeal-again-btn" data-address="${address}" style="margin-top: 1rem;">Start Appeal</button>
+                <button class="btn btn-primary appeal-again-btn" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Start Appeal</button>
             </div>
         `;
         } else {
@@ -122,14 +151,14 @@ function renderAppeals(appeals, address) {
                             <div style="margin-top: 0.5rem; font-weight: 500;">Amount: $${data.amount ? (data.amount / 100).toFixed(2) : '0.00'}</div>
                         </div>
                         <div class="history-status" style="text-align: right;">
-                             <span class="status-badge ${statusClass}">${displayStatus}</span>
+                             <span class="status-badge ${statusClass}">${escapeHtml(displayStatus)}</span>
                         </div>
                     </div>
                 </li>
             `;
                 });
                 html += '</ul>';
-                html += `<button class="btn btn-secondary appeal-again-btn btn-full" data-address="${address}" style="margin-top: 1rem;">Appeal Again</button>`;
+                html += `<button class="btn btn-secondary appeal-again-btn btn-full" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Appeal Again</button>`;
                 historyContainer.innerHTML = html;
         }
 
@@ -145,9 +174,11 @@ function renderAppeals(appeals, address) {
         });
 }
 
-function setupAddAddressForm(userId) {
+function setupAddAddressForm() {
         const form = document.getElementById('add-address-form');
         if (!form) return;
+        if (form.dataset.bound === 'true') return;
+        form.dataset.bound = 'true';
 
         form.addEventListener('submit', async (e) => {
                 e.preventDefault();
@@ -161,16 +192,17 @@ function setupAddAddressForm(userId) {
                 btn.disabled = true;
 
                 try {
-                        const response = await fetch('/api/addresses', {
+                        const response = await authFetch('/api/addresses', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ userId, address })
+                                body: JSON.stringify({ address })
                         });
 
                         if (response.ok) {
                                 input.value = '';
                                 // Refresh data
-                                await fetchAddresses(userId);
+                                await fetchAddresses();
+                                renderAccountSummary(auth.currentUser);
                                 renderAddressList();
                         } else {
                                 const err = await response.json();
@@ -189,8 +221,10 @@ function setupAddAddressForm(userId) {
 function getStatusClass(status) {
         switch (status) {
                 case 'completed': return 'status-success';
+                case 'success': return 'status-success';
                 case 'pending': return 'status-pending';
                 case 'failed': return 'status-error';
+                case 'denied': return 'status-error';
                 default: return 'status-neutral';
         }
 }
@@ -198,4 +232,14 @@ function getStatusClass(status) {
 function capitalize(str) {
         if (!str) return '';
         return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+        })[char]);
 }

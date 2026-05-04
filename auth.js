@@ -61,6 +61,30 @@ export const logoutUser = async () => {
         }
 };
 
+export const onAuthUserChanged = (callback) => {
+        if (!auth) return () => { };
+        return onAuthStateChanged(auth, callback);
+};
+
+export const getCurrentUserToken = async () => {
+        if (!auth?.currentUser) {
+                throw new Error('You must be logged in to continue.');
+        }
+
+        return auth.currentUser.getIdToken();
+};
+
+export const authFetch = async (url, options = {}) => {
+        const token = await getCurrentUserToken();
+        const headers = new Headers(options.headers || {});
+        headers.set('Authorization', `Bearer ${token}`);
+
+        return fetch(url, {
+                ...options,
+                headers
+        });
+};
+
 // UI State Management
 export const initAuthUI = () => {
         if (!auth) return;
@@ -126,14 +150,14 @@ const updateAuthButton = (container, user) => {
 
                 // Create Account History Button
                 const historyBtn = document.createElement('a');
-                historyBtn.href = "#user-dashboard";
+                historyBtn.href = "login.html";
                 historyBtn.className = "btn btn-sm btn-secondary";
                 historyBtn.style.marginLeft = "0.5rem";
-                historyBtn.textContent = "Account History";
+                historyBtn.textContent = "My Account";
                 historyBtn.onclick = (e) => {
-                        e.preventDefault();
                         const dashboard = document.getElementById('user-dashboard');
                         if (dashboard) {
+                                e.preventDefault();
                                 dashboard.scrollIntoView({ behavior: 'smooth' });
                         }
                 };
@@ -197,4 +221,3 @@ window.handleLogout = async (e) => {
                 alert('Logout failed: ' + result.error);
         }
 };
-

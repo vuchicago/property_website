@@ -10,6 +10,7 @@
                 gtag('js', new Date());
                 gtag('config', 'G-KRM2FPST0T');
         </script>
+        <script src="https://js.stripe.com/v3/"></script>
 
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -88,6 +89,63 @@
                         display: none;
                         font-size: var(--font-size-sm);
                 }
+
+                .account-shell {
+                        display: none;
+                        padding: var(--space-10) var(--container-padding) var(--space-16);
+                }
+
+                .account-header {
+                        display: flex;
+                        align-items: flex-end;
+                        justify-content: space-between;
+                        gap: var(--space-4);
+                        margin-bottom: var(--space-6);
+                }
+
+                .account-header h1 {
+                        color: var(--dark-900);
+                        font-size: var(--font-size-4xl);
+                        margin-bottom: var(--space-2);
+                }
+
+                .account-summary {
+                        display: grid;
+                        grid-template-columns: repeat(3, minmax(0, 1fr));
+                        gap: var(--space-4);
+                        margin-bottom: var(--space-6);
+                }
+
+                .summary-tile {
+                        background: var(--white);
+                        border: 1px solid var(--border-color);
+                        border-radius: var(--radius-md);
+                        padding: var(--space-5);
+                        box-shadow: var(--shadow-sm);
+                }
+
+                .summary-tile span {
+                        color: var(--text-muted);
+                        display: block;
+                        font-size: var(--font-size-sm);
+                        margin-bottom: var(--space-2);
+                }
+
+                .summary-tile strong {
+                        color: var(--dark-900);
+                        font-size: var(--font-size-3xl);
+                }
+
+                @media (max-width: 760px) {
+                        .account-header {
+                                align-items: flex-start;
+                                flex-direction: column;
+                        }
+
+                        .account-summary {
+                                grid-template-columns: 1fr;
+                        }
+                }
         </style>
 </head>
 
@@ -109,8 +167,8 @@
                 </div>
         </nav>
 
-        <div class="auth-container">
-                <div class="auth-card">
+        <div class="auth-container" id="auth-container">
+                <div class="auth-card" id="auth-card">
                         <div class="auth-header">
                                 <h1 id="page-title">Welcome Back</h1>
                                 <p id="page-subtitle">Sign in to your account</p>
@@ -137,12 +195,79 @@
                 </div>
         </div>
 
+        <main id="user-dashboard" class="account-shell">
+                <div class="container">
+                        <div class="account-header">
+                                <div>
+                                        <span class="section-badge">My Account</span>
+                                        <h1>Property Appeal Dashboard</h1>
+                                        <p class="text-muted">Signed in as <strong id="account-email">your account</strong></p>
+                                </div>
+                                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                                        <button type="button" class="btn btn-primary" id="account-add-appeal-btn">Add Property Appeal</button>
+                                        <button type="button" class="btn btn-secondary" id="account-logout-btn">Logout</button>
+                                </div>
+                        </div>
+
+                        <div class="account-summary">
+                                <div class="summary-tile">
+                                        <span>Tracked Properties</span>
+                                        <strong id="property-count">0</strong>
+                                </div>
+                                <div class="summary-tile">
+                                        <span>Total Appeals</span>
+                                        <strong id="appeal-count">0</strong>
+                                </div>
+                                <div class="summary-tile">
+                                        <span>Pending Appeals</span>
+                                        <strong id="pending-appeal-count">0</strong>
+                                </div>
+                        </div>
+
+                        <div class="dashboard-layout" style="display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap;">
+                                <div class="address-book-panel dashboard-card" style="flex: 1; min-width: 300px;">
+                                        <h3>My Properties</h3>
+                                        <p class="text-sm text-muted mb-4">Add property addresses to track new and past appeals.</p>
+
+                                        <form id="add-address-form" style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+                                                <input type="text" id="new-property-address" placeholder="Enter Chicago address..." required
+                                                        style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                                                <button type="submit" class="btn btn-primary" id="add-address-btn"
+                                                        style="padding: 0.5rem 1rem;">Add</button>
+                                        </form>
+
+                                        <ul id="address-list" class="address-list"
+                                                style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem;"></ul>
+                                </div>
+
+                                <div class="appeal-details-panel dashboard-card" style="flex: 2; min-width: 300px; display: none;"
+                                        id="appeal-details-container">
+                                        <div
+                                                style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; gap: 1rem;">
+                                                <div>
+                                                        <h3 id="selected-address-title">Selected Address</h3>
+                                                        <p class="text-sm text-muted">Appeal history for this property</p>
+                                                </div>
+                                                <div class="stats-badge"
+                                                        style="background: var(--bg-secondary); padding: 0.5rem 1rem; border-radius: var(--radius-full); font-size: 0.875rem; font-weight: 500;">
+                                                        Total Appeals: <span id="total-appeals-count">0</span>
+                                                </div>
+                                        </div>
+
+                                        <div id="appeal-history-list"></div>
+                                </div>
+
+                                <div class="dashboard-card" id="no-address-selected-msg"
+                                        style="flex: 2; min-width: 300px; display: flex; justify-content: center; align-items: center; min-height: 200px; color: var(--text-muted);">
+                                        Select an address to view its appeal history.
+                                </div>
+                        </div>
+                </div>
+        </main>
+
         <!-- Auth Logic Script -->
         <script type="module">
-                import { loginUser, registerUser, initAuthUI } from './auth.js';
-
-                // Initialize UI (for nav if we had full nav here, but we have simple nav)
-                initAuthUI();
+                import { loginUser, registerUser, logoutUser, onAuthUserChanged } from './auth.js';
 
                 const form = document.getElementById('auth-form');
                 const emailInput = document.getElementById('email');
@@ -153,6 +278,10 @@
                 const submitBtn = form.querySelector('button');
                 const toggleText = document.getElementById('toggle-text');
                 const errorAlert = document.getElementById('error-alert');
+                const authContainer = document.getElementById('auth-container');
+                const dashboard = document.getElementById('user-dashboard');
+                const addAppealBtn = document.getElementById('account-add-appeal-btn');
+                const logoutBtn = document.getElementById('account-logout-btn');
 
                 let isLogin = true;
 
@@ -195,8 +324,9 @@
                         }
 
                         if (result.success) {
-                                // Redirect to home on success
-                                window.location.href = 'index.html';
+                                submitBtn.disabled = false;
+                                submitBtn.textContent = isLogin ? 'Sign In' : 'Sign Up';
+                                await showDashboard();
                         } else {
                                 errorAlert.textContent = result.error;
                                 errorAlert.style.display = 'block';
@@ -204,6 +334,34 @@
                                 submitBtn.textContent = isLogin ? 'Sign In' : 'Sign Up';
                         }
                 });
+
+                onAuthUserChanged(async (user) => {
+                        if (user) {
+                                await showDashboard();
+                        } else {
+                                authContainer.style.display = 'flex';
+                                dashboard.style.display = 'none';
+                        }
+                });
+
+                addAppealBtn.addEventListener('click', async () => {
+                        const { openAppealModal } = await import('./appeal.js');
+                        openAppealModal();
+                });
+
+                logoutBtn.addEventListener('click', async () => {
+                        const result = await logoutUser();
+                        if (!result.success) {
+                                alert('Logout failed: ' + result.error);
+                        }
+                });
+
+                async function showDashboard() {
+                        authContainer.style.display = 'none';
+                        dashboard.style.display = 'block';
+                        const { loadAppealHistory } = await import('./history.js');
+                        await loadAppealHistory();
+                }
         </script>
 </body>
 
