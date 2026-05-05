@@ -233,7 +233,7 @@ function initFAQ() {
 function initContactForm() {
     const form = document.getElementById('contact-form');
 
-    form?.addEventListener('submit', e => {
+    form?.addEventListener('submit', async e => {
         e.preventDefault();
 
         const btn = form.querySelector('button[type="submit"]');
@@ -241,12 +241,32 @@ function initContactForm() {
         btn.innerHTML = '<svg class="spinner" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" opacity="0.3" fill="none"/><path d="M12 2C6.47715 2 2 6.47715 2 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg> Sending...';
         btn.disabled = true;
 
-        setTimeout(() => {
+        try {
+            const response = await fetch('/api/contact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: document.getElementById('name')?.value.trim(),
+                    email: document.getElementById('email')?.value.trim(),
+                    phone: document.getElementById('phone')?.value.trim(),
+                    propertyAddress: document.getElementById('property-address-contact')?.value.trim(),
+                    message: document.getElementById('message')?.value.trim()
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ error: 'Message could not be sent.' }));
+                throw new Error(error.error || 'Message could not be sent.');
+            }
+
             showNotification('Message sent! We\'ll be in touch soon.', 'success');
             form.reset();
+        } catch (error) {
+            showNotification(error.message || 'Message could not be sent.', 'error');
+        } finally {
             btn.innerHTML = originalText;
             btn.disabled = false;
-        }, 1500);
+        }
     });
 }
 

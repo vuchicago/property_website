@@ -1,4 +1,4 @@
-import { auth } from './auth.js';
+import { auth, authFetch } from './auth.js';
 
 let currentUserEmail = null;
 let currentRole = null;
@@ -15,7 +15,7 @@ auth.onAuthStateChanged(async (user) => {
 
 async function checkAdminAccess() {
         try {
-                const response = await fetch(`/api/admin/roles?email=${encodeURIComponent(currentUserEmail)}&checkRoleOnly=true`);
+                const response = await authFetch('/api/admin/roles?checkRoleOnly=true');
 
                 if (response.ok) {
                         const data = await response.json();
@@ -33,6 +33,7 @@ async function checkAdminAccess() {
                         }
 
                         setupTabs();
+                        setupHistorySearch();
                         await loadPendingAppeals();
 
                         if (currentRole === 'superadmin') {
@@ -69,7 +70,7 @@ async function loadPendingAppeals() {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Loading...</td></tr>';
 
         try {
-                const response = await fetch(`/api/admin/appeals?email=${encodeURIComponent(currentUserEmail)}`);
+                const response = await authFetch('/api/admin/appeals');
                 if (!response.ok) throw new Error('Failed to fetch appeals');
 
                 const appeals = await response.json();
@@ -86,13 +87,13 @@ async function loadPendingAppeals() {
 
                         html += `
                 <tr>
-                    <td><strong>${appeal.property_address}</strong></td>
-                    <td>${appeal.customer_email || 'N/A'}</td>
+                    <td><strong>${escapeHtml(appeal.property_address)}</strong></td>
+                    <td>${escapeHtml(appeal.customer_email || 'N/A')}</td>
                     <td>${date}<br><small class="text-muted">${amount}</small></td>
-                    <td><span class="status-badge status-pending">${appeal.appeal_status}</span></td>
+                    <td><span class="status-badge status-pending">${escapeHtml(appeal.appeal_status)}</span></td>
                     <td class="action-btns">
-                        <button class="btn-sm btn-primary action-btn" data-id="${appeal.transaction_id}" data-action="Success">Mark Success</button>
-                        <button class="btn-sm btn-secondary action-btn" data-id="${appeal.transaction_id}" data-action="Denied" style="background:var(--error-bg);color:var(--error);">Mark Denied</button>
+                        <button class="btn-sm btn-primary action-btn" data-id="${escapeHtml(appeal.transaction_id)}" data-action="Success">Mark Success</button>
+                        <button class="btn-sm btn-secondary action-btn" data-id="${escapeHtml(appeal.transaction_id)}" data-action="Denied" style="background:var(--error-bg);color:var(--error);">Mark Denied</button>
                     </td>
                 </tr>
             `;
@@ -121,10 +122,10 @@ async function handleAppealAction(e) {
         btn.disabled = true;
 
         try {
-                const response = await fetch('/api/admin/appeals', {
+                const response = await authFetch('/api/admin/appeals', {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: currentUserEmail, transactionId, newStatus })
+                        body: JSON.stringify({ transactionId, newStatus })
                 });
 
                 if (response.ok) {
@@ -143,6 +144,53 @@ async function handleAppealAction(e) {
         }
 }
 
+function setupHistorySearch() {
+        const form = document.getElementById('history-search-form');
+        if (!form || form.dataset.bound === 'true') return;
+        form.dataset.bound = 'true';
+
+        form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const searchEmail = document.getElementById('history-search-email').value.trim();
+                await loadUserHistory(searchEmail);
+        });
+}
+
+async function loadUserHistory(searchEmail) {
+        const tbody = document.querySelector('#history-table tbody');
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Searching...</td></tr>';
+
+        try {
+                const response = await authFetch(`/api/admin/appeals?searchEmail=${encodeURIComponent(searchEmail)}`);
+                if (!response.ok) throw new Error('Failed to fetch user history');
+
+                const appeals = await response.json();
+                if (appeals.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem;">No appeals found for this email.</td></tr>';
+                        return;
+                }
+
+                tbody.innerHTML = appeals.map(appeal => {
+                        const date = appeal.payment_date ? new Date(appeal.payment_date).toLocaleString() : 'N/A';
+                        const amount = appeal.payment_amount ? `$${(appeal.payment_amount / 100).toFixed(2)}` : 'N/A';
+                        const statusClass = getStatusClass(appeal.appeal_status);
+
+                        return `
+                                <tr>
+                                        <td>${escapeHtml(appeal.customer_name || 'N/A')}</td>
+                                        <td>${escapeHtml(appeal.customer_email || 'N/A')}</td>
+                                        <td><strong>${escapeHtml(appeal.property_address || 'N/A')}</strong></td>
+                                        <td>${date}<br><small class="text-muted">${amount}</small></td>
+                                        <td><span class="status-badge ${statusClass}">${escapeHtml(appeal.appeal_status || 'Pending')}</span></td>
+                                </tr>
+                        `;
+                }).join('');
+        } catch (error) {
+                console.error("Error loading user history:", error);
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--error);">Error loading history</td></tr>';
+        }
+}
+
 // -----------------------------------------
 // Super Admin Role Management Functions
 // -----------------------------------------
@@ -152,7 +200,7 @@ async function loadRoles() {
         tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Loading...</td></tr>';
 
         try {
-                const response = await fetch(`/api/admin/roles?email=${encodeURIComponent(currentUserEmail)}`);
+                const response = await authFetch('/api/admin/roles');
                 if (!response.ok) throw new Error('Failed to fetch roles');
 
                 const roles = await response.json();
@@ -162,10 +210,10 @@ async function loadRoles() {
                         const isSelf = r.email === currentUserEmail;
                         html += `
                 <tr>
-                    <td><strong>${r.email}</strong> ${isSelf ? '<span class="text-muted">(You)</span>' : ''}</td>
-                    <td><span class="status-badge" style="background: ${r.role === 'superadmin' ? 'var(--primary-light)' : 'var(--bg-secondary)'};">${r.role}</span></td>
+                    <td><strong>${escapeHtml(r.email)}</strong> ${isSelf ? '<span class="text-muted">(You)</span>' : ''}</td>
+                    <td><span class="status-badge" style="background: ${r.role === 'superadmin' ? 'var(--primary-light)' : 'var(--bg-secondary)'};">${escapeHtml(r.role)}</span></td>
                     <td>
-                        <button class="btn-sm btn-secondary delete-role-btn" data-email="${r.email}" ${r.email === 'vu@cookcountytaxcompare.com' ? 'disabled' : ''}>Revoke Access</button>
+                        <button class="btn-sm btn-secondary delete-role-btn" data-email="${escapeHtml(r.email)}" ${r.email === 'vu@cookcountytaxcompare.com' ? 'disabled' : ''}>Revoke Access</button>
                     </td>
                 </tr>
             `;
@@ -196,10 +244,10 @@ function setupRoleForm() {
                 btn.textContent = 'Adding...';
 
                 try {
-                        const response = await fetch('/api/admin/roles', {
+                        const response = await authFetch('/api/admin/roles', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ superEmail: currentUserEmail, newAdminEmail, role })
+                                body: JSON.stringify({ newAdminEmail, role })
                         });
 
                         if (response.ok) {
@@ -229,10 +277,10 @@ async function handleDeleteRole(e) {
         btn.disabled = true;
 
         try {
-                const response = await fetch('/api/admin/roles', {
+                const response = await authFetch('/api/admin/roles', {
                         method: 'DELETE',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ superEmail: currentUserEmail, removeEmail })
+                        body: JSON.stringify({ removeEmail })
                 });
 
                 if (response.ok) {
@@ -249,4 +297,23 @@ async function handleDeleteRole(e) {
                 btn.textContent = 'Revoke Access';
                 btn.disabled = false;
         }
+}
+
+function getStatusClass(status) {
+        switch ((status || '').toLowerCase()) {
+                case 'success': return 'status-success';
+                case 'denied': return 'status-error';
+                case 'pending': return 'status-pending';
+                default: return 'status-neutral';
+        }
+}
+
+function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+        })[char]);
 }

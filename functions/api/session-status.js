@@ -1,3 +1,5 @@
+import { recordPaidAppeal } from './_appeals.js';
+
 export const onRequestGet = async (context) => {
         const STRIPE_KEY = context.env.STRIPE_SECRET_KEY || context.env.STRIPE_API_KEY;
         const { searchParams } = new URL(context.request.url);
@@ -24,34 +26,22 @@ export const onRequestGet = async (context) => {
                 }
 
                 let dbStatus = 'not_configured';
+                let emailStatus = 'skipped';
                 if (context.env.DB && (session.status === 'complete' || session.payment_status === 'paid')) {
                         try {
-                                const transactionId = session.id;
-                                const customerId = session.client_reference_id;
-                                const customerEmail = session.customer_details?.email || session.metadata?.userEmail || null;
-                                const propertyAddress = session.metadata?.propertyAddress || null;
-                                const paymentAmount = session.amount_total;
-                                const paymentStatus = session.payment_status;
+                                if (session.client_reference_id && session.metadata?.propertyAddress) {
+                                        const result = await recordPaidAppeal(context.env, {
+                                                transactionId: session.id,
+                                                customerId: session.client_reference_id,
+                                                customerName: session.customer_details?.name || session.metadata?.userName || null,
+                                                customerEmail: session.customer_details?.email || session.metadata?.userEmail || null,
+                                                propertyAddress: session.metadata?.propertyAddress || null,
+                                                paymentAmount: session.amount_total,
+                                                paymentStatus: session.payment_status
+                                        });
 
-                                if (customerId && propertyAddress) {
-                                        await context.env.DB.prepare(
-                                                `INSERT INTO appeals (transaction_id, customer_id, customer_email, property_address, payment_amount, payment_status, payment_date, appeal_status, appeal_date)
-                                                 VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'Pending', CURRENT_TIMESTAMP)
-                                                 ON CONFLICT(transaction_id) DO UPDATE SET
-                                                 payment_status = excluded.payment_status,
-                                                 payment_date = excluded.payment_date`
-                                        )
-                                                .bind(transactionId, customerId, customerEmail, propertyAddress, paymentAmount, paymentStatus)
-                                                .run();
-
-                                        await context.env.DB.prepare(
-                                                `INSERT OR IGNORE INTO user_addresses (customer_id, address, email)
-                                                 VALUES (?, ?, ?)`
-                                        )
-                                                .bind(customerId, propertyAddress, customerEmail || '')
-                                                .run();
-
-                                        dbStatus = 'recorded';
+                                        dbStatus = result.dbStatus;
+                                        emailStatus = result.emailStatus;
                                 } else {
                                         dbStatus = 'missing_customer_or_property';
                                 }
@@ -67,7 +57,8 @@ export const onRequestGet = async (context) => {
                         metadata: session.metadata,
                         client_reference_id: session.client_reference_id,
                         amount_total: session.amount_total,
-                        db_status: dbStatus
+                        db_status: dbStatus,
+                        email_status: emailStatus
                 }), {
                         headers: { 'Content-Type': 'application/json' }
                 });
