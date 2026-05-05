@@ -1,3 +1,5 @@
+import { recordPaidAppeal } from './_appeals.js';
+
 export const onRequestPost = async (context) => {
         const STRIPE_KEY = context.env.STRIPE_SECRET_KEY || context.env.STRIPE_API_KEY;
         const WEBHOOK_SECRET = context.env.STRIPE_WEBHOOK_SECRET;
@@ -63,6 +65,7 @@ export const onRequestPost = async (context) => {
 
                         const transactionId = session.id;
                         const customerId = session.client_reference_id; // userId passed during checkout
+                        const customerName = session.customer_details?.name || session.metadata?.userName || null;
                         const customerEmail = session.customer_details?.email || null;
                         const propertyAddress = session.metadata?.propertyAddress || null;
                         const paymentAmount = session.amount_total; // in cents
@@ -70,26 +73,15 @@ export const onRequestPost = async (context) => {
 
                         // Write to D1 database
                         if (context.env.DB) {
-                                await context.env.DB.prepare(
-                                        `INSERT INTO appeals (transaction_id, customer_id, customer_email, property_address, payment_amount, payment_status, payment_date, appeal_status, appeal_date)
-					 VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'Pending', CURRENT_TIMESTAMP)
-					 ON CONFLICT(transaction_id) DO UPDATE SET 
-                        payment_status = excluded.payment_status,
-                        payment_date = excluded.payment_date,
-                        appeal_status = excluded.appeal_status,
-                        appeal_date = excluded.appeal_date`
-                                )
-                                        .bind(transactionId, customerId, customerEmail, propertyAddress, paymentAmount, paymentStatus)
-                                        .run();
-
-                                if (paymentStatus === 'paid' && customerId && propertyAddress) {
-                                        await context.env.DB.prepare(
-                                                `INSERT OR IGNORE INTO user_addresses (customer_id, address, email)
-                                                 VALUES (?, ?, ?)`
-                                        )
-                                                .bind(customerId, propertyAddress, customerEmail || '')
-                                                .run();
-                                }
+                                await recordPaidAppeal(context.env, {
+                                        transactionId,
+                                        customerId,
+                                        customerName,
+                                        customerEmail,
+                                        propertyAddress,
+                                        paymentAmount,
+                                        paymentStatus
+                                });
                         } else {
                                 console.error('D1 database (DB) binding not available — could not save appeal record.');
                         }

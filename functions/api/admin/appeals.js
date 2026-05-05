@@ -1,52 +1,78 @@
-// Helper to check if user is admin
-async function checkAdmin(email, env) {
-        if (!email) return false;
-        const { results } = await env.DB.prepare("SELECT role FROM admins WHERE email = ?").bind(email).all();
-        return results.length > 0 ? results[0].role : null;
-}
+import { getAdminUser, jsonResponse } from './_admin.js';
 
 export const onRequestGet = async (context) => {
         const url = new URL(context.request.url);
-        const email = url.searchParams.get('email');
+        const searchEmail = (url.searchParams.get('searchEmail') || '').trim();
 
-        if (!context.env.DB) {
-                return new Response(JSON.stringify({ error: 'Database not configured' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+        const { response } = await getAdminUser(context);
+        if (response) {
+                return response;
         }
 
         try {
-                const role = await checkAdmin(email, context.env);
-                if (!role) {
-                        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+                let query;
+                let sql;
+                let statement;
+
+                if (searchEmail) {
+                        query = `%${searchEmail.toLowerCase()}%`;
+                        sql = `SELECT id, transaction_id, customer_name, customer_email, property_address, payment_amount, payment_status, payment_date, appeal_status, appeal_date, created_at
+                               FROM appeals
+                               WHERE lower(customer_email) LIKE ?
+                               ORDER BY payment_date DESC, created_at DESC`;
+                        statement = context.env.DB.prepare(sql).bind(query);
+                } else {
+                        sql = `SELECT id, transaction_id, customer_name, customer_email, property_address, payment_amount, payment_status, payment_date, appeal_status, appeal_date, created_at
+                               FROM appeals
+                               WHERE appeal_status = 'Pending'
+                               ORDER BY payment_date ASC`;
+                        statement = context.env.DB.prepare(sql);
                 }
 
-                // Return all pending appeals
-                const { results } = await context.env.DB.prepare(
-                        "SELECT id, transaction_id, customer_email, property_address, payment_amount, payment_date, appeal_status, appeal_date FROM appeals WHERE appeal_status = 'Pending' ORDER BY payment_date ASC"
-                ).all();
+                let results;
+                try {
+                        ({ results } = await statement.all());
+                } catch (error) {
+                        if (!error.message.includes('customer_name')) {
+                                throw error;
+                        }
 
-                return new Response(JSON.stringify(results), {
-                        headers: { 'Content-Type': 'application/json' }
-                });
+                        if (searchEmail) {
+                                statement = context.env.DB.prepare(
+                                        `SELECT id, transaction_id, NULL AS customer_name, customer_email, property_address, payment_amount, payment_status, payment_date, appeal_status, appeal_date, created_at
+                                         FROM appeals
+                                         WHERE lower(customer_email) LIKE ?
+                                         ORDER BY payment_date DESC, created_at DESC`
+                                ).bind(query);
+                        } else {
+                                statement = context.env.DB.prepare(
+                                        `SELECT id, transaction_id, NULL AS customer_name, customer_email, property_address, payment_amount, payment_status, payment_date, appeal_status, appeal_date, created_at
+                                         FROM appeals
+                                         WHERE appeal_status = 'Pending'
+                                         ORDER BY payment_date ASC`
+                                );
+                        }
+
+                        ({ results } = await statement.all());
+                }
+
+                return jsonResponse(results);
         } catch (err) {
-                return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+                return jsonResponse({ error: err.message }, 500);
         }
 };
 
 export const onRequestPut = async (context) => {
-        if (!context.env.DB) {
-                return new Response(JSON.stringify({ error: 'Database not configured' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+        const { response } = await getAdminUser(context);
+        if (response) {
+                return response;
         }
 
         try {
-                const { email, transactionId, newStatus } = await context.request.json();
-
-                const role = await checkAdmin(email, context.env);
-                if (!role) {
-                        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
-                }
+                const { transactionId, newStatus } = await context.request.json();
 
                 if (!['Pending', 'Success', 'Denied'].includes(newStatus)) {
-                        return new Response(JSON.stringify({ error: 'Invalid status' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+                        return jsonResponse({ error: 'Invalid status' }, 400);
                 }
 
                 const result = await context.env.DB.prepare(
@@ -54,14 +80,12 @@ export const onRequestPut = async (context) => {
                 ).bind(newStatus, transactionId).run();
 
                 if (result.meta.changes === 0) {
-                        return new Response(JSON.stringify({ error: 'Appeal not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+                        return jsonResponse({ error: 'Appeal not found' }, 404);
                 }
 
-                return new Response(JSON.stringify({ success: true }), {
-                        headers: { 'Content-Type': 'application/json' }
-                });
+                return jsonResponse({ success: true });
 
         } catch (err) {
-                return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+                return jsonResponse({ error: err.message }, 500);
         }
 };

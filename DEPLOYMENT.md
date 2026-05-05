@@ -43,6 +43,38 @@ wrangler login
 npx wrangler pages deploy . --project-name=cook-county-tax-compare
 ```
 
+## Database Setup
+
+Cloudflare D1 must have the account tables before users can save properties or view appeal history.
+
+Apply the non-destructive migration to production:
+
+```bash
+wrangler d1 execute appeal_db --remote --file=migrations/0001_create_user_addresses.sql
+wrangler d1 execute appeal_db --remote --file=migrations/0002_add_customer_name_to_appeals.sql
+```
+
+For local Wrangler testing:
+
+```bash
+wrangler d1 execute appeal_db --local --file=migrations/0001_create_user_addresses.sql
+wrangler d1 execute appeal_db --local --file=migrations/0002_add_customer_name_to_appeals.sql
+```
+
+Do not run the full `schema.sql` against production unless you intend to reset data, because it drops and recreates the `appeals` table.
+
+## Email Notifications
+
+Payment notification emails and contact form messages use Resend from Cloudflare Pages Functions. Set these environment variables in Cloudflare Pages:
+
+```bash
+RESEND_API_KEY=your_resend_api_key
+ADMIN_NOTIFICATION_EMAIL=vu@cookcountytaxcompare.com
+NOTIFICATION_FROM_EMAIL="Cook County Tax Compare <alerts@yourdomain.com>"
+```
+
+`ADMIN_NOTIFICATION_EMAIL` defaults to `vu@cookcountytaxcompare.com` if it is not set. `NOTIFICATION_FROM_EMAIL` should be a sender address verified in Resend for production delivery.
+
 ## What's Deployed
 
 - **Homepage**: `index.html` - Main landing page

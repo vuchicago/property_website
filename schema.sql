@@ -3,6 +3,7 @@ CREATE TABLE appeals (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   transaction_id TEXT NOT NULL UNIQUE,
   customer_id TEXT NOT NULL,
+  customer_name TEXT,
   customer_email TEXT,
   property_address TEXT,
   payment_amount INTEGER,

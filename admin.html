@@ -75,6 +75,25 @@
                         display: flex;
                         gap: 0.5rem;
                 }
+
+                .admin-search-form {
+                        display: flex;
+                        gap: 1rem;
+                        align-items: flex-end;
+                        margin-bottom: 1.5rem;
+                }
+
+                .admin-search-form .input-group {
+                        flex: 1;
+                        margin: 0;
+                }
+
+                @media (max-width: 720px) {
+                        .admin-search-form {
+                                align-items: stretch;
+                                flex-direction: column;
+                        }
+                }
         </style>
 </head>
 
@@ -123,6 +142,7 @@
 
                         <div class="admin-nav">
                                 <button class="admin-tab active" data-tab="appeals">Pending Appeals</button>
+                                <button class="admin-tab" data-tab="history">Search User History</button>
                                 <button class="admin-tab" data-tab="roles" id="roles-tab" style="display: none;">Role
                                         Management</button>
                         </div>
@@ -146,6 +166,39 @@
                                                                 <tr>
                                                                         <td colspan="5" style="text-align:center;">
                                                                                 Loading...</td>
+                                                                </tr>
+                                                        </tbody>
+                                                </table>
+                                        </div>
+                                </div>
+
+                                <!-- User History Tab -->
+                                <div id="history" class="tab-content">
+                                        <h3>User Appeal History</h3>
+                                        <form id="history-search-form" class="admin-search-form">
+                                                <div class="input-group">
+                                                        <label for="history-search-email">Search by payer email</label>
+                                                        <input type="email" id="history-search-email"
+                                                                placeholder="customer@example.com" required>
+                                                </div>
+                                                <button type="submit" class="btn btn-primary">Search</button>
+                                        </form>
+
+                                        <div style="overflow-x: auto;">
+                                                <table class="pending-list" id="history-table">
+                                                        <thead>
+                                                                <tr>
+                                                                        <th>Name</th>
+                                                                        <th>Email</th>
+                                                                        <th>Address</th>
+                                                                        <th>Payment Date</th>
+                                                                        <th>Status</th>
+                                                                </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                                <tr>
+                                                                        <td colspan="5" style="text-align:center;">
+                                                                                Search an email to view history.</td>
                                                                 </tr>
                                                         </tbody>
                                                 </table>
