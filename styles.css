@@ -1665,6 +1665,36 @@ ol {
     gap: var(--space-8);
 }
 
+.page-header-description {
+    max-width: 760px;
+    margin-top: var(--space-4);
+    color: var(--dark-500);
+    font-size: var(--font-size-lg);
+    line-height: 1.7;
+}
+
+.tool-description-panel {
+    margin-bottom: var(--space-8);
+}
+
+.tool-description-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-5);
+    margin-top: var(--space-6);
+}
+
+.tool-description-card h3 {
+    color: var(--dark-900);
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--space-3);
+}
+
+.tool-description-card p {
+    color: var(--dark-500);
+    line-height: 1.7;
+}
+
 /* Input Groups */
 .input-group {
     margin-bottom: var(--space-4);
@@ -2883,6 +2913,10 @@ textarea {
 
     .tool-container,
     .loan-container {
+        grid-template-columns: 1fr;
+    }
+
+    .tool-description-grid {
         grid-template-columns: 1fr;
     }
 
