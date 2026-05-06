@@ -14,7 +14,16 @@ export const onRequestGet = async (context) => {
 
         try {
                 const { results } = await context.env.DB.prepare(
-                        "SELECT * FROM user_addresses WHERE customer_id = ? ORDER BY created_at DESC"
+                        `SELECT user_addresses.*,
+                                (
+                                  SELECT pin
+                                  FROM property_addresses
+                                  WHERE property_addresses.address = user_addresses.address
+                                  LIMIT 1
+                                ) AS pin
+                         FROM user_addresses
+                         WHERE user_addresses.customer_id = ?
+                         ORDER BY user_addresses.created_at DESC`
                 ).bind(user.uid).all();
 
                 return jsonResponse(results);

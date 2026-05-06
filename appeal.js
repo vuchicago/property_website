@@ -159,7 +159,15 @@ async function getStripe() {
 }
 
 async function handleAppealPayment() {
-        const address = selectedAppealAddressSuggestion || document.getElementById('appeal-address').value.trim();
+        const addressInput = document.getElementById('appeal-address');
+        const address = selectedAppealAddressSuggestion;
+        const typedAddress = addressInput.value.trim();
+        if (!address && typedAddress) {
+                await updateAppealAddressSuggestions(typedAddress, true);
+                addressInput.focus();
+                return;
+        }
+
         if (!address) {
                 alert("Please enter your property address.");
                 return;
@@ -231,7 +239,7 @@ async function handleAppealPayment() {
         }
 }
 
-async function updateAppealAddressSuggestions(query) {
+async function updateAppealAddressSuggestions(query, forceVisible = false) {
         const suggestionsPanel = document.getElementById('appeal-address-suggestions');
         if (!suggestionsPanel) return;
 
@@ -253,13 +261,13 @@ async function updateAppealAddressSuggestions(query) {
                                 input.focus();
                         }
                         selectedAppealAddressSuggestion = address;
-                });
+                }, forceVisible ? 'Select the closest matching address before continuing.' : '');
         } catch (error) {
                 console.error('Appeal address lookup failed:', error);
         }
 }
 
-function renderAddressSuggestions(containerId, suggestions, onSelect) {
+function renderAddressSuggestions(containerId, suggestions, onSelect, helperText = '') {
         const panel = document.getElementById(containerId);
         if (!panel) return;
 
@@ -268,12 +276,14 @@ function renderAddressSuggestions(containerId, suggestions, onSelect) {
                 return;
         }
 
-        panel.innerHTML = suggestions.slice(0, 5).map(item => `
+        panel.innerHTML = `
+                ${helperText ? `<div class="address-suggestion-helper">${escapeHtml(helperText)}</div>` : ''}
+                ${suggestions.slice(0, 5).map(item => `
                 <button type="button" class="address-suggestion" role="option" data-address="${escapeHtml(item.address)}">
                         ${escapeHtml(item.address)}
                         <span>PIN ${escapeHtml(item.pin || 'not available')}</span>
                 </button>
-        `).join('');
+        `).join('')}`;
         panel.classList.add('is-visible');
 
         panel.querySelectorAll('.address-suggestion').forEach(button => {

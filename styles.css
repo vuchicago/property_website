@@ -457,6 +457,15 @@ ol {
     width: 100%;
 }
 
+.address-suggestion-helper {
+    background: var(--dark-50);
+    border-bottom: 1px solid var(--border-color);
+    color: var(--dark-600);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    padding: 0.75rem;
+}
+
 .address-suggestion:last-child {
     border-bottom: 0;
 }
@@ -472,6 +481,19 @@ ol {
     display: block;
     font-size: var(--font-size-xs);
     margin-top: 0.2rem;
+}
+
+.delete-address-btn {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: var(--white);
+}
+
+.delete-address-btn:hover,
+.delete-address-btn:focus {
+    background: hsl(0, 72%, 43%);
+    border-color: hsl(0, 72%, 43%);
+    color: var(--white);
 }
 
 .status-badge {

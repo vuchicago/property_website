@@ -4,6 +4,7 @@ let userAddresses = [];
 let allAppeals = [];
 let lookupTimer = null;
 let selectedAddressSuggestion = '';
+let currentSuggestions = [];
 
 export async function loadAppealHistory() {
         const user = auth.currentUser;
@@ -77,6 +78,7 @@ function renderAddressList() {
                 <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
                         <div>
                                 <div style="font-weight: 500; margin-bottom: 0.25rem;">${safeAddress}</div>
+                                ${addrObj.pin ? `<div class="text-xs text-muted">PIN ${escapeHtml(addrObj.pin)}</div>` : ''}
                                 <div class="text-xs text-muted">${appealCount} appeal(s)</div>
                         </div>
                         ${canDelete ? `<button type="button" class="btn btn-secondary btn-sm delete-address-btn" data-address="${safeAddress}" aria-label="Delete ${safeAddress}">Delete</button>` : ''}
@@ -161,6 +163,18 @@ function selectAddress(address) {
         detailsPanel.style.display = 'block';
 
         document.getElementById('selected-address-title').textContent = address;
+        const selectedAddress = userAddresses.find(item => item.address === address);
+        const pinEl = document.getElementById('selected-address-pin');
+
+        if (pinEl) {
+                if (selectedAddress?.pin) {
+                        pinEl.textContent = `PIN ${selectedAddress.pin}`;
+                        pinEl.style.display = 'block';
+                } else {
+                        pinEl.textContent = '';
+                        pinEl.style.display = 'none';
+                }
+        }
 
         const filteredAppeals = allAppeals.filter(a => a.propertyAddress === address);
         document.getElementById('total-appeals-count').textContent = filteredAppeals.length;
@@ -229,7 +243,14 @@ function setupAddAddressForm() {
         form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const input = document.getElementById('new-property-address');
-                const address = selectedAddressSuggestion || input.value.trim();
+                const address = selectedAddressSuggestion;
+                const typedAddress = input.value.trim();
+                if (!address && typedAddress) {
+                        await updateAddressSuggestions(typedAddress, true);
+                        input.focus();
+                        return;
+                }
+
                 if (!address) return;
 
                 const btn = document.getElementById('add-address-btn');
@@ -268,6 +289,7 @@ function setupAddAddressForm() {
         const input = document.getElementById('new-property-address');
         input?.addEventListener('input', () => {
                 selectedAddressSuggestion = '';
+                currentSuggestions = [];
                 window.clearTimeout(lookupTimer);
                 lookupTimer = window.setTimeout(() => {
                         updateAddressSuggestions(input.value);
@@ -281,7 +303,7 @@ function setupAddAddressForm() {
         });
 }
 
-async function updateAddressSuggestions(query) {
+async function updateAddressSuggestions(query, forceVisible = false) {
         const suggestionsPanel = document.getElementById('property-address-suggestions');
         if (!suggestionsPanel) return;
 
@@ -295,20 +317,21 @@ async function updateAddressSuggestions(query) {
                 if (!response.ok) return;
 
                 const data = await response.json();
-                renderAddressSuggestions('property-address-suggestions', data.suggestions || [], (address) => {
+                currentSuggestions = data.suggestions || [];
+                renderAddressSuggestions('property-address-suggestions', currentSuggestions, (address) => {
                         const input = document.getElementById('new-property-address');
                         if (input) {
                                 input.value = address;
                                 input.focus();
                         }
                         selectedAddressSuggestion = address;
-                });
+                }, forceVisible ? 'Select the closest matching address before adding it.' : '');
         } catch (error) {
                 console.error('Address lookup failed:', error);
         }
 }
 
-function renderAddressSuggestions(containerId, suggestions, onSelect) {
+function renderAddressSuggestions(containerId, suggestions, onSelect, helperText = '') {
         const panel = document.getElementById(containerId);
         if (!panel) return;
 
@@ -317,12 +340,14 @@ function renderAddressSuggestions(containerId, suggestions, onSelect) {
                 return;
         }
 
-        panel.innerHTML = suggestions.slice(0, 5).map(item => `
+        panel.innerHTML = `
+                ${helperText ? `<div class="address-suggestion-helper">${escapeHtml(helperText)}</div>` : ''}
+                ${suggestions.slice(0, 5).map(item => `
                 <button type="button" class="address-suggestion" role="option" data-address="${escapeHtml(item.address)}">
                         ${escapeHtml(item.address)}
                         <span>PIN ${escapeHtml(item.pin || 'not available')}</span>
                 </button>
-        `).join('');
+        `).join('')}`;
         panel.classList.add('is-visible');
 
         panel.querySelectorAll('.address-suggestion').forEach(button => {
