@@ -75,15 +75,13 @@ function buildCandidateQuery(query, limit) {
         clauses.push('normalized_address LIKE ?');
         params.push(`${normalizedQuery}%`);
 
-        clauses.push('normalized_address LIKE ?');
-        params.push(`%${normalizedQuery}%`);
-
-        if (firstNumber) {
+        if (firstNumber && streetToken) {
+                clauses.push('normalized_address LIKE ?');
+                params.push(`${firstNumber}%${streetToken}%`);
+        } else if (firstNumber) {
                 clauses.push('normalized_address LIKE ?');
                 params.push(`${firstNumber}%`);
-        }
-
-        if (streetToken) {
+        } else if (streetToken) {
                 clauses.push('normalized_address LIKE ?');
                 params.push(`%${streetToken}%`);
         }
