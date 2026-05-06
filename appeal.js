@@ -44,7 +44,7 @@ function createAppealModalHTML() {
             <span class="close-modal" id="close-appeal-modal">&times;</span>
             <div class="modal-header">
                 <h2>Appeal Your Property Tax</h2>
-                <p>Enter your property address to start the appeal process. We'll handle the rest.</p>
+                <p id="appeal-modal-subtitle">Enter your property address to start the appeal process. We'll handle the rest.</p>
             </div>
             <form id="appeal-form">
                 <div class="input-group">
@@ -70,16 +70,44 @@ function createAppealModalHTML() {
         document.body.appendChild(modal);
 }
 
-export function openAppealModal() {
+export function openAppealModal(propertyAddress = '') {
         const modal = document.getElementById('appeal-modal');
         if (modal) {
+                setAppealAddress(propertyAddress);
                 modal.classList.add('show');
-                document.getElementById('appeal-address').focus();
+                const addressInput = document.getElementById('appeal-address');
+                const payBtn = document.getElementById('pay-appeal-btn');
+                if (propertyAddress && payBtn) {
+                        payBtn.focus();
+                } else if (addressInput) {
+                        addressInput.focus();
+                }
         } else {
                 // Fallback if init didn't run or was delayed
                 createAppealModalHTML();
                 initAppealModal();
-                setTimeout(() => document.getElementById('appeal-modal').classList.add('show'), 10);
+                setTimeout(() => {
+                        setAppealAddress(propertyAddress);
+                        document.getElementById('appeal-modal').classList.add('show');
+                }, 10);
+        }
+}
+
+function setAppealAddress(propertyAddress = '') {
+        const addressInput = document.getElementById('appeal-address');
+        const subtitle = document.getElementById('appeal-modal-subtitle');
+
+        if (!addressInput) {
+                return;
+        }
+
+        addressInput.value = propertyAddress;
+        addressInput.readOnly = Boolean(propertyAddress);
+
+        if (subtitle) {
+                subtitle.textContent = propertyAddress
+                        ? 'This appeal will use the property already saved in your account.'
+                        : "Enter your property address to start the appeal process. We'll handle the rest.";
         }
 }
 

@@ -136,6 +136,12 @@
                         font-size: var(--font-size-3xl);
                 }
 
+                .account-actions {
+                        display: flex;
+                        gap: 0.75rem;
+                        flex-wrap: wrap;
+                }
+
                 @media (max-width: 760px) {
                         .account-header {
                                 align-items: flex-start;
@@ -144,6 +150,34 @@
 
                         .account-summary {
                                 grid-template-columns: 1fr;
+                        }
+
+                        .account-actions {
+                                background: rgba(255, 255, 255, 0.96);
+                                border-top: 1px solid var(--border-color);
+                                bottom: 0;
+                                box-shadow: 0 -8px 20px rgba(15, 23, 42, 0.08);
+                                display: grid;
+                                gap: 0.5rem;
+                                grid-template-columns: 1fr 1fr;
+                                left: 0;
+                                padding: 0.75rem var(--container-padding);
+                                position: fixed;
+                                right: 0;
+                                z-index: 1000;
+                        }
+
+                        .account-shell {
+                                padding-bottom: 6rem;
+                        }
+
+                        .account-actions .btn {
+                                justify-content: center;
+                                width: 100%;
+                        }
+
+                        #add-address-form {
+                                flex-direction: column;
                         }
                 }
         </style>
@@ -203,7 +237,7 @@
                                         <h1>Property Appeal Dashboard</h1>
                                         <p class="text-muted">Signed in as <strong id="account-email">your account</strong></p>
                                 </div>
-                                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                                <div class="account-actions">
                                         <button type="button" class="btn btn-primary" id="account-add-appeal-btn">Add Property Appeal</button>
                                         <button type="button" class="btn btn-secondary" id="account-logout-btn">Logout</button>
                                 </div>

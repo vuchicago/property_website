@@ -165,11 +165,9 @@ function renderAppeals(appeals, address) {
         // Add Event Listeners for appeal buttons
         historyContainer.querySelectorAll('.appeal-again-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
-                        const addr = e.target.dataset.address;
+                        const addr = e.currentTarget.dataset.address;
                         const { openAppealModal } = await import('./appeal.js');
-                        const addressInput = document.getElementById('appeal-address');
-                        if (addressInput) addressInput.value = addr;
-                        openAppealModal();
+                        openAppealModal(addr);
                 });
         });
 }

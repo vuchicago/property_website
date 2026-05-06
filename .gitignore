@@ -55,6 +55,7 @@ docker-compose.yml
 *.xlsx
 *.db
 *.sqlite
+import/
 
 # ============================================
 # DEVELOPMENT FILES
@@ -106,4 +107,3 @@ coverage/
 .cache/
 .temp/
 tmp/
-

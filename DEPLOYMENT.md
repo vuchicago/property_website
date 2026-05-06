@@ -52,6 +52,7 @@ Apply the non-destructive migration to production:
 ```bash
 wrangler d1 execute appeal_db --remote --file=migrations/0001_create_user_addresses.sql
 wrangler d1 execute appeal_db --remote --file=migrations/0002_add_customer_name_to_appeals.sql
+wrangler d1 execute appeal_db --remote --file=migrations/0003_create_property_addresses.sql
 ```
 
 For local Wrangler testing:
@@ -59,9 +60,30 @@ For local Wrangler testing:
 ```bash
 wrangler d1 execute appeal_db --local --file=migrations/0001_create_user_addresses.sql
 wrangler d1 execute appeal_db --local --file=migrations/0002_add_customer_name_to_appeals.sql
+wrangler d1 execute appeal_db --local --file=migrations/0003_create_property_addresses.sql
 ```
 
 Do not run the full `schema.sql` against production unless you intend to reset data, because it drops and recreates the `appeals` table.
+
+The `property_addresses` table is the import target for the Cook County address dataset. Convert `outfile_all_2025.parquet` to rows with at least `address` and `normalized_address`; include `pin`, `zip`, `latitude`, and `longitude` when available for faster exact and nearest-address matching.
+
+The current local dataset path is:
+
+```bash
+../property_tax_data_big/output_all_2025.parquet
+```
+
+Generate the D1 import SQL from that Parquet file:
+
+```bash
+python3 scripts/export_property_addresses_sql.py
+```
+
+Then import the generated SQL after the `property_addresses` table migration has been applied:
+
+```bash
+wrangler d1 execute appeal_db --remote --file=import/property_addresses_2025.sql
+```
 
 ## Email Notifications
 
