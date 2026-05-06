@@ -208,27 +208,21 @@
                         }
 
                         .account-actions {
-                                background: rgba(255, 255, 255, 0.96);
-                                border-top: 1px solid var(--border-color);
-                                bottom: 0;
-                                box-shadow: 0 -8px 20px rgba(15, 23, 42, 0.08);
-                                display: grid;
+                                display: flex;
                                 gap: 0.5rem;
-                                grid-template-columns: 1fr 1fr;
-                                left: 0;
-                                padding: 0.75rem var(--container-padding) calc(0.75rem + env(safe-area-inset-bottom));
-                                position: fixed;
-                                right: 0;
-                                z-index: 1100;
+                                overflow-x: auto;
+                                padding-bottom: 0.25rem;
+                                width: 100%;
+                                -webkit-overflow-scrolling: touch;
                         }
 
                         .account-shell {
-                                padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+                                padding-bottom: var(--space-16);
                         }
 
                         .account-actions .btn {
                                 justify-content: center;
-                                width: 100%;
+                                min-width: max-content;
                         }
 
                         #add-address-form {
@@ -237,6 +231,15 @@
 
                         .address-search-wrap {
                                 width: 100%;
+                        }
+
+                        .address-suggestions.is-visible {
+                                left: var(--container-padding);
+                                max-height: 45vh;
+                                position: fixed;
+                                right: var(--container-padding);
+                                top: auto;
+                                z-index: 2200;
                         }
                 }
         </style>

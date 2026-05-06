@@ -750,6 +750,11 @@ ol {
     display: flex;
     flex-shrink: 0;
     gap: var(--space-3);
+    min-width: 0;
+}
+
+#auth-action-container {
+    min-width: 0;
 }
 
 .nav-links a::after {
@@ -2710,6 +2715,36 @@ textarea {
         display: flex;
     }
 
+    .nav-container {
+        gap: var(--space-2);
+    }
+
+    .nav-actions {
+        flex: 1;
+        justify-content: flex-end;
+        min-width: 0;
+    }
+
+    #auth-action-container {
+        display: flex !important;
+        flex: 1;
+        gap: var(--space-2);
+        max-width: calc(100vw - 120px);
+        min-width: 0;
+        overflow-x: auto;
+        padding: var(--space-1) 0;
+        scrollbar-width: thin;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    #auth-action-container .cta-btn,
+    #auth-action-container .btn {
+        flex: 0 0 auto;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        white-space: nowrap;
+    }
+
     .hero {
         flex-direction: column;
         text-align: center;
@@ -2812,6 +2847,15 @@ textarea {
         flex-direction: column;
         gap: var(--space-4);
         text-align: center;
+    }
+
+    .address-suggestions.is-visible {
+        left: var(--container-padding);
+        max-height: 45vh;
+        position: fixed;
+        right: var(--container-padding);
+        top: auto;
+        z-index: 2200;
     }
 }
 
