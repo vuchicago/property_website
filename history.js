@@ -446,6 +446,12 @@ function setupAddAddressForm() {
                 }, 250);
         });
 
+        input?.addEventListener('focus', () => {
+                if (input.value.trim().length >= 3) {
+                        updateAddressSuggestions(input.value);
+                }
+        });
+
         document.addEventListener('click', (event) => {
                 if (!event.target.closest('#add-address-form')) {
                         hideAddressSuggestions('property-address-suggestions');
