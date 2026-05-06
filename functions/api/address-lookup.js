@@ -23,8 +23,6 @@ export const onRequestGet = async (context) => {
                                 id: item.id,
                                 pin: item.pin,
                                 address: item.address,
-                                city: item.city,
-                                zip: item.zip,
                                 score: item.score
                         }))
                 });

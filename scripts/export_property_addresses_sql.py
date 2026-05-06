@@ -11,82 +11,16 @@ from pathlib import Path
 import pyarrow.parquet as pq
 
 
-COLUMNS = [
-    "source_year",
+LOOKUP_COLUMNS = [
     "pin",
     "address",
     "normalized_address",
-    "house_number",
-    "street_name",
-    "street_suffix",
-    "unit",
-    "city",
-    "state",
-    "zip",
-    "property_class",
-    "class_code",
-    "taxable_value",
-    "certified_land",
-    "certified_building",
-    "home_size",
-    "bedroom_count",
-    "bathroom_count",
-    "masonry_type",
-    "finished_basement",
-    "single_vs_multi_family",
-    "neighborhood_code",
-    "garage_size",
-    "pin_proration_rate",
-    "last_appeal_year",
-    "last_appeal_status",
-    "latitude",
-    "longitude",
-    "source_row_id",
 ]
 
 
 def normalize_address(address: str) -> str:
     value = re.sub(r"[^A-Z0-9]+", " ", address.upper()).strip()
     return re.sub(r"\s+", " ", value)
-
-
-def split_city_zip(address: str) -> tuple[str | None, str | None]:
-    parts = [part.strip() for part in address.split(",")]
-    if len(parts) < 2:
-        return None, None
-
-    city = parts[-2] or None
-    tail = parts[-1]
-    zip_match = re.search(r"\b(\d{5})(?:-\d{4})?\b", tail)
-    return city, zip_match.group(1) if zip_match else None
-
-
-def split_street_parts(address: str) -> tuple[str | None, str | None, str | None, str | None]:
-    street = address.split(",", 1)[0]
-    tokens = normalize_address(street).split()
-
-    if not tokens:
-        return None, None, None, None
-
-    house_number = tokens[0] if tokens[0].isdigit() else None
-    street_tokens = tokens[1:] if house_number else tokens
-    unit = None
-
-    if len(street_tokens) >= 2 and street_tokens[-2] in {"APT", "UNIT", "STE", "SUITE"}:
-        unit = " ".join(street_tokens[-2:])
-        street_tokens = street_tokens[:-2]
-
-    street_suffix = None
-    suffixes = {"AVE", "AVENUE", "BLVD", "BOULEVARD", "CT", "COURT", "DR", "DRIVE", "LN", "LANE", "PL", "PLACE", "PKWY", "PARKWAY", "RD", "ROAD", "ST", "STREET", "TER", "TERRACE", "WAY"}
-
-    if street_tokens and street_tokens[-1] in suffixes:
-        street_suffix = street_tokens[-1]
-        street_tokens = street_tokens[:-1]
-
-    if street_tokens and street_tokens[0] in {"N", "S", "E", "W", "NE", "NW", "SE", "SW"}:
-        street_tokens = street_tokens[1:]
-
-    return house_number, " ".join(street_tokens) or None, street_suffix, unit
 
 
 def clean_string(value) -> str | None:
@@ -113,16 +47,6 @@ def clean_pin(value) -> str | None:
     return text
 
 
-def clean_number(value, integer: bool = False):
-    if value is None:
-        return None
-    if isinstance(value, float) and math.isnan(value):
-        return None
-    if clean_string(value) is None:
-        return None
-    return int(value) if integer else float(value)
-
-
 def sql_literal(value) -> str:
     if value is None:
         return "NULL"
@@ -131,51 +55,22 @@ def sql_literal(value) -> str:
     return "'" + str(value).replace("'", "''") + "'"
 
 
-def row_to_values(row: dict, source_year: int, source_index: int) -> list:
+def row_to_values(row: dict) -> list:
     address = clean_string(row.get("Nearby Address"))
-    if not address:
+    if not address or normalize_address(address) == "NO MATCHES IN RADIUS":
         return []
 
-    city, zip_code = split_city_zip(address)
-    house_number, street_name, street_suffix, unit = split_street_parts(address)
     return [
-        source_year,
         clean_pin(row.get("pin")),
         address,
         normalize_address(address),
-        house_number,
-        street_name,
-        street_suffix,
-        unit,
-        city,
-        "IL",
-        zip_code,
-        clean_string(row.get("Class Description")),
-        clean_string(row.get("class")),
-        clean_number(row.get("Taxable Value"), integer=True),
-        clean_number(row.get("Certified Land"), integer=True),
-        clean_number(row.get("Certified Building"), integer=True),
-        clean_number(row.get("Home Size")),
-        clean_number(row.get("Bedroom Count")),
-        clean_number(row.get("Bathroom Count")),
-        clean_string(row.get("Masonry Type")),
-        clean_string(row.get("Finished Basement")),
-        clean_string(row.get("Single vs Multi Family")),
-        clean_string(row.get("Neighborhood Code")),
-        clean_string(row.get("Garage Size")),
-        clean_number(row.get("PIN Proration Rate")),
-        clean_string(row.get("Last Appeal Year")),
-        clean_string(row.get("Last Appeal Status")),
-        clean_number(row.get("lat")),
-        clean_number(row.get("lon")),
-        str(source_index),
     ]
 
 
-def flush_insert(handle, rows: list[list]) -> None:
+def flush_insert(handle, rows: list[list], columns: list[str]) -> None:
     if not rows:
         return
-    handle.write(f"INSERT OR REPLACE INTO property_addresses ({', '.join(COLUMNS)}) VALUES\n")
+    handle.write(f"INSERT OR REPLACE INTO property_addresses ({', '.join(columns)}) VALUES\n")
     handle.write(",\n".join("(" + ", ".join(sql_literal(value) for value in row) + ")" for row in rows))
     handle.write(";\n")
 
@@ -192,7 +87,6 @@ def main() -> None:
         default="import/property_addresses_2025.sql",
         help="SQL file to create for wrangler d1 execute.",
     )
-    parser.add_argument("--source-year", type=int, default=2025)
     parser.add_argument("--batch-size", type=int, default=50)
     args = parser.parse_args()
 
@@ -201,19 +95,16 @@ def main() -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     parquet_file = pq.ParquetFile(input_path)
-    source_index = 0
     exported = 0
     batch: list[list] = []
 
     with output_path.open("w", encoding="utf-8") as handle:
-        handle.write("BEGIN TRANSACTION;\n")
-        handle.write("DELETE FROM property_addresses WHERE source_year = %d;\n" % args.source_year)
+        handle.write("DELETE FROM property_addresses;\n")
 
         for record_batch in parquet_file.iter_batches(batch_size=10_000):
             table = record_batch.to_pylist()
             for row in table:
-                values = row_to_values(row, args.source_year, source_index)
-                source_index += 1
+                values = row_to_values(row)
                 if not values:
                     continue
 
@@ -221,13 +112,12 @@ def main() -> None:
                 exported += 1
 
                 if len(batch) >= args.batch_size:
-                    flush_insert(handle, batch)
+                    flush_insert(handle, batch, LOOKUP_COLUMNS)
                     batch = []
 
-        flush_insert(handle, batch)
-        handle.write("COMMIT;\n")
+        flush_insert(handle, batch, LOOKUP_COLUMNS)
 
-    print(f"Exported {exported:,} rows to {output_path}")
+    print(f"Exported {exported:,} address lookup rows to {output_path}")
 
 
 if __name__ == "__main__":

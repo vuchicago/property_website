@@ -1,5 +1,5 @@
 import { requireFirebaseUser, jsonResponse } from './_auth.js';
-import { findBestPropertyAddress } from './_property_addresses.js';
+import { findBestPropertyAddress, getPropertyAddressCount } from './_property_addresses.js';
 
 export const onRequestGet = async (context) => {
         const { user, response } = await requireFirebaseUser(context.request);
@@ -44,6 +44,13 @@ export const onRequestPost = async (context) => {
                 const propertyAddress = await findBestPropertyAddress(context.env.DB, address);
 
                 if (!propertyAddress) {
+                        const propertyAddressCount = await getPropertyAddressCount(context.env.DB);
+                        if (propertyAddressCount === 0) {
+                                return jsonResponse({
+                                        error: 'The Cook County property address database has not been imported yet. Please import property_addresses before adding properties.'
+                                }, 400);
+                        }
+
                         return jsonResponse({
                                 error: 'Please enter a valid Cook County property address from our database.'
                         }, 400);

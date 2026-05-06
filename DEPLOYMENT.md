@@ -65,7 +65,21 @@ wrangler d1 execute appeal_db --local --file=migrations/0003_create_property_add
 
 Do not run the full `schema.sql` against production unless you intend to reset data, because it drops and recreates the `appeals` table.
 
-The `property_addresses` table is the import target for the Cook County address dataset. Convert `outfile_all_2025.parquet` to rows with at least `address` and `normalized_address`; include `pin`, `zip`, `latitude`, and `longitude` when available for faster exact and nearest-address matching.
+If you previously ran an older draft of `0003_create_property_addresses.sql` and see an error like `no such column: neighborhood_code`, rebuild only the generated lookup table before importing the Parquet data:
+
+```bash
+wrangler d1 execute appeal_db --remote --file=migrations/0004_rebuild_property_addresses.sql
+```
+
+This does not delete user accounts, saved user properties, or appeal/payment history. It only resets `property_addresses`, which is regenerated from the Parquet import.
+
+For the current lightweight address lookup, use the minimal rebuild migration:
+
+```bash
+wrangler d1 execute appeal_db --remote --file=migrations/0005_rebuild_property_addresses_minimal.sql
+```
+
+The `property_addresses` table is the import target for the Cook County address dataset. The current minimal lookup table stores only `pin`, the display address from `Nearby Address`, and a generated `normalized_address` used for matching.
 
 The current local dataset path is:
 
@@ -78,6 +92,8 @@ Generate the D1 import SQL from that Parquet file:
 ```bash
 python3 scripts/export_property_addresses_sql.py
 ```
+
+This export includes only address, normalized address, and PIN.
 
 Then import the generated SQL after the `property_addresses` table migration has been applied:
 

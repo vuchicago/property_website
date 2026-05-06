@@ -142,6 +142,61 @@
                         flex-wrap: wrap;
                 }
 
+                .address-search-wrap {
+                        flex: 1;
+                        position: relative;
+                }
+
+                .address-suggestions {
+                        background: var(--white);
+                        border: 1px solid var(--border-color);
+                        border-radius: var(--radius-md);
+                        box-shadow: var(--shadow-lg);
+                        display: none;
+                        left: 0;
+                        margin-top: 0.35rem;
+                        max-height: 260px;
+                        overflow-y: auto;
+                        position: absolute;
+                        right: 0;
+                        top: 100%;
+                        z-index: 20;
+                }
+
+                .address-suggestions.is-visible {
+                        display: block;
+                }
+
+                .address-suggestion {
+                        background: transparent;
+                        border: 0;
+                        border-bottom: 1px solid var(--border-color);
+                        color: var(--dark-900);
+                        cursor: pointer;
+                        display: block;
+                        font: inherit;
+                        padding: 0.75rem;
+                        text-align: left;
+                        width: 100%;
+                }
+
+                .address-suggestion:last-child {
+                        border-bottom: 0;
+                }
+
+                .address-suggestion:hover,
+                .address-suggestion:focus {
+                        background: var(--bg-secondary);
+                        outline: none;
+                }
+
+                .address-suggestion span {
+                        color: var(--text-muted);
+                        display: block;
+                        font-size: var(--font-size-xs);
+                        margin-top: 0.2rem;
+                }
+
                 @media (max-width: 760px) {
                         .account-header {
                                 align-items: flex-start;
@@ -178,6 +233,10 @@
 
                         #add-address-form {
                                 flex-direction: column;
+                        }
+
+                        .address-search-wrap {
+                                width: 100%;
                         }
                 }
         </style>
@@ -264,10 +323,12 @@
                                         <p class="text-sm text-muted mb-4">Add property addresses to track new and past appeals.</p>
 
                                         <form id="add-address-form" style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
-                                                <input type="text" id="new-property-address" placeholder="Enter Chicago address..." required
-                                                        list="property-address-suggestions" autocomplete="off"
-                                                        style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
-                                                <datalist id="property-address-suggestions"></datalist>
+                                                <div class="address-search-wrap">
+                                                        <input type="text" id="new-property-address" placeholder="Enter Chicago address..." required
+                                                                autocomplete="off" aria-autocomplete="list" aria-controls="property-address-suggestions"
+                                                                style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                                                        <div id="property-address-suggestions" class="address-suggestions" role="listbox"></div>
+                                                </div>
                                                 <button type="submit" class="btn btn-primary" id="add-address-btn"
                                                         style="padding: 0.5rem 1rem;">Add</button>
                                         </form>
@@ -381,7 +442,7 @@
                 });
 
                 addAppealBtn.addEventListener('click', async () => {
-                        const { openAppealModal } = await import('./appeal.js');
+                        const { openAppealModal } = await import('./appeal.js?v=20260506-address-suggestions');
                         openAppealModal();
                 });
 

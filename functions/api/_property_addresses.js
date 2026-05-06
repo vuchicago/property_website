@@ -79,13 +79,13 @@ function buildCandidateQuery(query, limit) {
         params.push(`%${normalizedQuery}%`);
 
         if (firstNumber) {
-                clauses.push('house_number = ?');
-                params.push(firstNumber);
+                clauses.push('normalized_address LIKE ?');
+                params.push(`${firstNumber}%`);
         }
 
         if (streetToken) {
-                clauses.push('street_name LIKE ?');
-                params.push(`${streetToken}%`);
+                clauses.push('normalized_address LIKE ?');
+                params.push(`%${streetToken}%`);
         }
 
         if (normalizedQuery.length >= 10) {
@@ -101,7 +101,7 @@ function buildCandidateQuery(query, limit) {
         params.push(Math.max(limit * 8, 40));
 
         return {
-                sql: `SELECT id, pin, address, normalized_address, city, zip, latitude, longitude
+                sql: `SELECT id, pin, address, normalized_address
                       FROM property_addresses
                       WHERE ${clauses.join(' OR ')}
                       LIMIT ?`,
@@ -138,4 +138,12 @@ export async function findBestPropertyAddress(db, address) {
         }
 
         return best;
+}
+
+export async function getPropertyAddressCount(db) {
+        const row = await db.prepare(
+                'SELECT COUNT(*) AS count FROM property_addresses'
+        ).first();
+
+        return Number(row?.count || 0);
 }

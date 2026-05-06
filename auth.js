@@ -160,7 +160,7 @@ const updateAuthButton = (container, user) => {
 
         if (user) {
                 // User is logged in
-                import('./appeal.js').then(module => {
+                import('./appeal.js?v=20260506-address-suggestions').then(module => {
                         window.openAppealModal = module.openAppealModal;
                 });
 
@@ -236,7 +236,7 @@ const updateMobileMenu = (ulElement, user) => {
                 li.innerHTML = `<a href="#" onclick="window.handleLogout(event)">Logout (${user.email})</a>`;
                 // Add appeal link to mobile menu too if desired
                 const appealLi = document.createElement('li');
-                appealLi.innerHTML = `<a href="#" onclick="import('./appeal.js').then(m=>m.openAppealModal())">Appeal Now</a>`;
+                appealLi.innerHTML = `<a href="#" onclick="import('./appeal.js?v=20260506-address-suggestions').then(m=>m.openAppealModal())">Appeal Now</a>`;
                 ulElement.insertBefore(appealLi, li);
         } else {
                 li.innerHTML = `<a href="login.html">Login</a>`;

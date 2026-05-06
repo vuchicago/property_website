@@ -419,6 +419,61 @@ ol {
     padding: var(--space-6);
 }
 
+.address-search-wrap {
+    flex: 1;
+    position: relative;
+}
+
+.address-suggestions {
+    background: var(--white);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    display: none;
+    left: 0;
+    margin-top: 0.35rem;
+    max-height: 260px;
+    overflow-y: auto;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    z-index: 1001;
+}
+
+.address-suggestions.is-visible {
+    display: block;
+}
+
+.address-suggestion {
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--dark-900);
+    cursor: pointer;
+    display: block;
+    font: inherit;
+    padding: 0.75rem;
+    text-align: left;
+    width: 100%;
+}
+
+.address-suggestion:last-child {
+    border-bottom: 0;
+}
+
+.address-suggestion:hover,
+.address-suggestion:focus {
+    background: var(--bg-secondary);
+    outline: none;
+}
+
+.address-suggestion span {
+    color: var(--text-muted);
+    display: block;
+    font-size: var(--font-size-xs);
+    margin-top: 0.2rem;
+}
+
 .status-badge {
     border-radius: var(--radius-full);
     display: inline-flex;
