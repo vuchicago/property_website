@@ -44,7 +44,11 @@ wrangler pages deploy dist --project-name=cook-county-tax-compare
 
 Cloudflare D1 must have the account tables before users can save properties or view appeal history.
 
+<<<<<<< HEAD
 Apply the non-destructive migrations to production:
+=======
+Apply the non-destructive migration to production:
+>>>>>>> Development
 
 ```bash
 wrangler d1 execute appeal_db --remote --file=migrations/0001_create_user_addresses.sql

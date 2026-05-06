@@ -3,8 +3,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
 
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
 // Firebase Configuration
 const firebaseConfig = {
         apiKey: "AIzaSyC_dBdm2F3zkzlP_540C4QgLAZhnb9a9Sc",
@@ -20,12 +18,10 @@ const firebaseConfig = {
 let app;
 let auth;
 let analytics;
-let db;
 
 try {
         app = initializeApp(firebaseConfig);
         auth = getAuth(app);
-        db = getFirestore(app);
         // Explicitly set persistence to local (it keeps the user logged in even after browser restart)
         setPersistence(auth, browserLocalPersistence).catch(error => {
                 console.error("Firebase persistence error:", error);
@@ -35,7 +31,7 @@ try {
         console.error("Firebase initialization failed:", error);
 }
 
-export { app, auth, db };
+export { app, auth };
 
 // Authentication Functions
 export const loginUser = async (email, password) => {
@@ -63,6 +59,62 @@ export const logoutUser = async () => {
         } catch (error) {
                 return { success: false, error: error.message };
         }
+};
+
+export const onAuthUserChanged = (callback) => {
+        if (!auth) return () => { };
+        return onAuthStateChanged(auth, callback);
+};
+
+export const waitForAuthUser = async () => {
+        if (!auth) {
+                throw new Error('Authentication is not initialized.');
+        }
+
+        if (auth.currentUser) {
+                return auth.currentUser;
+        }
+
+        return new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                        unsubscribe();
+                        reject(new Error('Please log in again before continuing.'));
+                }, 8000);
+
+                const unsubscribe = onAuthStateChanged(auth, (user) => {
+                        if (!user) return;
+                        clearTimeout(timeout);
+                        unsubscribe();
+                        resolve(user);
+                }, (error) => {
+                        clearTimeout(timeout);
+                        unsubscribe();
+                        reject(error);
+                });
+        });
+};
+
+export const getCurrentUserToken = async () => {
+        const user = await waitForAuthUser();
+        const token = await user.getIdToken();
+
+        if (!token) {
+                throw new Error('Could not verify your login. Please log in again.');
+        }
+
+        return token;
+};
+
+export const authFetch = async (url, options = {}) => {
+        const token = await getCurrentUserToken();
+        const headers = new Headers(options.headers || {});
+        headers.set('Authorization', `Bearer ${token}`);
+        headers.set('X-Firebase-Auth', token);
+
+        return fetch(url, {
+                ...options,
+                headers
+        });
 };
 
 // UI State Management
@@ -117,7 +169,6 @@ const updateAuthButton = (container, user) => {
                 appealBtn.href = "#";
                 appealBtn.className = "cta-btn"; // Use same style as original "Get Started"
                 appealBtn.style.marginRight = "10px";
-                // appealBtn.style.backgroundColor = "var(--primary)"; // Ensure it looks active
                 appealBtn.innerHTML = `
             <span>Appeal Now</span>
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -127,6 +178,20 @@ const updateAuthButton = (container, user) => {
                 appealBtn.onclick = (e) => {
                         e.preventDefault();
                         if (window.openAppealModal) window.openAppealModal();
+                };
+
+                // Create Account History Button
+                const historyBtn = document.createElement('a');
+                historyBtn.href = "login.html";
+                historyBtn.className = "btn btn-sm btn-secondary";
+                historyBtn.style.marginLeft = "0.5rem";
+                historyBtn.textContent = "My Account";
+                historyBtn.onclick = (e) => {
+                        const dashboard = document.getElementById('user-dashboard');
+                        if (dashboard) {
+                                e.preventDefault();
+                                dashboard.scrollIntoView({ behavior: 'smooth' });
+                        }
                 };
 
                 // Create Logout Button (smaller or icon?)
@@ -141,6 +206,7 @@ const updateAuthButton = (container, user) => {
                 container.style.alignItems = 'center';
 
                 container.appendChild(appealBtn);
+                container.appendChild(historyBtn);
                 container.appendChild(logoutBtn);
 
         } else {

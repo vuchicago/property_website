@@ -15,26 +15,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description"
-        content="Cook County Tax Compare - Analyze property taxes, compare valuations, and find potential savings through tax appeals. Professional tools for Cook County property owners.">
+        content="Compare your Cook County property assessment with nearby properties and get help understanding whether a property tax appeal may make sense.">
     <meta name="keywords"
         content="Cook County, property tax, tax appeal, tax comparison, real estate ROI, loan calculator">
 
     <!-- Open Graph / Social Media Meta Tags -->
     <meta property="og:type" content="website">
-    <meta property="og:title" content="Cook County Tax Compare | Property Tax Analysis & Appeal Tools">
+    <meta property="og:title" content="Cook County Property Tax Appeal Help & Assessment Comparison">
     <meta property="og:description"
-        content="Analyze property taxes, compare valuations, and find potential savings through tax appeals. Professional tools for Cook County property owners.">
+        content="Compare Cook County property assessments, review appeal windows, and request help with a residential property tax appeal.">
     <meta property="og:site_name" content="Cook County Tax Compare">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Cook County Tax Compare">
     <meta name="twitter:description"
-        content="Stop overpaying property taxes. Analyze assessments and file smarter appeals.">
+        content="Compare your Cook County assessment and decide whether a property tax appeal may make sense.">
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 
-    <title>Cook County Tax Compare | Property Tax Analysis & Appeal Tools</title>
+    <title>Cook County Property Tax Appeal Help & Assessment Comparison</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
@@ -43,6 +43,41 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <link rel="stylesheet" href="styles.css">
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@graph": [
+                {
+                    "@type": "LocalBusiness",
+                    "@id": "https://cookcountytaxcompare.com/#business",
+                    "name": "Cook County Tax Compare",
+                    "url": "https://cookcountytaxcompare.com/",
+                    "email": "vu@cookcountytaxcompare.com",
+                    "telephone": "+1-773-715-3476",
+                    "areaServed": "Cook County, Illinois",
+                    "description": "Cook County property assessment comparison tools and residential property tax appeal help."
+                },
+                {
+                    "@type": "Service",
+                    "@id": "https://cookcountytaxcompare.com/#appeal-help",
+                    "name": "Cook County property tax appeal help",
+                    "provider": {
+                        "@id": "https://cookcountytaxcompare.com/#business"
+                    },
+                    "areaServed": "Cook County, Illinois",
+                    "description": "Help reviewing Cook County property assessments, identifying comparable properties, and preparing residential appeal requests."
+                },
+                {
+                    "@type": "WebApplication",
+                    "@id": "https://cookcountytaxcompare.com/property-tax.html#tool",
+                    "name": "Cook County Property Tax Comparison Tool",
+                    "applicationCategory": "FinanceApplication",
+                    "operatingSystem": "Web",
+                    "url": "https://cookcountytaxcompare.com/property-tax.html"
+                }
+            ]
+        }
+    </script>
 </head>
 
 <body>
@@ -61,12 +96,11 @@
             <ul class="nav-links" id="nav-links">
                 <li><a href="index.html" class="active">Home</a></li>
                 <li><a href="property-tax.html">Property Tax Tool</a></li>
-                <li><a href="roi-calculator.html">ROI Calculator</a></li>
-                <li><a href="loan-tool.html">Loan Tool</a></li>
-                <!-- Removed Appeal Deadlines as per request -->
+                <li><a href="#why-appeal">How Appeals Work</a></li>
+                <li><a href="#pricing">Pricing</a></li>
+                <li><a href="#tools-preview">Real-Estate Tools</a></li>
                 <li><a href="#faq">FAQ</a></li>
                 <li><a href="#contact">Contact</a></li>
-                <!-- Removed Login placeholder as per request -->
             </ul>
             <div class="nav-actions">
                 <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
@@ -102,9 +136,9 @@
             <ul class="mobile-nav-links">
                 <li><a href="index.html" class="active">Home</a></li>
                 <li><a href="property-tax.html">Property Tax Tool</a></li>
-                <li><a href="roi-calculator.html">ROI Calculator</a></li>
-                <li><a href="loan-tool.html">Loan Tool</a></li>
-                <li><a href="#deadlines">Appeal Deadlines</a></li>
+                <li><a href="#why-appeal">How Appeals Work</a></li>
+                <li><a href="#pricing">Pricing</a></li>
+                <li><a href="#tools-preview">Real-Estate Tools</a></li>
                 <li><a href="#faq">FAQ</a></li>
                 <li><a href="#contact">Contact</a></li>
             </ul>
@@ -129,15 +163,15 @@
                         <path d="M12 2L14.09 8.26L21 12L14.09 15.74L12 22L9.91 15.74L3 12L9.91 8.26L12 2Z"
                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
-                    Trusted by 10,000+ Cook County Homeowners
+                    Cook County assessment comparison and appeal help
                 </div>
                 <h1>
-                    <span class="hero-title-line">Stop Overpaying</span>
-                    <span class="hero-title-accent">Property Taxes</span>
+                    <span class="hero-title-line">Your Property</span>
+                    <span class="hero-title-accent">May Be Overassessed</span>
                 </h1>
                 <p class="hero-subtitle">
-                    Discover if your property is overvalued with our analysis tools.
-                    Compare assessments, calculate potential savings, and file smarter appeals.
+                    Compare your Cook County assessment against nearby properties, understand the appeal process, and
+                    decide whether filing a residential property tax appeal may make sense.
                 </p>
                 <div class="hero-cta">
                     <a href="property-tax.html" class="btn btn-primary">
@@ -146,26 +180,22 @@
                                 d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z"
                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
-                        Analyze My Property
+                        Compare My Assessment
                     </a>
                     <a href="#why-appeal" class="btn btn-secondary">
-                        Learn How It Works
+                        How Appeals Work
                     </a>
                 </div>
                 <div class="hero-stats">
-                    <div class="stat">
-                        <span class="stat-number"><span data-count="2500">0</span></span>
-                        <span class="stat-label">Successful Appeals</span>
-                    </div>
+                    <div class="stat-divider"></div>
+                    <a href="login.html" class="stat stat-link" aria-label="Create an account for optional $99 appeal help">
+                        <span class="stat-number">$99</span>
+                        <span class="stat-label">Optional Appeal Help</span>
+                    </a>
                     <div class="stat-divider"></div>
                     <div class="stat">
-                        <span class="stat-number">$<span data-count="15">0</span>M+</span>
-                        <span class="stat-label">Taxes Saved</span>
-                    </div>
-                    <div class="stat-divider"></div>
-                    <div class="stat">
-                        <span class="stat-number"><span data-count="98">0</span>%</span>
-                        <span class="stat-label">Customer Satisfaction</span>
+                        <span class="stat-number">2x</span>
+                        <span class="stat-label">We Appeal Twice<br>if First Time Is Unsuccessful</span>
                     </div>
                 </div>
             </div>
@@ -175,7 +205,7 @@
                         <div class="dashboard-dots">
                             <span></span><span></span><span></span>
                         </div>
-                        <span class="dashboard-title">Property Analysis Dashboard</span>
+                        <span class="dashboard-title">Assessment Review</span>
                     </div>
                     <div class="dashboard-content">
                         <div class="mini-chart">
@@ -188,7 +218,8 @@
                         </div>
                         <div class="savings-indicator">
                             <span class="savings-label">Potential Savings</span>
-                            <span class="savings-value">$2,450/yr</span>
+                            <span class="savings-value">$900/year<a href="#demo-savings-note"
+                                    class="savings-footnote" aria-label="Potential savings footnote">1</a></span>
                         </div>
                     </div>
                 </div>
@@ -210,13 +241,52 @@
         <div class="container">
             <div class="section-header left">
                 <span class="section-badge">My Account</span>
-                <h2>Appeal History</h2>
-                <p>Track the status of your property tax appeals.</p>
+                <h2>Dashboard</h2>
+                <p>Manage your properties and track your tax appeals.</p>
             </div>
 
-            <div class="dashboard-card">
-                <div id="appeal-history-list">
-                    <!-- History items will be loaded here by history.js -->
+            <div class="dashboard-layout" style="display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap;">
+                <!-- Address Book Side -->
+                <div class="address-book-panel dashboard-card" style="flex: 1; min-width: 300px;">
+                    <h3>My Properties</h3>
+                    <p class="text-sm text-muted mb-4">Add your property addresses to track them.</p>
+
+                    <form id="add-address-form" style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+                        <input type="text" id="new-property-address" placeholder="Enter Chicago address..." required
+                            style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                        <button type="submit" class="btn btn-primary" id="add-address-btn"
+                            style="padding: 0.5rem 1rem;">Add</button>
+                    </form>
+
+                    <ul id="address-list" class="address-list"
+                        style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem;">
+                        <!-- Addresses loaded here -->
+                    </ul>
+                </div>
+
+                <!-- Appeal Details Side -->
+                <div class="appeal-details-panel dashboard-card" style="flex: 2; min-width: 300px; display: none;"
+                    id="appeal-details-container">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
+                        <div>
+                            <h3 id="selected-address-title">Selected Address</h3>
+                            <p class="text-sm text-muted">Appeal history for this property</p>
+                        </div>
+                        <div class="stats-badge"
+                            style="background: var(--bg-secondary); padding: 0.5rem 1rem; border-radius: var(--radius-full); font-size: 0.875rem; font-weight: 500;">
+                            Total Appeals: <span id="total-appeals-count">0</span>
+                        </div>
+                    </div>
+
+                    <div id="appeal-history-list">
+                        <!-- History items will be loaded here by history.js -->
+                    </div>
+                </div>
+
+                <div class="dashboard-card" id="no-address-selected-msg"
+                    style="flex: 2; min-width: 300px; display: flex; justify-content: center; align-items: center; min-height: 200px; color: var(--text-muted);">
+                    Select an address to view its appeal history.
                 </div>
             </div>
         </div>
@@ -226,9 +296,9 @@
     <section id="features" class="features">
         <div class="container">
             <div class="section-header animate-on-scroll">
-                <span class="section-badge">Our Tools</span>
-                <h2>Powerful Property Tax Analysis</h2>
-                <p>Everything you need to understand your property taxes and maximize your savings</p>
+                <span class="section-badge">How It Works</span>
+                <h2>A Clearer Way To Review Your Assessment</h2>
+                <p>Start with public data, then decide whether you want to file yourself or request help.</p>
             </div>
             <div class="features-grid">
                 <a href="property-tax.html" class="feature-card animate-on-scroll">
@@ -240,18 +310,18 @@
                             <circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="2" />
                         </svg>
                     </div>
-                    <h3>Property Tax Comparison</h3>
-                    <p>Compare your property's taxable value against similar properties in your neighborhood with
-                        interactive maps.</p>
+                    <h3>Compare Your Assessment</h3>
+                    <p>Look at your Cook County property alongside nearby parcels and start building a clearer picture
+                        of whether the assessment deserves a closer review.</p>
                     <span class="feature-link">
-                        Analyze Now
+                        Open the Tool
                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2"
                                 stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
                     </span>
                 </a>
-                <a href="roi-calculator.html" class="feature-card animate-on-scroll delay-100">
+                <a href="#why-appeal" class="feature-card animate-on-scroll delay-100">
                     <div class="feature-icon">
                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path
@@ -259,18 +329,18 @@
                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
                     </div>
-                    <h3>Real Estate ROI Calculator</h3>
-                    <p>Calculate Net Operating Income, CAP Rate, and Cash-on-Cash returns. Export results to CSV or PDF.
-                    </p>
+                    <h3>Understand the Appeal Window</h3>
+                    <p>Appeal timing depends on township publication dates. We point you toward the official Cook County
+                        calendar and explain what to check before filing.</p>
                     <span class="feature-link">
-                        Calculate ROI
+                        Learn the Process
                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2"
                                 stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
                     </span>
                 </a>
-                <a href="loan-tool.html" class="feature-card animate-on-scroll delay-200">
+                <a href="#pricing" class="feature-card animate-on-scroll delay-200">
                     <div class="feature-icon">
                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M3 3V21H21" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -279,18 +349,18 @@
                                 stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
                     </div>
-                    <h3>Loan Maturity Tool</h3>
-                    <p>Visualize your mortgage payments and see how extra payments can save you money. Download
-                        amortization schedules.</p>
+                    <h3>Choose Free or Assisted Filing</h3>
+                    <p>Filing directly with the Assessor is free. If you want help organizing the request, our assisted
+                        appeal option is a flat $99.</p>
                     <span class="feature-link">
-                        Analyze Loan
+                        View Pricing
                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2"
                                 stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
                     </span>
                 </a>
-                <a href="#deadlines" class="feature-card animate-on-scroll delay-300">
+                <a href="login.html" class="feature-card animate-on-scroll delay-300">
                     <div class="feature-icon">
                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2" />
@@ -298,10 +368,10 @@
                                 stroke-linecap="round" />
                         </svg>
                     </div>
-                    <h3>Appeal Deadlines</h3>
-                    <p>Stay informed about important tax appeal deadlines and never miss an opportunity.</p>
+                    <h3>Track Your Account</h3>
+                    <p>Log in to keep property addresses and appeal requests in one private account dashboard.</p>
                     <span class="feature-link">
-                        View Schedule
+                        Login
                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2"
                                 stroke-linecap="round" stroke-linejoin="round" />
@@ -318,9 +388,10 @@
             <div class="why-appeal-content animate-on-scroll">
                 <div class="section-header left">
                     <span class="section-badge">Why Appeal</span>
-                    <h2>Is Your Home Overvalued?</h2>
-                    <p>Cook County estimates property values using automated models that are often inaccurate. If your
-                        home is overvalued, you're paying more taxes than you should.</p>
+                    <h2>When Does an Appeal Make Sense?</h2>
+                    <p>A property tax appeal may be worth reviewing when your assessed value appears high compared with
+                        similar nearby properties. The county decides the outcome, so the goal is to organize evidence
+                        clearly, not promise a reduction.</p>
                 </div>
                 <div class="appeal-facts">
                     <div class="fact animate-on-scroll">
@@ -333,8 +404,9 @@
                             </svg>
                         </div>
                         <div class="fact-content">
-                            <h4>60%+ of Appeals Win</h4>
-                            <p>The majority of property tax appeals result in reduced assessments</p>
+                            <h4>Compare Similar Properties</h4>
+                            <p>Review assessment patterns near your property and look for comparable homes that may
+                                support your position.</p>
                         </div>
                     </div>
                     <div class="fact animate-on-scroll delay-100">
@@ -346,8 +418,9 @@
                             </svg>
                         </div>
                         <div class="fact-content">
-                            <h4>$1,200 Average Savings</h4>
-                            <p>Successful appellants save an average of $1,200 per year on property taxes</p>
+                            <h4>Check Official Deadlines</h4>
+                            <p>Appeal windows vary by township and are published by Cook County. Always confirm dates
+                                with the official calendar.</p>
                         </div>
                     </div>
                     <div class="fact animate-on-scroll delay-200">
@@ -360,8 +433,8 @@
                             </svg>
                         </div>
                         <div class="fact-content">
-                            <h4>Free to Appeal</h4>
-                            <p>Filing an appeal with the Cook County Assessor's Office costs nothing</p>
+                            <h4>Know Your Options</h4>
+                            <p>You can file directly for free or request paid help preparing an appeal request.</p>
                         </div>
                     </div>
                 </div>
@@ -377,36 +450,36 @@
                 <div class="comparison-card">
                     <div class="comparison-header">
                         <h4>Assessment Comparison</h4>
-                        <span class="badge-alert">Potentially Overvalued</span>
+                        <span class="badge-alert">Example Review</span>
                     </div>
                     <div class="comparison-chart">
                         <div class="comparison-bar">
                             <div class="bar-fill your-property animate-bar" style="--target-width: 85%;">
-                                <span>Your Property: $385,000</span>
+                                <span>Your Property Assessment</span>
                             </div>
                         </div>
                         <div class="comparison-bar">
                             <div class="bar-fill avg-comps animate-bar" style="--target-width: 65%;">
-                                <span>Avg. Comps: $295,000</span>
+                                <span>Comparable Properties</span>
                             </div>
                         </div>
                     </div>
                     <div class="potential-savings">
-                        <span class="savings-label">Potential Annual Savings</span>
-                        <span class="savings-amount">$1,890</span>
+                        <span class="savings-label">Next Step</span>
+                        <span class="savings-amount">Review Evidence</span>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Testimonials Section -->
-    <section id="testimonials" class="testimonials-section">
+    <!-- Pricing Section -->
+    <section id="pricing" class="testimonials-section">
         <div class="container">
             <div class="section-header animate-on-scroll">
-                <span class="section-badge">Success Stories</span>
-                <h2>Trusted by Homeowners</h2>
-                <p>See how we've helped Cook County property owners save money and make smarter decisions.</p>
+                <span class="section-badge">Pricing</span>
+                <h2>Use The Tool Free Or Request Appeal Help</h2>
+                <p>Transparent options for Cook County homeowners before we have public case results to share.</p>
             </div>
             <div class="testimonials-grid">
                 <div class="testimonial-card animate-on-scroll">
@@ -417,15 +490,15 @@
                                     d="M14.017 21L14.017 18C14.017 16.082 14.321 15.118 14.869 13.9C15.549 12.38 16.711 11.609 18.067 11.233C18.312 11.164 18.239 10.835 17.995 10.871C16.923 11.028 15.932 10.867 15.229 9.948C14.633 9.17001 14.481 8.01601 14.808 6.94101C15.253 5.48001 16.634 4.54201 18.066 5.09301C19.782 5.75401 20.916 8.05301 20.086 11.751C19.385 14.872 17.203 21 14.017 21ZM5.00699 21L5.00699 18C5.00699 16.082 5.31199 15.118 5.85899 13.9C6.54499 12.38 7.70299 11.609 9.06399 11.233C9.30899 11.164 9.23199 10.835 8.98999 10.871C7.91599 11.028 6.92499 10.867 6.22199 9.948C5.62699 9.17001 5.47399 8.01601 5.80099 6.94101C6.24499 5.48001 7.62699 4.54201 9.05999 5.09301C10.776 5.75401 11.91 8.05301 11.08 11.751C10.375 14.872 8.19299 21 5.00699 21Z" />
                             </svg>
                         </div>
-                        <p>"I had no idea I was overpaying on my property taxes until I used this tool. The comparison
-                            map made it so obvious that my assessment was higher than my neighbors. Using the data
-                            provided, I filed a successful appeal and saved over $2,000 this year!"</p>
+                        <h3>Free Assessment Review</h3>
+                        <p>Use the property comparison tool to review nearby assessments, understand the data, and decide
+                            whether you want to research an appeal yourself.</p>
                     </div>
                     <div class="testimonial-author">
-                        <div class="author-avatar">SJ</div>
+                        <div class="author-avatar">$0</div>
                         <div class="author-info">
-                            <h4>Sarah Jenkins</h4>
-                            <span>Chicago, IL</span>
+                            <h4>Self-guided</h4>
+                            <span>Public-data comparison</span>
                         </div>
                     </div>
                 </div>
@@ -437,15 +510,16 @@
                                     d="M14.017 21L14.017 18C14.017 16.082 14.321 15.118 14.869 13.9C15.549 12.38 16.711 11.609 18.067 11.233C18.312 11.164 18.239 10.835 17.995 10.871C16.923 11.028 15.932 10.867 15.229 9.948C14.633 9.17001 14.481 8.01601 14.808 6.94101C15.253 5.48001 16.634 4.54201 18.066 5.09301C19.782 5.75401 20.916 8.05301 20.086 11.751C19.385 14.872 17.203 21 14.017 21ZM5.00699 21L5.00699 18C5.00699 16.082 5.31199 15.118 5.85899 13.9C6.54499 12.38 7.70299 11.609 9.06399 11.233C9.30899 11.164 9.23199 10.835 8.98999 10.871C7.91599 11.028 6.92499 10.867 6.22199 9.948C5.62699 9.17001 5.47399 8.01601 5.80099 6.94101C6.24499 5.48001 7.62699 4.54201 9.05999 5.09301C10.776 5.75401 11.91 8.05301 11.08 11.751C10.375 14.872 8.19299 21 5.00699 21Z" />
                             </svg>
                         </div>
-                        <p>"As a first-time real estate investor, the ROI calculator is a godsend. It breaks down the
-                            cap rate and cash-on-cash return so clearly. I can analyze a potential deal in seconds
-                            rather than hours. Highly recommended for anyone in Cook County real estate."</p>
+                        <h3>Appeal Help</h3>
+                        <p>Request help organizing your property address, comparable assessment information, and appeal
+                            materials for review. If the first appeal is unsuccessful, we will appeal the next time for
+                            free.</p>
                     </div>
                     <div class="testimonial-author">
-                        <div class="author-avatar">MR</div>
+                        <div class="author-avatar">$99</div>
                         <div class="author-info">
-                            <h4>Michael Rodriguez</h4>
-                            <span>Evanston, IL</span>
+                            <h4>Flat fee</h4>
+                            <span>Optional assisted request</span>
                         </div>
                     </div>
                 </div>
@@ -457,15 +531,15 @@
                                     d="M14.017 21L14.017 18C14.017 16.082 14.321 15.118 14.869 13.9C15.549 12.38 16.711 11.609 18.067 11.233C18.312 11.164 18.239 10.835 17.995 10.871C16.923 11.028 15.932 10.867 15.229 9.948C14.633 9.17001 14.481 8.01601 14.808 6.94101C15.253 5.48001 16.634 4.54201 18.066 5.09301C19.782 5.75401 20.916 8.05301 20.086 11.751C19.385 14.872 17.203 21 14.017 21ZM5.00699 21L5.00699 18C5.00699 16.082 5.31199 15.118 5.85899 13.9C6.54499 12.38 7.70299 11.609 9.06399 11.233C9.30899 11.164 9.23199 10.835 8.98999 10.871C7.91599 11.028 6.92499 10.867 6.22199 9.948C5.62699 9.17001 5.47399 8.01601 5.80099 6.94101C6.24499 5.48001 7.62699 4.54201 9.05999 5.09301C10.776 5.75401 11.91 8.05301 11.08 11.751C10.375 14.872 8.19299 21 5.00699 21Z" />
                             </svg>
                         </div>
-                        <p>"The interface is beautiful and intuitive. I was intimidated by the appeal process before,
-                            but this site explains everything simply. Checked the deadlines, found comparables, and
-                            submitted my appeal with confidence."</p>
+                        <h3>We Appeal Twice</h3>
+                        <p>If your first appeal request is unsuccessful, we will appeal the same property again during
+                            the next eligible appeal window for free. County results are still not guaranteed.</p>
                     </div>
                     <div class="testimonial-author">
-                        <div class="author-avatar">DL</div>
+                        <div class="author-avatar">!</div>
                         <div class="author-info">
-                            <h4>David Lewis</h4>
-                            <span>Oak Park, IL</span>
+                            <h4>Second try included</h4>
+                            <span>If first appeal is unsuccessful</span>
                         </div>
                     </div>
                 </div>
@@ -477,9 +551,24 @@
     <section id="tools-preview" class="tools-preview">
         <div class="container">
             <div class="section-header animate-on-scroll">
-                <span class="section-badge">Quick Preview</span>
-                <h2>Try Our Tools</h2>
-                <p>Get a taste of our powerful property analysis tools right here</p>
+                <span class="section-badge">Real Estate Tools</span>
+                <h2>Additional Calculators</h2>
+                <p>These tools are useful for investors and homeowners, but the main service here is Cook County
+                    assessment comparison and appeal help.</p>
+            </div>
+            <div class="tool-link-grid">
+                <a href="roi-calculator.html" class="dashboard-card tool-link-card">
+                    <span class="section-badge">Investor Tool</span>
+                    <h3>ROI Calculator</h3>
+                    <p>Estimate NOI, cap rate, and cash-on-cash return for a real estate investment.</p>
+                    <span class="feature-link">Open ROI Calculator →</span>
+                </a>
+                <a href="loan-tool.html" class="dashboard-card tool-link-card">
+                    <span class="section-badge">Mortgage Tool</span>
+                    <h3>Loan Tool</h3>
+                    <p>Review loan payments, maturity, and amortization details for a mortgage scenario.</p>
+                    <span class="feature-link">Open Loan Tool →</span>
+                </a>
             </div>
             <div class="preview-tabs">
                 <button class="tab-btn active" data-tab="property">Property Tax</button>
@@ -579,8 +668,8 @@
                 <div class="section-header left">
                     <span class="section-badge">Important Dates</span>
                     <h2>2026 Tax Appeal Deadlines</h2>
-                    <p>Don't miss your opportunity to appeal your property tax assessment. Check the current deadline
-                        schedule for your township.</p>
+                    <p>Appeal windows depend on township and publication dates. Use the official Cook County calendar
+                        before making filing decisions.</p>
                 </div>
                 <div class="deadline-info">
                     <div class="info-card animate-on-scroll">
@@ -636,7 +725,7 @@
             <div class="deadlines-visual animate-on-scroll delay-200">
                 <div class="calendar-preview">
                     <div class="calendar-header">
-                        <span>January 2025</span>
+                        <span>Official calendar reminder</span>
                         <div class="calendar-nav">
                             <button><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M15 19L8 12L15 5" stroke="currentColor" stroke-width="2"
@@ -701,8 +790,6 @@
         </div>
     </section>
 
-    </section>
-
     <!-- FAQ Section -->
     <section id="faq" class="faq-section">
         <div class="container">
@@ -737,7 +824,7 @@
                     <div class="faq-answer">
                         <p>Filing an appeal directly with the Cook County Assessor's Office is completely free. You do
                             not need to hire a lawyer to file an appeal, especially for residential properties. Our
-                            tools provide the data you need to file yourself or we can do it for you for just $99</p>
+                            tools can help you review public data, and our optional appeal help is a flat $99.</p>
                     </div>
                 </div>
                 <div class="faq-item animate-on-scroll delay-200">
@@ -763,11 +850,24 @@
                         </svg>
                     </button>
                     <div class="faq-answer">
-                        <p>We use publicly available data directly from the Cook County Assessor's Office and the Cook
-                            County Open Data Portal. While we strive for 100% accuracy, we always recommend verifying
-                            final numbers with official county records before filing legal documents.</p>
+                        <p>We use public Cook County data sources where available. Always verify final numbers,
+                            deadlines, and filing requirements with official county records before submitting an appeal.
+                        </p>
                     </div>
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footnotes Section -->
+    <section id="footnotes" class="footnotes-section">
+        <div class="container">
+            <div class="dashboard-card">
+                <h2>Notes</h2>
+                <ol class="footnotes-list">
+                    <li id="demo-savings-note">The $900/year potential savings figure shown in the Assessment Review
+                        demo is for demonstration purposes only.</li>
+                </ol>
             </div>
         </div>
     </section>
@@ -779,8 +879,9 @@
                 <div class="section-header left">
                     <span class="section-badge">Get in Touch</span>
                     <h2>Need Help With Your Appeal?</h2>
-                    <p>Our team of property tax experts is here to help you navigate the appeal process and maximize
-                        your savings.</p>
+                    <p>Send your property address and questions. We can help you understand next steps, but we do not
+                        guarantee a reduced assessment or tax savings. If the first appeal is unsuccessful, we will
+                        appeal the same property again during the next eligible appeal window for free.</p>
                 </div>
                 <div class="contact-info">
                     <div class="contact-item">
@@ -912,8 +1013,7 @@
                         </div>
                         <span>Cook County<br><span class="logo-accent">Tax Compare</span></span>
                     </a>
-                    <p>Our mission is to lower your Cook County property taxes by providing powerful analysis tools and
-                        expert guidance.</p>
+                    <p>Cook County assessment comparison tools and optional residential property tax appeal help.</p>
                 </div>
                 <div class="footer-links">
                     <div class="footer-column">
@@ -921,16 +1021,19 @@
                         <ul>
                             <li><a href="index.html">Home</a></li>
                             <li><a href="property-tax.html">Property Tax Tool</a></li>
-                            <li><a href="roi-calculator.html">ROI Calculator</a></li>
-                            <li><a href="loan-tool.html">Loan Tool</a></li>
+                            <li><a href="#why-appeal">How Appeals Work</a></li>
+                            <li><a href="#pricing">Pricing</a></li>
+                            <li><a href="#tools-preview">Real-Estate Tools</a></li>
                         </ul>
                     </div>
                     <div class="footer-column">
                         <h4>Resources</h4>
                         <ul>
                             <li><a href="#deadlines">Appeal Deadlines</a></li>
-                            <li><a href="#testimonials">Success Stories</a></li>
                             <li><a href="#faq">FAQ</a></li>
+                            <li><a href="about-cook-county-tax-compare.html">About</a></li>
+                            <li><a href="roi-calculator.html">ROI Calculator</a></li>
+                            <li><a href="loan-tool.html">Loan Tool</a></li>
                             <li><a href="https://www.cookcountyassessor.com/" target="_blank">Assessor's Office</a></li>
                             <li><a href="https://github.com/ccao-data" target="_blank">CCAO GitHub</a></li>
                             <li><a href="#contact">Contact Us</a></li>
@@ -947,7 +1050,7 @@
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; 2025 Cook County Tax Compare LLC. All Rights Reserved.</p>
+                <p>&copy; 2026 Cook County Tax Compare LLC. All Rights Reserved.</p>
                 <div class="footer-legal">
                     <a href="#">Privacy Policy</a>
                     <a href="#">Terms of Service</a>

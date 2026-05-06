@@ -1,0 +1,5 @@
+.venv
+.git
+.wrangler
+__pycache__
+*.log

@@ -1,7 +1,15 @@
 {
-        "name": "cook-county-tax-compare",
+        "name": "cookcountytaxcompare",
         "compatibility_date": "2026-02-01",
-        "assets": {
-                "directory": "./"
+        "pages_build_output_dir": "dist",
+        "d1_databases": [
+                {
+                        "binding": "DB",
+                        "database_name": "appeal_db",
+                        "database_id": "ccbba211-1c8b-46b6-94f5-12e1cf840609"
+                }
+        ],
+        "observability": {
+                "enabled": true
         }
 }

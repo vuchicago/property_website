@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Admin Dashboard | Cook County Tax Compare</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+                rel="stylesheet">
+        <link rel="stylesheet" href="styles.css">
+        <style>
+                .admin-section {
+                        padding: 4rem 0;
+                        min-height: 80vh;
+                        display: none;
+                }
+
+                .admin-nav {
+                        display: flex;
+                        gap: 1rem;
+                        margin-bottom: 2rem;
+                        border-bottom: 1px solid var(--border-color);
+                        padding-bottom: 1rem;
+                }
+
+                .admin-tab {
+                        padding: 0.5rem 1rem;
+                        background: transparent;
+                        border: none;
+                        font-weight: 500;
+                        color: var(--text-muted);
+                        cursor: pointer;
+                        border-radius: var(--radius-md);
+                }
+
+                .admin-tab.active {
+                        background: var(--bg-secondary);
+                        color: var(--text);
+                }
+
+                .tab-content {
+                        display: none;
+                }
+
+                .tab-content.active {
+                        display: block;
+                }
+
+                .pending-list {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-top: 1rem;
+                }
+
+                .pending-list th,
+                .pending-list td {
+                        padding: 1rem;
+                        text-align: left;
+                        border-bottom: 1px solid var(--border-color);
+                }
+
+                .pending-list th {
+                        background: var(--bg-secondary);
+                        font-weight: 600;
+                }
+
+                #unauthorized-msg {
+                        text-align: center;
+                        padding: 5rem 0;
+                }
+
+                .action-btns {
+                        display: flex;
+                        gap: 0.5rem;
+                }
+
+                .admin-search-form {
+                        display: flex;
+                        gap: 1rem;
+                        align-items: flex-end;
+                        margin-bottom: 1.5rem;
+                }
+
+                .admin-search-form .input-group {
+                        flex: 1;
+                        margin: 0;
+                }
+
+                @media (max-width: 720px) {
+                        .admin-search-form {
+                                align-items: stretch;
+                                flex-direction: column;
+                        }
+                }
+        </style>
+</head>
+
+<body>
+        <!-- Navigation -->
+        <nav class="navbar">
+                <div class="nav-container">
+                        <a href="index.html" class="logo">
+                                <div class="logo-icon">
+                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M3 21H21M4 18H20M6 18V10M10 18V10M14 18V10M18 18V10M12 3L21 10H3L12 3Z"
+                                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                        stroke-linejoin="round" />
+                                        </svg>
+                                </div>
+                                <span>Cook County<br><span class="logo-accent">Tax Compare</span></span>
+                        </a>
+                        <ul class="nav-links">
+                                <li><a href="index.html">Home</a></li>
+                        </ul>
+                        <div class="nav-actions">
+                                <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+                                        <svg class="sun-icon" viewBox="0 0 24 24" fill="none"
+                                                xmlns="http://www.w3.org/2000/svg">
+                                                <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2" />
+                                                <path d="M12 2V4M12 20V22M4 12H2M6.31 6.31L4.9 4.9M17.69 6.31L19.1 4.9M6.31 17.69L4.9 19.1M17.69 17.69L19.1 19.1M22 12H20"
+                                                        stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                                        </svg>
+                                </button>
+                        </div>
+                </div>
+        </nav>
+
+        <!-- Content -->
+        <main>
+                <div id="unauthorized-msg">
+                        <h2>Checking Administrator Access...</h2>
+                </div>
+
+                <section id="admin-dashboard" class="admin-section container">
+                        <div class="section-header left">
+                                <span class="section-badge" id="admin-badge">Admin</span>
+                                <h2>Administrator Dashboard</h2>
+                                <p>Manage pending appeals and system administrators.</p>
+                        </div>
+
+                        <div class="admin-nav">
+                                <button class="admin-tab active" data-tab="appeals">Pending Appeals</button>
+                                <button class="admin-tab" data-tab="history">Search User History</button>
+                                <button class="admin-tab" data-tab="roles" id="roles-tab" style="display: none;">Role
+                                        Management</button>
+                        </div>
+
+                        <div class="dashboard-card">
+                                <!-- Appeals Tab -->
+                                <div id="appeals" class="tab-content active">
+                                        <h3>Appeals Awaiting Action</h3>
+                                        <div style="overflow-x: auto;">
+                                                <table class="pending-list" id="appeals-table">
+                                                        <thead>
+                                                                <tr>
+                                                                        <th>Address</th>
+                                                                        <th>Email</th>
+                                                                        <th>Payment Date</th>
+                                                                        <th>Status</th>
+                                                                        <th>Action</th>
+                                                                </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                                <tr>
+                                                                        <td colspan="5" style="text-align:center;">
+                                                                                Loading...</td>
+                                                                </tr>
+                                                        </tbody>
+                                                </table>
+                                        </div>
+                                </div>
+
+                                <!-- User History Tab -->
+                                <div id="history" class="tab-content">
+                                        <h3>User Appeal History</h3>
+                                        <form id="history-search-form" class="admin-search-form">
+                                                <div class="input-group">
+                                                        <label for="history-search-email">Search by payer email</label>
+                                                        <input type="email" id="history-search-email"
+                                                                placeholder="customer@example.com" required>
+                                                </div>
+                                                <button type="submit" class="btn btn-primary">Search</button>
+                                        </form>
+
+                                        <div style="overflow-x: auto;">
+                                                <table class="pending-list" id="history-table">
+                                                        <thead>
+                                                                <tr>
+                                                                        <th>Name</th>
+                                                                        <th>Email</th>
+                                                                        <th>Address</th>
+                                                                        <th>Payment Date</th>
+                                                                        <th>Status</th>
+                                                                </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                                <tr>
+                                                                        <td colspan="5" style="text-align:center;">
+                                                                                Search an email to view history.</td>
+                                                                </tr>
+                                                        </tbody>
+                                                </table>
+                                        </div>
+                                </div>
+
+                                <!-- Roles Tab -->
+                                <div id="roles" class="tab-content">
+                                        <h3>System Administrators</h3>
+
+                                        <form id="add-admin-form"
+                                                style="display: flex; gap: 1rem; margin-bottom: 2rem; align-items: flex-end;">
+                                                <div class="input-group" style="flex: 2; margin: 0;">
+                                                        <label>Email Address</label>
+                                                        <input type="email" id="new-admin-email" required
+                                                                placeholder="admin@example.com">
+                                                </div>
+                                                <div class="input-group" style="flex: 1; margin: 0;">
+                                                        <label>Role</label>
+                                                        <select id="new-admin-role"
+                                                                style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 100%; background: var(--bg-primary); color: var(--text);">
+                                                                <option value="admin">Admin</option>
+                                                                <option value="superadmin">Super Admin</option>
+                                                        </select>
+                                                </div>
+                                                <button type="submit" class="btn btn-primary">Add Admin</button>
+                                        </form>
+
+                                        <div style="overflow-x: auto;">
+                                                <table class="pending-list" id="roles-table">
+                                                        <thead>
+                                                                <tr>
+                                                                        <th>Email</th>
+                                                                        <th>Role</th>
+                                                                        <th>Action</th>
+                                                                </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                                <!-- Roles loaded dynamically -->
+                                                        </tbody>
+                                                </table>
+                                        </div>
+                                </div>
+                        </div>
+                </section>
+        </main>
+
+        <script type="module" src="admin.js"></script>
+        <script src="components.js"></script>
+</body>
+
+</html>

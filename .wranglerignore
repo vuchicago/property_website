@@ -1,0 +1,44 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py
+*.pyc
+*.pyo
+.python-version
+pyproject.toml
+uv.lock
+requirements.txt
+setup.py
+setup.cfg
+*.egg-info/
+
+# Dev/Build
+.git/
+.gitignore
+node_modules/
+.wrangler/
+.DS_Store
+.agent/
+.gemini/
+
+# Data
+*.parquet
+*.csv
+*.xlsx
+*.db
+*.sqlite
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Docs
+README.md
+DEPLOYMENT.md
+
+# Misc
+*.log
+.env
+.env.*

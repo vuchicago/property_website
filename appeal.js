@@ -115,7 +115,7 @@ async function handleAppealPayment() {
         }
 
         // Get current user
-        const { auth } = await import('./auth.js');
+        const { auth, authFetch } = await import('./auth.js');
         const user = auth.currentUser;
 
         if (!user) {
@@ -130,12 +130,11 @@ async function handleAppealPayment() {
         btn.disabled = true;
 
         try {
-                const response = await fetch('/api/create-checkout-session', {
+                const response = await authFetch('/api/create-checkout-session', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                                propertyAddress: address,
-                                userId: user.uid
+                                propertyAddress: address
                         })
                 });
 
@@ -144,13 +143,7 @@ async function handleAppealPayment() {
                         const text = await response.text();
                         console.error("API Error Response:", text);
 
-                        // Fallback for local testing if API is missing (404)
-                        if (response.status === 404 && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-                                if (confirm("Backend API not found (running locally?). Use Mock Payment flow for testing?")) {
-                                        mockPaymentFlow(address, user.uid);
-                                        return;
-                                }
-                        }
+                        // Handle 404 naturally via the throw new Error below
 
                         throw new Error(`Server returned ${response.status}: ${text || response.statusText}`);
                 }

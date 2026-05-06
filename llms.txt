@@ -1,0 +1,18 @@
+# Cook County Tax Compare
+
+Cook County Tax Compare helps Cook County, Illinois residential property owners compare property assessments, understand appeal timing, and request optional property tax appeal help.
+
+## Key Pages
+
+- Homepage: https://cookcountytaxcompare.com/
+- Property tax comparison tool: https://cookcountytaxcompare.com/property-tax.html
+- Cook County property tax appeal help: https://cookcountytaxcompare.com/cook-county-property-tax-appeal.html
+- About: https://cookcountytaxcompare.com/about-cook-county-tax-compare.html
+- Contact: https://cookcountytaxcompare.com/#contact
+
+## Important Notes
+
+- Filing a property tax appeal directly with Cook County is free.
+- Optional assisted appeal help is offered for a flat $99.
+- Cook County Tax Compare does not guarantee a lower assessment, tax savings, refund, or successful appeal.
+- Users should verify deadlines, property data, and filing requirements with official Cook County sources.
