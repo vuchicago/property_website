@@ -34,12 +34,25 @@ CREATE TABLE IF NOT EXISTS property_addresses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   pin TEXT,
   address TEXT NOT NULL,
-  normalized_address TEXT NOT NULL
+  normalized_address TEXT NOT NULL,
+  taxable_value INTEGER,
+  last_appeal_year TEXT,
+  certified_land INTEGER,
+  certified_building INTEGER,
+  home_size REAL,
+  last_appeal_status TEXT,
+  bedroom_count REAL,
+  bathroom_count REAL,
+  masonry_type TEXT,
+  finished_basement TEXT,
+  single_vs_multi_family TEXT,
+  neighborhood_code TEXT,
+  garage_size TEXT,
+  property_class TEXT,
+  pin_proration_rate REAL,
+  latitude REAL,
+  longitude REAL,
+  latitude_raw TEXT,
+  longitude_raw TEXT,
+  class_code TEXT
 );
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_property_addresses_pin
-ON property_addresses(pin)
-WHERE pin IS NOT NULL;
-
-CREATE INDEX IF NOT EXISTS idx_property_addresses_normalized
-ON property_addresses(normalized_address);

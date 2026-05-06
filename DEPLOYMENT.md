@@ -65,21 +65,19 @@ wrangler d1 execute appeal_db --local --file=migrations/0003_create_property_add
 
 Do not run the full `schema.sql` against production unless you intend to reset data, because it drops and recreates the `appeals` table.
 
-If you previously ran an older draft of `0003_create_property_addresses.sql` and see an error like `no such column: neighborhood_code`, rebuild only the generated lookup table before importing the Parquet data:
+If you previously ran an older draft of `0003_create_property_addresses.sql` and see an error like `no such column: neighborhood_code`, rebuild the generated property lookup table before importing the Parquet data:
 
 ```bash
-wrangler d1 execute appeal_db --remote --file=migrations/0004_rebuild_property_addresses.sql
+wrangler d1 execute appeal_db --remote --file=migrations/0006_rebuild_property_addresses_full.sql
 ```
 
 This does not delete user accounts, saved user properties, or appeal/payment history. It only resets `property_addresses`, which is regenerated from the Parquet import.
 
-For the current lightweight address lookup, use the minimal rebuild migration:
+Older repair migrations are kept for history, but use `0006_rebuild_property_addresses_full.sql` for the current full Parquet table.
 
-```bash
-wrangler d1 execute appeal_db --remote --file=migrations/0005_rebuild_property_addresses_minimal.sql
-```
+The `property_addresses` table is the import target for the Cook County address dataset. It stores `pin`, the display address from `Nearby Address`, a generated `normalized_address` used for matching, and the remaining assessment/appeal columns from `output_all_2025.parquet`.
 
-The `property_addresses` table is the import target for the Cook County address dataset. The current minimal lookup table stores only `pin`, the display address from `Nearby Address`, and a generated `normalized_address` used for matching.
+The full rebuild intentionally creates the table without secondary indexes to reduce D1 rows-written during bulk import. Add the PIN index only after the import succeeds.
 
 The current local dataset path is:
 
@@ -93,12 +91,38 @@ Generate the D1 import SQL from that Parquet file:
 python3 scripts/export_property_addresses_sql.py
 ```
 
-This export includes only address, normalized address, and PIN.
+This export includes all mapped Parquet columns.
 
 Then import the generated SQL after the `property_addresses` table migration has been applied:
 
 ```bash
 wrangler d1 execute appeal_db --remote --file=import/property_addresses_2025.sql
+```
+
+For large imports, split the generated SQL into smaller files:
+
+```bash
+python3 scripts/export_property_addresses_sql.py --rows-per-file 10000
+```
+
+Then import each generated part in order:
+
+```bash
+bash scripts/import_property_addresses_parts.sh
+```
+
+The import script passes `--yes` to Wrangler so you do not have to approve each split file manually.
+
+If an import fails partway through, rerun from the failed part number:
+
+```bash
+START_PART=42 bash scripts/import_property_addresses_parts.sh
+```
+
+After all parts import and the count looks right, add the PIN index:
+
+```bash
+wrangler d1 execute appeal_db --remote --file=migrations/0007_add_property_addresses_pin_index.sql
 ```
 
 ## Email Notifications

@@ -11,10 +11,30 @@ from pathlib import Path
 import pyarrow.parquet as pq
 
 
-LOOKUP_COLUMNS = [
+PROPERTY_COLUMNS = [
     "pin",
     "address",
     "normalized_address",
+    "taxable_value",
+    "last_appeal_year",
+    "certified_land",
+    "certified_building",
+    "home_size",
+    "last_appeal_status",
+    "bedroom_count",
+    "bathroom_count",
+    "masonry_type",
+    "finished_basement",
+    "single_vs_multi_family",
+    "neighborhood_code",
+    "garage_size",
+    "property_class",
+    "pin_proration_rate",
+    "latitude",
+    "longitude",
+    "latitude_raw",
+    "longitude_raw",
+    "class_code",
 ]
 
 
@@ -47,6 +67,16 @@ def clean_pin(value) -> str | None:
     return text
 
 
+def clean_number(value, integer: bool = False):
+    if value is None:
+        return None
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    if clean_string(value) is None:
+        return None
+    return int(value) if integer else float(value)
+
+
 def sql_literal(value) -> str:
     if value is None:
         return "NULL"
@@ -64,6 +94,26 @@ def row_to_values(row: dict) -> list:
         clean_pin(row.get("pin")),
         address,
         normalize_address(address),
+        clean_number(row.get("Taxable Value"), integer=True),
+        clean_string(row.get("Last Appeal Year")),
+        clean_number(row.get("Certified Land"), integer=True),
+        clean_number(row.get("Certified Building"), integer=True),
+        clean_number(row.get("Home Size")),
+        clean_string(row.get("Last Appeal Status")),
+        clean_number(row.get("Bedroom Count")),
+        clean_number(row.get("Bathroom Count")),
+        clean_string(row.get("Masonry Type")),
+        clean_string(row.get("Finished Basement")),
+        clean_string(row.get("Single vs Multi Family")),
+        clean_string(row.get("Neighborhood Code")),
+        clean_string(row.get("Garage Size")),
+        clean_string(row.get("Class Description")),
+        clean_number(row.get("PIN Proration Rate")),
+        clean_number(row.get("lat")),
+        clean_number(row.get("lon")),
+        clean_string(row.get("latitude")),
+        clean_string(row.get("longitude")),
+        clean_string(row.get("class")),
     ]
 
 
@@ -73,6 +123,10 @@ def flush_insert(handle, rows: list[list], columns: list[str]) -> None:
     handle.write(f"INSERT OR REPLACE INTO property_addresses ({', '.join(columns)}) VALUES\n")
     handle.write(",\n".join("(" + ", ".join(sql_literal(value) for value in row) + ")" for row in rows))
     handle.write(";\n")
+
+
+def part_path(output_path: Path, part_number: int) -> Path:
+    return output_path.with_name(f"{output_path.stem}_part_{part_number:04d}{output_path.suffix}")
 
 
 def main() -> None:
@@ -88,6 +142,12 @@ def main() -> None:
         help="SQL file to create for wrangler d1 execute.",
     )
     parser.add_argument("--batch-size", type=int, default=50)
+    parser.add_argument(
+        "--rows-per-file",
+        type=int,
+        default=0,
+        help="Split output into multiple SQL files with this many rows each. Use this for large D1 imports.",
+    )
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -97,10 +157,19 @@ def main() -> None:
     parquet_file = pq.ParquetFile(input_path)
     exported = 0
     batch: list[list] = []
+    part_number = 1
+    rows_in_part = 0
 
-    with output_path.open("w", encoding="utf-8") as handle:
-        handle.write("DELETE FROM property_addresses;\n")
+    def open_output_file():
+        path = part_path(output_path, part_number) if args.rows_per_file else output_path
+        handle = path.open("w", encoding="utf-8")
+        if part_number == 1:
+            handle.write("DELETE FROM property_addresses;\n")
+        return handle, path
 
+    handle, current_path = open_output_file()
+
+    try:
         for record_batch in parquet_file.iter_batches(batch_size=10_000):
             table = record_batch.to_pylist()
             for row in table:
@@ -110,14 +179,30 @@ def main() -> None:
 
                 batch.append(values)
                 exported += 1
+                rows_in_part += 1
 
                 if len(batch) >= args.batch_size:
-                    flush_insert(handle, batch, LOOKUP_COLUMNS)
+                    flush_insert(handle, batch, PROPERTY_COLUMNS)
                     batch = []
 
-        flush_insert(handle, batch, LOOKUP_COLUMNS)
+                if args.rows_per_file and rows_in_part >= args.rows_per_file:
+                    flush_insert(handle, batch, PROPERTY_COLUMNS)
+                    batch = []
+                    handle.close()
+                    print(f"Wrote {current_path}")
+                    part_number += 1
+                    rows_in_part = 0
+                    handle, current_path = open_output_file()
 
-    print(f"Exported {exported:,} address lookup rows to {output_path}")
+        flush_insert(handle, batch, PROPERTY_COLUMNS)
+    finally:
+        handle.close()
+
+    if args.rows_per_file:
+        print(f"Wrote {current_path}")
+        print(f"Exported {exported:,} full property address rows across {part_number} files")
+    else:
+        print(f"Exported {exported:,} full property address rows to {output_path}")
 
 
 if __name__ == "__main__":

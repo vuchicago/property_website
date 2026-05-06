@@ -1,4 +1,6 @@
-CREATE TABLE IF NOT EXISTS property_addresses (
+DROP TABLE IF EXISTS property_addresses;
+
+CREATE TABLE property_addresses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   pin TEXT,
   address TEXT NOT NULL,
