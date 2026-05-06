@@ -5,6 +5,8 @@ let allAppeals = [];
 let lookupTimer = null;
 let selectedAddressSuggestion = '';
 let currentSuggestions = [];
+let selectedAddressForImage = '';
+let selectedPinForImage = '';
 
 export async function loadAppealHistory() {
         const user = auth.currentUser;
@@ -19,6 +21,7 @@ export async function loadAppealHistory() {
         renderAccountSummary(user);
         renderAddressList();
         setupAddAddressForm();
+        setupPropertyImageUpload();
 }
 
 async function fetchAddresses() {
@@ -49,7 +52,12 @@ function renderAccountSummary(user) {
 
         if (emailEl) emailEl.textContent = user.email || 'Signed in';
         if (propertyCountEl) propertyCountEl.textContent = userAddresses.length;
-        if (appealCountEl) appealCountEl.textContent = allAppeals.length;
+        if (appealCountEl) {
+                appealCountEl.textContent = allAppeals.filter(appeal => {
+                        const status = (appeal.appealStatus || appeal.status || '').toLowerCase();
+                        return status && status !== 'pending';
+                }).length;
+        }
         if (pendingCountEl) {
                 pendingCountEl.textContent = allAppeals.filter(appeal => (appeal.appealStatus || appeal.status || '').toLowerCase() === 'pending').length;
         }
@@ -158,6 +166,8 @@ function showEmptyDetailsPanel() {
 }
 
 function selectAddress(address) {
+        selectedAddressForImage = address;
+        selectedPinForImage = '';
         document.getElementById('no-address-selected-msg').style.display = 'none';
         const detailsPanel = document.getElementById('appeal-details-container');
         detailsPanel.style.display = 'block';
@@ -168,6 +178,7 @@ function selectAddress(address) {
 
         if (pinEl) {
                 if (selectedAddress?.pin) {
+                        selectedPinForImage = selectedAddress.pin;
                         pinEl.textContent = `PIN ${selectedAddress.pin}`;
                         pinEl.style.display = 'block';
                 } else {
@@ -176,10 +187,149 @@ function selectAddress(address) {
                 }
         }
 
+        renderPropertyDetails(selectedAddress?.propertyDetails);
+        renderPropertyImage(selectedAddress?.pin);
+
         const filteredAppeals = allAppeals.filter(a => a.propertyAddress === address);
         document.getElementById('total-appeals-count').textContent = filteredAppeals.length;
 
         renderAppeals(filteredAppeals, address);
+}
+
+async function renderPropertyImage(pin) {
+        const preview = document.getElementById('property-image-preview');
+        const dateEl = document.getElementById('property-image-date');
+        if (!preview || !dateEl) return;
+
+        preview.style.display = 'none';
+        preview.removeAttribute('src');
+        if (!pin) {
+                dateEl.textContent = 'PIN unavailable. Image upload is disabled for this property.';
+                return;
+        }
+
+        dateEl.textContent = 'Loading image...';
+
+        try {
+                const response = await authFetch(`/api/property-image?pin=${encodeURIComponent(pin)}`);
+                if (!response.ok) throw new Error('Failed to load image');
+
+                const data = await response.json();
+                if (!data.image) {
+                        dateEl.textContent = 'No image uploaded.';
+                        return;
+                }
+
+                preview.src = data.image.image_data;
+                preview.style.display = 'block';
+                dateEl.textContent = `Uploaded ${new Date(data.image.uploaded_at).toLocaleString()}`;
+        } catch (error) {
+                console.error('Error loading property image:', error);
+                dateEl.textContent = 'Image could not be loaded.';
+        }
+}
+
+function setupPropertyImageUpload() {
+        const input = document.getElementById('property-image-input');
+        if (!input || input.dataset.bound === 'true') return;
+        input.dataset.bound = 'true';
+
+        input.addEventListener('change', async () => {
+                const file = input.files?.[0];
+                if (!file || !selectedAddressForImage || !selectedPinForImage) return;
+
+                try {
+                        const resized = await resizeImage(file, 400, 400);
+                        const response = await authFetch('/api/property-image', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                        address: selectedAddressForImage,
+                                        pin: selectedPinForImage,
+                                        imageData: resized.imageData,
+                                        mimeType: resized.mimeType
+                                })
+                        });
+
+                        if (!response.ok) {
+                                const err = await response.json();
+                                alert(`Failed to upload image: ${err.error}`);
+                                return;
+                        }
+
+                        await renderPropertyImage(selectedPinForImage);
+                } catch (error) {
+                        console.error('Error uploading image:', error);
+                        alert('The image could not be uploaded.');
+                } finally {
+                        input.value = '';
+                }
+        });
+}
+
+function resizeImage(file, maxWidth, maxHeight) {
+        return new Promise((resolve, reject) => {
+                const image = new Image();
+                const reader = new FileReader();
+
+                reader.onload = () => {
+                        image.onload = () => {
+                                const scale = Math.min(maxWidth / image.width, maxHeight / image.height, 1);
+                                const width = Math.max(1, Math.round(image.width * scale));
+                                const height = Math.max(1, Math.round(image.height * scale));
+                                const canvas = document.createElement('canvas');
+                                canvas.width = width;
+                                canvas.height = height;
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(image, 0, 0, width, height);
+
+                                resolve({
+                                        imageData: canvas.toDataURL('image/jpeg', 0.82),
+                                        mimeType: 'image/jpeg'
+                                });
+                        };
+                        image.onerror = reject;
+                        image.src = reader.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+        });
+}
+
+function renderPropertyDetails(details) {
+        const container = document.getElementById('selected-property-details');
+        if (!container) return;
+
+        const fields = [
+                ['Taxable Value', formatCurrency(details?.taxableValue)],
+                ['Home Size', formatNumber(details?.homeSize, ' sq ft')],
+                ['Last Appeal Year', details?.lastAppealYear],
+                ['Last Appeal Status', details?.lastAppealStatus],
+                ['Certified Land', formatCurrency(details?.certifiedLand)],
+                ['Certified Building', formatCurrency(details?.certifiedBuilding)],
+                ['Masonry Type', details?.masonryType],
+                ['Class Code', details?.classCode],
+                ['Neighborhood Code', details?.neighborhoodCode],
+                ['Bedrooms', formatNumber(details?.bedroomCount)],
+                ['Bathrooms', formatNumber(details?.bathroomCount)],
+                ['Single vs. Multi-Family', details?.singleVsMultiFamily],
+                ['PIN Proration Rate', formatPercent(details?.pinProrationRate)],
+                ['Property Class', details?.propertyClass]
+        ].filter(([, value]) => value !== null && value !== undefined && value !== '');
+
+        if (!fields.length) {
+                container.style.display = 'none';
+                container.innerHTML = '';
+                return;
+        }
+
+        container.innerHTML = fields.map(([label, value]) => `
+                <div class="property-detail-item">
+                        <span>${escapeHtml(label)}</span>
+                        <strong>${escapeHtml(value)}</strong>
+                </div>
+        `).join('');
+        container.style.display = 'grid';
 }
 
 function renderAppeals(appeals, address) {
@@ -369,6 +519,7 @@ function getStatusClass(status) {
         switch (status) {
                 case 'completed': return 'status-success';
                 case 'success': return 'status-success';
+                case 'finished': return 'status-success';
                 case 'pending': return 'status-pending';
                 case 'failed': return 'status-error';
                 case 'denied': return 'status-error';
@@ -379,6 +530,25 @@ function getStatusClass(status) {
 function capitalize(str) {
         if (!str) return '';
         return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function formatCurrency(value) {
+        if (value === null || value === undefined || value === '') return '';
+        return Number(value).toLocaleString('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                maximumFractionDigits: 0
+        });
+}
+
+function formatNumber(value, suffix = '') {
+        if (value === null || value === undefined || value === '') return '';
+        return `${Number(value).toLocaleString('en-US', { maximumFractionDigits: 1 })}${suffix}`;
+}
+
+function formatPercent(value) {
+        if (value === null || value === undefined || value === '') return '';
+        return `${Number(value).toLocaleString('en-US', { maximumFractionDigits: 3 })}`;
 }
 
 function escapeHtml(value) {

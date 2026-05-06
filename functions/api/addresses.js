@@ -20,13 +20,39 @@ export const onRequestGet = async (context) => {
                                   FROM property_addresses
                                   WHERE property_addresses.address = user_addresses.address
                                   LIMIT 1
-                                ) AS pin
+                                ) AS pin,
+                                (
+                                  SELECT json_object(
+                                    'pin', pin,
+                                    'taxableValue', taxable_value,
+                                    'homeSize', home_size,
+                                    'lastAppealYear', last_appeal_year,
+                                    'lastAppealStatus', last_appeal_status,
+                                    'certifiedLand', certified_land,
+                                    'certifiedBuilding', certified_building,
+                                    'masonryType', masonry_type,
+                                    'classCode', class_code,
+                                    'neighborhoodCode', neighborhood_code,
+                                    'bedroomCount', bedroom_count,
+                                    'bathroomCount', bathroom_count,
+                                    'singleVsMultiFamily', single_vs_multi_family,
+                                    'pinProrationRate', pin_proration_rate,
+                                    'propertyClass', property_class
+                                  )
+                                  FROM property_addresses
+                                  WHERE property_addresses.address = user_addresses.address
+                                  LIMIT 1
+                                ) AS property_details
                          FROM user_addresses
                          WHERE user_addresses.customer_id = ?
                          ORDER BY user_addresses.created_at DESC`
                 ).bind(user.uid).all();
 
-                return jsonResponse(results);
+                return jsonResponse(results.map(row => ({
+                        ...row,
+                        propertyDetails: row.property_details ? JSON.parse(row.property_details) : null,
+                        property_details: undefined
+                })));
         } catch (err) {
                 return jsonResponse({ error: err.message }, 500);
         }

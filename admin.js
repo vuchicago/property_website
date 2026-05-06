@@ -92,7 +92,7 @@ async function loadPendingAppeals() {
                     <td>${date}<br><small class="text-muted">${amount}</small></td>
                     <td><span class="status-badge status-pending">${escapeHtml(appeal.appeal_status)}</span></td>
                     <td class="action-btns">
-                        <button class="btn-sm btn-primary action-btn" data-id="${escapeHtml(appeal.transaction_id)}" data-action="Success">Mark Success</button>
+                        <button class="btn-sm btn-primary action-btn" data-id="${escapeHtml(appeal.transaction_id)}" data-action="Finished">Mark Finished</button>
                         <button class="btn-sm btn-secondary action-btn" data-id="${escapeHtml(appeal.transaction_id)}" data-action="Denied" style="background:var(--error-bg);color:var(--error);">Mark Denied</button>
                     </td>
                 </tr>
@@ -133,13 +133,13 @@ async function handleAppealAction(e) {
                 } else {
                         const err = await response.json();
                         alert(`Failed to update: ${err.error}`);
-                        btn.textContent = newStatus === 'Success' ? 'Mark Success' : 'Mark Denied';
+                        btn.textContent = newStatus === 'Finished' ? 'Mark Finished' : 'Mark Denied';
                         btn.disabled = false;
                 }
         } catch (error) {
                 console.error("Error updating appeal:", error);
                 alert('An error occurred.');
-                btn.textContent = newStatus === 'Success' ? 'Mark Success' : 'Mark Denied';
+                btn.textContent = newStatus === 'Finished' ? 'Mark Finished' : 'Mark Denied';
                 btn.disabled = false;
         }
 }
@@ -301,7 +301,9 @@ async function handleDeleteRole(e) {
 
 function getStatusClass(status) {
         switch ((status || '').toLowerCase()) {
-                case 'success': return 'status-success';
+                case 'success':
+                case 'finished':
+                        return 'status-success';
                 case 'denied': return 'status-error';
                 case 'pending': return 'status-pending';
                 default: return 'status-neutral';

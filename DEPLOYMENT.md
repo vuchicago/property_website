@@ -53,6 +53,7 @@ Apply the non-destructive migration to production:
 wrangler d1 execute appeal_db --remote --file=migrations/0001_create_user_addresses.sql
 wrangler d1 execute appeal_db --remote --file=migrations/0002_add_customer_name_to_appeals.sql
 wrangler d1 execute appeal_db --remote --file=migrations/0003_create_property_addresses.sql
+wrangler d1 execute appeal_db --remote --file=migrations/0008_create_property_images.sql
 ```
 
 For local Wrangler testing:
@@ -61,6 +62,7 @@ For local Wrangler testing:
 wrangler d1 execute appeal_db --local --file=migrations/0001_create_user_addresses.sql
 wrangler d1 execute appeal_db --local --file=migrations/0002_add_customer_name_to_appeals.sql
 wrangler d1 execute appeal_db --local --file=migrations/0003_create_property_addresses.sql
+wrangler d1 execute appeal_db --local --file=migrations/0008_create_property_images.sql
 ```
 
 Do not run the full `schema.sql` against production unless you intend to reset data, because it drops and recreates the `appeals` table.

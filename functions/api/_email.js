@@ -27,8 +27,8 @@ export async function sendPaymentNotification(env, payment) {
                 : 'Not provided';
 
         const html = `
-                <h2>New Property Appeal Payment</h2>
-                <p>A customer paid for a property appeal.</p>
+                <h2>New Pending Property Appeal</h2>
+                <p>A customer paid for appeal help and the appeal is now pending in the admin dashboard.</p>
                 <table cellpadding="8" cellspacing="0" style="border-collapse: collapse;">
                         <tr><td><strong>Name</strong></td><td>${escapeHtml(payerName)}</td></tr>
                         <tr><td><strong>Email</strong></td><td>${escapeHtml(payerEmail)}</td></tr>
@@ -40,7 +40,9 @@ export async function sendPaymentNotification(env, payment) {
         `;
 
         const text = [
-                'New Property Appeal Payment',
+                'New Pending Property Appeal',
+                '',
+                'A customer paid for appeal help and the appeal is now pending in the admin dashboard.',
                 '',
                 `Name: ${payerName}`,
                 `Email: ${payerEmail}`,
@@ -59,7 +61,7 @@ export async function sendPaymentNotification(env, payment) {
                 body: JSON.stringify({
                         from,
                         to,
-                        subject: `New property appeal payment: ${propertyAddress}`,
+                        subject: `Pending appeal: ${propertyAddress}`,
                         html,
                         text
                 })
