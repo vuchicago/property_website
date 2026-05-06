@@ -502,6 +502,11 @@ ol {
     margin-bottom: var(--space-2);
 }
 
+.pricing-cta {
+    align-self: flex-start;
+    margin-top: var(--space-4);
+}
+
 .btn-lg {
     padding: var(--space-4) var(--space-8);
     font-size: var(--font-size-lg);

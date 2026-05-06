@@ -97,7 +97,6 @@
                 <li><a href="index.html" class="active">Home</a></li>
                 <li><a href="property-tax.html">Property Tax Tool</a></li>
                 <li><a href="#why-appeal">How Appeals Work</a></li>
-                <li><a href="#pricing">Pricing</a></li>
                 <li><a href="#tools-preview">Real-Estate Tools</a></li>
                 <li><a href="#faq">FAQ</a></li>
                 <li><a href="#contact">Contact</a></li>
@@ -137,7 +136,6 @@
                 <li><a href="index.html" class="active">Home</a></li>
                 <li><a href="property-tax.html">Property Tax Tool</a></li>
                 <li><a href="#why-appeal">How Appeals Work</a></li>
-                <li><a href="#pricing">Pricing</a></li>
                 <li><a href="#tools-preview">Real-Estate Tools</a></li>
                 <li><a href="#faq">FAQ</a></li>
                 <li><a href="#contact">Contact</a></li>
@@ -187,8 +185,7 @@
                     </a>
                 </div>
                 <div class="hero-stats">
-                    <div class="stat-divider"></div>
-                    <a href="login.html" class="stat stat-link" aria-label="Create an account for optional $99 appeal help">
+                    <a href="#pricing" class="stat stat-link" aria-label="View optional $99 appeal help">
                         <span class="stat-number">$99</span>
                         <span class="stat-label">Optional Appeal Help</span>
                     </a>
@@ -353,7 +350,7 @@
                     <p>Filing directly with the Assessor is free. If you want help organizing the request, our assisted
                         appeal option is a flat $99.</p>
                     <span class="feature-link">
-                        View Pricing
+                        View Appeal Help
                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2"
                                 stroke-linecap="round" stroke-linejoin="round" />
@@ -473,11 +470,11 @@
         </div>
     </section>
 
-    <!-- Pricing Section -->
+    <!-- Appeal Help Section -->
     <section id="pricing" class="testimonials-section">
         <div class="container">
             <div class="section-header animate-on-scroll">
-                <span class="section-badge">Pricing</span>
+                <span class="section-badge">Appeal Help</span>
                 <h2>Use The Tool Free Or Request Appeal Help</h2>
                 <p>Transparent options for Cook County homeowners before we have public case results to share.</p>
             </div>
@@ -514,6 +511,13 @@
                         <p>Request help organizing your property address, comparable assessment information, and appeal
                             materials for review. If the first appeal is unsuccessful, we will appeal the next time for
                             free.</p>
+                        <a href="login.html" class="cta-btn pricing-cta">
+                            <span>Let's Get Started</span>
+                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </a>
                     </div>
                     <div class="testimonial-author">
                         <div class="author-avatar">$99</div>
@@ -569,94 +573,6 @@
                     <p>Review loan payments, maturity, and amortization details for a mortgage scenario.</p>
                     <span class="feature-link">Open Loan Tool →</span>
                 </a>
-            </div>
-            <div class="preview-tabs">
-                <button class="tab-btn active" data-tab="property">Property Tax</button>
-                <button class="tab-btn" data-tab="roi">ROI Calculator</button>
-                <button class="tab-btn" data-tab="loan">Loan Tool</button>
-            </div>
-            <div class="preview-content">
-                <div id="property-preview" class="tab-content active">
-                    <div class="preview-tool">
-                        <div class="preview-sidebar">
-                            <div class="input-group">
-                                <label for="preview-address">Property Address</label>
-                                <div class="input-wrapper">
-                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path
-                                            d="M21 10C21 17 12 23 12 23C12 23 3 17 3 10C3 5.02944 7.02944 1 12 1C16.9706 1 21 5.02944 21 10Z"
-                                            stroke="currentColor" stroke-width="2" />
-                                        <circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="2" />
-                                    </svg>
-                                    <input type="text" id="preview-address" placeholder="Enter Chicago address...">
-                                </div>
-                            </div>
-                            <button class="btn btn-primary btn-full" id="preview-search">
-                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path
-                                        d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z"
-                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round" />
-                                </svg>
-                                Quick Search
-                            </button>
-                            <a href="property-tax.html" class="btn btn-secondary btn-full">Open Full Tool →</a>
-                        </div>
-                        <div class="preview-map" id="preview-map"></div>
-                    </div>
-                </div>
-                <div id="roi-preview" class="tab-content">
-                    <div class="preview-tool roi-preview-grid">
-                        <div class="preview-sidebar">
-                            <div class="input-group">
-                                <label>Purchase Price ($)</label>
-                                <input type="number" id="preview-price" value="300000">
-                            </div>
-                            <div class="input-group">
-                                <label>Monthly Rent ($)</label>
-                                <input type="number" id="preview-rent" value="2500">
-                            </div>
-                            <button class="btn btn-primary btn-full" id="preview-calc-roi">Calculate</button>
-                            <a href="roi-calculator.html" class="btn btn-secondary btn-full">Open Full Tool →</a>
-                        </div>
-                        <div class="preview-results">
-                            <div class="preview-result-card">
-                                <span class="preview-result-label">CAP Rate</span>
-                                <span class="preview-result-value" id="preview-cap">7.5%</span>
-                            </div>
-                            <div class="preview-result-card">
-                                <span class="preview-result-label">Cash on Cash</span>
-                                <span class="preview-result-value" id="preview-coc">11.9%</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div id="loan-preview" class="tab-content">
-                    <div class="preview-tool loan-preview-grid">
-                        <div class="preview-sidebar">
-                            <div class="input-group">
-                                <label>Loan Amount ($)</label>
-                                <input type="number" id="preview-loan" value="240000">
-                            </div>
-                            <div class="input-group">
-                                <label>Interest Rate (%)</label>
-                                <input type="number" id="preview-rate" value="6.5" step="0.1">
-                            </div>
-                            <button class="btn btn-primary btn-full" id="preview-calc-loan">Calculate</button>
-                            <a href="loan-tool.html" class="btn btn-secondary btn-full">Open Full Tool →</a>
-                        </div>
-                        <div class="preview-results">
-                            <div class="preview-result-card">
-                                <span class="preview-result-label">Monthly Payment</span>
-                                <span class="preview-result-value" id="preview-payment">$1,517</span>
-                            </div>
-                            <div class="preview-result-card">
-                                <span class="preview-result-label">Total Interest</span>
-                                <span class="preview-result-value" id="preview-interest">$306,108</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </section>
@@ -1022,7 +938,6 @@
                             <li><a href="index.html">Home</a></li>
                             <li><a href="property-tax.html">Property Tax Tool</a></li>
                             <li><a href="#why-appeal">How Appeals Work</a></li>
-                            <li><a href="#pricing">Pricing</a></li>
                             <li><a href="#tools-preview">Real-Estate Tools</a></li>
                         </ul>
                     </div>
