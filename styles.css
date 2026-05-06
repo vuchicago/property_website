@@ -1674,7 +1674,7 @@ ol {
 }
 
 .tool-description-panel {
-    margin-bottom: var(--space-8);
+    margin-top: var(--space-10);
 }
 
 .tool-description-grid {
