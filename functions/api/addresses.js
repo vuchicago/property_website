@@ -1,43 +1,5 @@
 import { requireFirebaseUser, jsonResponse } from './_auth.js';
-
-function normalizeAddress(value) {
-        return String(value || '')
-                .toUpperCase()
-                .replace(/[^A-Z0-9]+/g, ' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-}
-
-async function findPropertyAddress(db, address) {
-        const normalizedAddress = normalizeAddress(address);
-
-        if (!normalizedAddress) {
-                return null;
-        }
-
-        const exact = await db.prepare(
-                `SELECT id, pin, address, city, zip, latitude, longitude
-                 FROM property_addresses
-                 WHERE normalized_address = ?
-                 LIMIT 1`
-        ).bind(normalizedAddress).first();
-
-        if (exact) {
-                return exact;
-        }
-
-        if (normalizedAddress.length < 8) {
-                return null;
-        }
-
-        return db.prepare(
-                `SELECT id, pin, address, city, zip, latitude, longitude
-                 FROM property_addresses
-                 WHERE normalized_address LIKE ?
-                 ORDER BY LENGTH(normalized_address) ASC
-                 LIMIT 1`
-        ).bind(`${normalizedAddress}%`).first();
-}
+import { findBestPropertyAddress } from './_property_addresses.js';
 
 export const onRequestGet = async (context) => {
         const { user, response } = await requireFirebaseUser(context.request);
@@ -79,7 +41,7 @@ export const onRequestPost = async (context) => {
                         return jsonResponse({ error: 'Missing address' }, 400);
                 }
 
-                const propertyAddress = await findPropertyAddress(context.env.DB, address);
+                const propertyAddress = await findBestPropertyAddress(context.env.DB, address);
 
                 if (!propertyAddress) {
                         return jsonResponse({

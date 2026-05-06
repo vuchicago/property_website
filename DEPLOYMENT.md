@@ -93,9 +93,11 @@ Payment notification emails and contact form messages use Resend from Cloudflare
 RESEND_API_KEY=your_resend_api_key
 ADMIN_NOTIFICATION_EMAIL=vu@cookcountytaxcompare.com
 NOTIFICATION_FROM_EMAIL="Cook County Tax Compare <alerts@yourdomain.com>"
+APPEAL_HELP_AMOUNT_CENTS=9900
 ```
 
 `ADMIN_NOTIFICATION_EMAIL` defaults to `vu@cookcountytaxcompare.com` if it is not set. `NOTIFICATION_FROM_EMAIL` should be a sender address verified in Resend for production delivery.
+`APPEAL_HELP_AMOUNT_CENTS` controls the Stripe Checkout amount for appeal help. Use cents, so `9900` is $99.00.
 
 ## What's Deployed
 

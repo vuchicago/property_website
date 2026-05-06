@@ -16,6 +16,10 @@ COLUMNS = [
     "pin",
     "address",
     "normalized_address",
+    "house_number",
+    "street_name",
+    "street_suffix",
+    "unit",
     "city",
     "state",
     "zip",
@@ -55,6 +59,34 @@ def split_city_zip(address: str) -> tuple[str | None, str | None]:
     tail = parts[-1]
     zip_match = re.search(r"\b(\d{5})(?:-\d{4})?\b", tail)
     return city, zip_match.group(1) if zip_match else None
+
+
+def split_street_parts(address: str) -> tuple[str | None, str | None, str | None, str | None]:
+    street = address.split(",", 1)[0]
+    tokens = normalize_address(street).split()
+
+    if not tokens:
+        return None, None, None, None
+
+    house_number = tokens[0] if tokens[0].isdigit() else None
+    street_tokens = tokens[1:] if house_number else tokens
+    unit = None
+
+    if len(street_tokens) >= 2 and street_tokens[-2] in {"APT", "UNIT", "STE", "SUITE"}:
+        unit = " ".join(street_tokens[-2:])
+        street_tokens = street_tokens[:-2]
+
+    street_suffix = None
+    suffixes = {"AVE", "AVENUE", "BLVD", "BOULEVARD", "CT", "COURT", "DR", "DRIVE", "LN", "LANE", "PL", "PLACE", "PKWY", "PARKWAY", "RD", "ROAD", "ST", "STREET", "TER", "TERRACE", "WAY"}
+
+    if street_tokens and street_tokens[-1] in suffixes:
+        street_suffix = street_tokens[-1]
+        street_tokens = street_tokens[:-1]
+
+    if street_tokens and street_tokens[0] in {"N", "S", "E", "W", "NE", "NW", "SE", "SW"}:
+        street_tokens = street_tokens[1:]
+
+    return house_number, " ".join(street_tokens) or None, street_suffix, unit
 
 
 def clean_string(value) -> str | None:
@@ -105,11 +137,16 @@ def row_to_values(row: dict, source_year: int, source_index: int) -> list:
         return []
 
     city, zip_code = split_city_zip(address)
+    house_number, street_name, street_suffix, unit = split_street_parts(address)
     return [
         source_year,
         clean_pin(row.get("pin")),
         address,
         normalize_address(address),
+        house_number,
+        street_name,
+        street_suffix,
+        unit,
         city,
         "IL",
         zip_code,

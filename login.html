@@ -265,7 +265,9 @@
 
                                         <form id="add-address-form" style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
                                                 <input type="text" id="new-property-address" placeholder="Enter Chicago address..." required
+                                                        list="property-address-suggestions" autocomplete="off"
                                                         style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                                                <datalist id="property-address-suggestions"></datalist>
                                                 <button type="submit" class="btn btn-primary" id="add-address-btn"
                                                         style="padding: 0.5rem 1rem;">Add</button>
                                         </form>

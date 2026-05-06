@@ -1,43 +1,5 @@
 import { requireFirebaseUser, jsonResponse } from './_auth.js';
-
-function normalizeAddress(value) {
-        return String(value || '')
-                .toUpperCase()
-                .replace(/[^A-Z0-9]+/g, ' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-}
-
-async function findPropertyAddress(db, address) {
-        const normalizedAddress = normalizeAddress(address);
-
-        if (!normalizedAddress) {
-                return null;
-        }
-
-        const exact = await db.prepare(
-                `SELECT id, pin, address
-                 FROM property_addresses
-                 WHERE normalized_address = ?
-                 LIMIT 1`
-        ).bind(normalizedAddress).first();
-
-        if (exact) {
-                return exact;
-        }
-
-        if (normalizedAddress.length < 8) {
-                return null;
-        }
-
-        return db.prepare(
-                `SELECT id, pin, address
-                 FROM property_addresses
-                 WHERE normalized_address LIKE ?
-                 ORDER BY LENGTH(normalized_address) ASC
-                 LIMIT 1`
-        ).bind(`${normalizedAddress}%`).first();
-}
+import { findBestPropertyAddress } from './_property_addresses.js';
 
 export const onRequestPost = async (context) => {
         const { user, response: authResponse } = await requireFirebaseUser(context.request);
@@ -53,7 +15,7 @@ export const onRequestPost = async (context) => {
         }
 
         try {
-                const { priceId, propertyAddress } = await context.request.json();
+                const { propertyAddress } = await context.request.json();
 
                 if (!propertyAddress) {
                         return jsonResponse({ error: 'Missing property address' }, 400);
@@ -63,7 +25,7 @@ export const onRequestPost = async (context) => {
                         return jsonResponse({ error: 'Database not configured' }, 500);
                 }
 
-                const validatedProperty = await findPropertyAddress(context.env.DB, propertyAddress);
+                const validatedProperty = await findBestPropertyAddress(context.env.DB, propertyAddress);
 
                 if (!validatedProperty) {
                         return jsonResponse({
@@ -71,13 +33,20 @@ export const onRequestPost = async (context) => {
                         }, 400);
                 }
 
-                const PRICE_ID = priceId || context.env.STRIPE_PRICE_ID || 'price_1T0bF2RrARHriB9TIqHffgW0';
+                const appealHelpAmountCents = Number(context.env.APPEAL_HELP_AMOUNT_CENTS || 9900);
+                if (!Number.isInteger(appealHelpAmountCents) || appealHelpAmountCents < 50) {
+                        return jsonResponse({ error: 'Invalid appeal help amount configured' }, 500);
+                }
+
                 const DOMAIN = context.env.YOUR_DOMAIN || new URL(context.request.url).origin;
 
                 // Construct form-urlencoded body manually for nested params
                 const body = new URLSearchParams();
                 body.append('mode', 'payment');
-                body.append('line_items[0][price]', PRICE_ID);
+                body.append('line_items[0][price_data][currency]', 'usd');
+                body.append('line_items[0][price_data][unit_amount]', String(appealHelpAmountCents));
+                body.append('line_items[0][price_data][product_data][name]', 'Cook County Property Tax Appeal Help');
+                body.append('line_items[0][price_data][product_data][description]', validatedProperty.address);
                 body.append('line_items[0][quantity]', '1');
                 body.append('success_url', `${DOMAIN}/return.html?session_id={CHECKOUT_SESSION_ID}`);
                 body.append('cancel_url', `${DOMAIN}/index.html`);

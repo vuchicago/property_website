@@ -2,6 +2,7 @@ import { auth, authFetch } from './auth.js';
 
 let userAddresses = [];
 let allAppeals = [];
+let lookupTimer = null;
 
 export async function loadAppealHistory() {
         const user = auth.currentUser;
@@ -214,6 +215,36 @@ function setupAddAddressForm() {
                         btn.disabled = false;
                 }
         });
+
+        const input = document.getElementById('new-property-address');
+        input?.addEventListener('input', () => {
+                window.clearTimeout(lookupTimer);
+                lookupTimer = window.setTimeout(() => {
+                        updateAddressSuggestions(input.value);
+                }, 250);
+        });
+}
+
+async function updateAddressSuggestions(query) {
+        const datalist = document.getElementById('property-address-suggestions');
+        if (!datalist) return;
+
+        if (!query || query.trim().length < 3) {
+                datalist.innerHTML = '';
+                return;
+        }
+
+        try {
+                const response = await authFetch(`/api/address-lookup?q=${encodeURIComponent(query)}&limit=8`);
+                if (!response.ok) return;
+
+                const data = await response.json();
+                datalist.innerHTML = (data.suggestions || [])
+                        .map(item => `<option value="${escapeHtml(item.address)}">${escapeHtml(item.pin || '')}</option>`)
+                        .join('');
+        } catch (error) {
+                console.error('Address lookup failed:', error);
+        }
 }
 
 function getStatusClass(status) {

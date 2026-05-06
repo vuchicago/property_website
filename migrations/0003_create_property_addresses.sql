@@ -42,6 +42,12 @@ WHERE pin IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_property_addresses_normalized
 ON property_addresses(normalized_address);
 
+CREATE INDEX IF NOT EXISTS idx_property_addresses_house_number
+ON property_addresses(house_number);
+
+CREATE INDEX IF NOT EXISTS idx_property_addresses_street_name
+ON property_addresses(street_name);
+
 CREATE INDEX IF NOT EXISTS idx_property_addresses_zip
 ON property_addresses(zip);
 
