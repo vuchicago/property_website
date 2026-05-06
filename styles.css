@@ -2286,6 +2286,62 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 /* ========================================
+   Comparison Guide
+======================================== */
+.compare-guide-section {
+    padding: var(--space-24) 0;
+    background: var(--bg-secondary);
+}
+
+.compare-guide-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-6);
+    margin-top: var(--space-10);
+}
+
+.compare-guide-card h3,
+.source-note h3 {
+    color: var(--dark-900);
+    font-size: var(--font-size-xl);
+    margin-bottom: var(--space-3);
+}
+
+.compare-guide-card p,
+.source-note p {
+    color: var(--dark-500);
+    line-height: 1.7;
+}
+
+.source-note {
+    margin-top: var(--space-6);
+}
+
+.source-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-top: var(--space-5);
+}
+
+.source-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 0 var(--space-4);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--primary);
+    font-weight: 700;
+    text-decoration: none;
+    background: var(--white);
+}
+
+.source-links a:hover {
+    border-color: var(--primary);
+}
+
+/* ========================================
    Contact Section
 ======================================== */
 .footnotes-section {
@@ -2789,6 +2845,10 @@ textarea {
 
     .testimonials-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    .compare-guide-grid {
+        grid-template-columns: 1fr;
     }
 }
 

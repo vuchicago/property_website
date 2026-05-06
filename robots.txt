@@ -8,6 +8,6 @@ User-agent: ChatGPT-User
 Allow: /
 
 User-agent: GPTBot
-Disallow: /
+Allow: /
 
 Sitemap: https://cookcountytaxcompare.com/sitemap.xml

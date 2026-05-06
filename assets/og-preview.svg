@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Cook County Tax Compare preview</title>
+  <desc id="desc">Cook County property tax comparison and appeal help preview graphic.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="0.55" stop-color="#eef6f2"/>
+      <stop offset="1" stop-color="#dfeee7"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f6fbf8"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#0f172a" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="72" y="66" width="1056" height="498" rx="34" fill="url(#panel)" filter="url(#shadow)"/>
+  <g transform="translate(118 116)">
+    <rect x="0" y="0" width="78" height="78" rx="18" fill="#0f766e"/>
+    <path d="M18 60h42M23 51h32M26 51V29m13 22V29m13 22V29M39 13l28 16H11L39 13z" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="102" y="31" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="800">Cook County</text>
+    <text x="102" y="66" fill="#0f766e" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="800">Tax Compare</text>
+  </g>
+  <g transform="translate(118 235)">
+    <text x="0" y="0" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="64" font-weight="850">Compare Cook County</text>
+    <text x="0" y="76" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="64" font-weight="850">Property Taxes</text>
+    <text x="0" y="135" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="27" font-weight="500">Assessment comparison, appeal timing, and optional appeal help.</text>
+  </g>
+  <g transform="translate(735 163)">
+    <rect x="0" y="0" width="315" height="306" rx="24" fill="#ffffff" stroke="#d7e7df" stroke-width="2"/>
+    <rect x="28" y="32" width="112" height="20" rx="10" fill="#0f766e"/>
+    <rect x="28" y="72" width="255" height="14" rx="7" fill="#d9e8e1"/>
+    <rect x="28" y="102" width="210" height="14" rx="7" fill="#e7f0ec"/>
+    <g transform="translate(28 150)">
+      <rect x="0" y="80" width="76" height="58" rx="10" fill="#94a3b8"/>
+      <rect x="96" y="38" width="76" height="100" rx="10" fill="#0f766e"/>
+      <rect x="192" y="68" width="76" height="70" rx="10" fill="#2dd4bf"/>
+      <line x1="0" y1="154" x2="270" y2="154" stroke="#cbd5e1" stroke-width="4" stroke-linecap="round"/>
+    </g>
+    <text x="28" y="283" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="800">$99 optional appeal help</text>
+  </g>
+</svg>

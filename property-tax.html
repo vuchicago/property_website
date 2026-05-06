@@ -14,7 +14,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description"
-        content="Property Tax Comparison Tool - Compare your Cook County property assessment with nearby comparable properties using interactive maps.">
+        content="Compare Cook County property taxes and assessments by address with an interactive property tax comparison tool.">
+    <link rel="canonical" href="https://cookcountytaxcompare.com/property-tax">
+    <link rel="image_src" href="https://cookcountytaxcompare.com/assets/og-preview.png">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://cookcountytaxcompare.com/property-tax">
+    <meta property="og:title" content="Cook County Property Tax Comparison Tool">
+    <meta property="og:description"
+        content="Compare Cook County property taxes and assessments by address using public property data.">
+    <meta property="og:site_name" content="Cook County Tax Compare">
+    <meta property="og:image" content="https://cookcountytaxcompare.com/assets/og-preview.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Cook County Tax Compare property tax comparison preview">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Cook County Property Tax Comparison Tool">
+    <meta name="twitter:description"
+        content="Compare Cook County property taxes and assessments by address.">
+    <meta name="twitter:image" content="https://cookcountytaxcompare.com/assets/og-preview.png">
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml"
@@ -28,6 +45,41 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <link rel="stylesheet" href="styles.css">
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@graph": [
+                {
+                    "@type": "WebApplication",
+                    "@id": "https://cookcountytaxcompare.com/property-tax#tool",
+                    "name": "Cook County Property Tax Comparison Tool",
+                    "applicationCategory": "FinanceApplication",
+                    "operatingSystem": "Web",
+                    "url": "https://cookcountytaxcompare.com/property-tax",
+                    "description": "Compare Cook County property taxes and assessments by address using public property data.",
+                    "image": "https://cookcountytaxcompare.com/assets/og-preview.png"
+                },
+                {
+                    "@type": "BreadcrumbList",
+                    "@id": "https://cookcountytaxcompare.com/property-tax#breadcrumb",
+                    "itemListElement": [
+                        {
+                            "@type": "ListItem",
+                            "position": 1,
+                            "name": "Home",
+                            "item": "https://cookcountytaxcompare.com/"
+                        },
+                        {
+                            "@type": "ListItem",
+                            "position": 2,
+                            "name": "Property Tax Tool",
+                            "item": "https://cookcountytaxcompare.com/property-tax"
+                        }
+                    ]
+                }
+            ]
+        }
+    </script>
 </head>
 
 <body>

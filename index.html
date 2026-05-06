@@ -15,20 +15,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description"
-        content="Compare your Cook County property assessment with nearby properties and get help understanding whether a property tax appeal may make sense.">
+        content="Compare Cook County property taxes and assessments by address, review appeal timing, and request optional residential property tax appeal help.">
     <meta name="keywords"
-        content="Cook County, property tax, tax appeal, tax comparison, real estate ROI, loan calculator">
+        content="compare Cook County property taxes, Cook County property tax appeal, Cook County assessment, property tax comparison, Cook County real estate taxes">
+    <link rel="canonical" href="https://cookcountytaxcompare.com/">
+    <link rel="image_src" href="https://cookcountytaxcompare.com/assets/og-preview.png">
 
     <!-- Open Graph / Social Media Meta Tags -->
     <meta property="og:type" content="website">
+    <meta property="og:url" content="https://cookcountytaxcompare.com/">
     <meta property="og:title" content="Cook County Property Tax Appeal Help & Assessment Comparison">
     <meta property="og:description"
         content="Compare Cook County property assessments, review appeal windows, and request help with a residential property tax appeal.">
     <meta property="og:site_name" content="Cook County Tax Compare">
+    <meta property="og:image" content="https://cookcountytaxcompare.com/assets/og-preview.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Cook County Tax Compare property tax comparison preview">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Cook County Tax Compare">
     <meta name="twitter:description"
         content="Compare your Cook County assessment and decide whether a property tax appeal may make sense.">
+    <meta name="twitter:image" content="https://cookcountytaxcompare.com/assets/og-preview.png">
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml"
@@ -48,10 +56,20 @@
             "@context": "https://schema.org",
             "@graph": [
                 {
+                    "@type": "Organization",
+                    "@id": "https://cookcountytaxcompare.com/#organization",
+                    "name": "Cook County Tax Compare",
+                    "url": "https://cookcountytaxcompare.com/",
+                    "logo": "https://cookcountytaxcompare.com/assets/og-preview.png",
+                    "email": "vu@cookcountytaxcompare.com",
+                    "telephone": "+1-773-715-3476"
+                },
+                {
                     "@type": "LocalBusiness",
                     "@id": "https://cookcountytaxcompare.com/#business",
                     "name": "Cook County Tax Compare",
                     "url": "https://cookcountytaxcompare.com/",
+                    "image": "https://cookcountytaxcompare.com/assets/og-preview.png",
                     "email": "vu@cookcountytaxcompare.com",
                     "telephone": "+1-773-715-3476",
                     "areaServed": "Cook County, Illinois",
@@ -69,11 +87,71 @@
                 },
                 {
                     "@type": "WebApplication",
-                    "@id": "https://cookcountytaxcompare.com/property-tax.html#tool",
+                    "@id": "https://cookcountytaxcompare.com/property-tax#tool",
                     "name": "Cook County Property Tax Comparison Tool",
                     "applicationCategory": "FinanceApplication",
                     "operatingSystem": "Web",
-                    "url": "https://cookcountytaxcompare.com/property-tax.html"
+                    "url": "https://cookcountytaxcompare.com/property-tax"
+                },
+                {
+                    "@type": "WebSite",
+                    "@id": "https://cookcountytaxcompare.com/#website",
+                    "name": "Cook County Tax Compare",
+                    "url": "https://cookcountytaxcompare.com/",
+                    "publisher": {
+                        "@id": "https://cookcountytaxcompare.com/#organization"
+                    },
+                    "inLanguage": "en-US"
+                },
+                {
+                    "@type": "WebPage",
+                    "@id": "https://cookcountytaxcompare.com/#webpage",
+                    "url": "https://cookcountytaxcompare.com/",
+                    "name": "Compare Cook County Property Taxes and Assessments",
+                    "description": "Compare Cook County property taxes and assessments by address, review appeal timing, and request optional residential property tax appeal help.",
+                    "isPartOf": {
+                        "@id": "https://cookcountytaxcompare.com/#website"
+                    },
+                    "about": {
+                        "@id": "https://cookcountytaxcompare.com/#appeal-help"
+                    },
+                    "primaryImageOfPage": {
+                        "@type": "ImageObject",
+                        "url": "https://cookcountytaxcompare.com/assets/og-preview.png",
+                        "width": 1200,
+                        "height": 630
+                    },
+                    "inLanguage": "en-US"
+                },
+                {
+                    "@type": "FAQPage",
+                    "@id": "https://cookcountytaxcompare.com/#faq-schema",
+                    "mainEntity": [
+                        {
+                            "@type": "Question",
+                            "name": "How do I know if my Cook County property is overvalued?",
+                            "acceptedAnswer": {
+                                "@type": "Answer",
+                                "text": "Compare your assessed value against similar nearby properties, then verify property characteristics, official records, and appeal rules with Cook County sources."
+                            }
+                        },
+                        {
+                            "@type": "Question",
+                            "name": "How much does it cost to file a Cook County property tax appeal?",
+                            "acceptedAnswer": {
+                                "@type": "Answer",
+                                "text": "Filing directly with the Cook County Assessor's Office is free. Cook County Tax Compare offers optional assisted appeal help for a flat $99."
+                            }
+                        },
+                        {
+                            "@type": "Question",
+                            "name": "Does Cook County Tax Compare guarantee savings?",
+                            "acceptedAnswer": {
+                                "@type": "Answer",
+                                "text": "No. The site does not guarantee a lower assessment, tax savings, refund, or successful appeal. County agencies decide appeal outcomes."
+                            }
+                        }
+                    ]
                 }
             ]
         }
@@ -701,6 +779,51 @@
                         <span><span class="legend-dot today"></span> Today</span>
                         <span><span class="legend-dot deadline"></span> Deadline</span>
                     </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Search Intent Guide -->
+    <section id="compare-guide" class="compare-guide-section">
+        <div class="container">
+            <div class="section-header animate-on-scroll">
+                <span class="section-badge">Cook County Tax Comparison</span>
+                <h2>How To Compare Cook County Property Taxes</h2>
+                <p>Searchers often want a quick calculator, but a useful comparison starts with the property record,
+                    assessed value, property class, and nearby parcels that are genuinely similar.</p>
+            </div>
+            <div class="compare-guide-grid">
+                <article class="dashboard-card compare-guide-card animate-on-scroll">
+                    <h3>1. Start With The Address Or PIN</h3>
+                    <p>Use the property address to find the Cook County PIN, then confirm the official property record.
+                        PIN-based matching is more reliable than address text alone because one address can have
+                        formatting differences across data sources.</p>
+                </article>
+                <article class="dashboard-card compare-guide-card animate-on-scroll delay-100">
+                    <h3>2. Compare Similar Properties</h3>
+                    <p>Review nearby properties with similar class, building size, age, and location. A lower assessment
+                        on a truly comparable property can be a useful signal, while broad neighborhood averages are only
+                        a starting point.</p>
+                </article>
+                <article class="dashboard-card compare-guide-card animate-on-scroll delay-200">
+                    <h3>3. Verify Before Filing</h3>
+                    <p>Appeal deadlines and filing rules change by township and agency. Always check official Cook
+                        County Assessor or Board of Review information before relying on any comparison for a filing
+                        decision.</p>
+                </article>
+            </div>
+            <div class="source-note dashboard-card animate-on-scroll">
+                <h3>Sources And Methodology</h3>
+                <p>Cook County Tax Compare is designed around public Cook County property, assessment, and appeal
+                    information. The tool helps organize comparison signals, but final values, deadlines, exemptions,
+                    and filing requirements should be verified through official Cook County records.</p>
+                <div class="source-links">
+                    <a href="https://www.cookcountyassessor.com/" target="_blank" rel="noopener">Cook County
+                        Assessor</a>
+                    <a href="https://www.cookcountyassessoril.gov/assessment-calendar-and-deadlines" target="_blank"
+                        rel="noopener">Assessment Calendar</a>
+                    <a href="https://github.com/ccao-data" target="_blank" rel="noopener">CCAO Public Data</a>
                 </div>
             </div>
         </div>

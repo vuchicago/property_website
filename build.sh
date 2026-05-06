@@ -9,8 +9,8 @@ cp *.html *.css *.js dist/
 # Copy crawl/indexing metadata when present
 cp robots.txt sitemap.xml llms.txt dist/ 2>/dev/null || true
 
-# If there are any subdirectories that need to be public, add them here
-# cp -r assets/ dist/assets/
+# Copy public assets used by social previews, favicons, and page images
+cp -r assets/ dist/assets/ 2>/dev/null || true
 cp -r functions/ dist/functions/
 
 echo "Build complete. Output directory ready for Pages deploy."
