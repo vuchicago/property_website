@@ -68,13 +68,19 @@ function renderAddressList() {
         userAddresses.forEach(addrObj => {
                 // Count appeals for this address
                 const appealCount = allAppeals.filter(a => a.propertyAddress === addrObj.address).length;
+                const canDelete = appealCount === 0;
 
                 const safeAddress = escapeHtml(addrObj.address);
 
                 html += `
             <li class="address-item" style="padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s;" data-address="${safeAddress}">
-                <div style="font-weight: 500; margin-bottom: 0.25rem;">${safeAddress}</div>
-                <div class="text-xs text-muted">${appealCount} appeal(s)</div>
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
+                        <div>
+                                <div style="font-weight: 500; margin-bottom: 0.25rem;">${safeAddress}</div>
+                                <div class="text-xs text-muted">${appealCount} appeal(s)</div>
+                        </div>
+                        ${canDelete ? `<button type="button" class="btn btn-secondary btn-sm delete-address-btn" data-address="${safeAddress}" aria-label="Delete ${safeAddress}">Delete</button>` : ''}
+                </div>
             </li>
         `;
         });
@@ -84,6 +90,10 @@ function renderAddressList() {
         // Add click event listeners
         listContainer.querySelectorAll('.address-item').forEach(item => {
                 item.addEventListener('click', (e) => {
+                        if (e.target.closest('.delete-address-btn')) {
+                                return;
+                        }
+
                         // Remove active class from all
                         listContainer.querySelectorAll('.address-item').forEach(i => i.style.borderColor = 'var(--border-color)');
                         listContainer.querySelectorAll('.address-item').forEach(i => i.style.background = 'transparent');
@@ -96,6 +106,42 @@ function renderAddressList() {
                         selectAddress(address);
                 });
         });
+
+        listContainer.querySelectorAll('.delete-address-btn').forEach(button => {
+                button.addEventListener('click', async (event) => {
+                        event.stopPropagation();
+                        const address = event.currentTarget.dataset.address;
+                        if (!address) return;
+
+                        await deleteAddress(address);
+                });
+        });
+}
+
+async function deleteAddress(address) {
+        const confirmed = window.confirm(`Delete ${address} from My Properties?`);
+        if (!confirmed) return;
+
+        try {
+                const response = await authFetch('/api/addresses', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ address })
+                });
+
+                if (!response.ok) {
+                        const err = await response.json();
+                        alert(`Failed to delete address: ${err.error}`);
+                        return;
+                }
+
+                await fetchAddresses();
+                renderAccountSummary(auth.currentUser);
+                renderAddressList();
+        } catch (error) {
+                console.error('Error deleting address:', error);
+                alert('An error occurred while deleting the address.');
+        }
 }
 
 function showEmptyDetailsPanel() {

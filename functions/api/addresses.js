@@ -81,3 +81,47 @@ export const onRequestPost = async (context) => {
                 return jsonResponse({ error: err.message }, 500);
         }
 }
+
+export const onRequestDelete = async (context) => {
+        const { user, response } = await requireFirebaseUser(context.request);
+
+        if (response) {
+                return response;
+        }
+
+        if (!context.env.DB) {
+                return jsonResponse({ error: 'Database not configured' }, 500);
+        }
+
+        try {
+                const { address } = await context.request.json();
+
+                if (!address) {
+                        return jsonResponse({ error: 'Missing address' }, 400);
+                }
+
+                const appeal = await context.env.DB.prepare(
+                        `SELECT id
+                         FROM appeals
+                         WHERE customer_id = ? AND property_address = ?
+                         LIMIT 1`
+                ).bind(user.uid, address).first();
+
+                if (appeal) {
+                        return jsonResponse({
+                                error: 'This property already has an appeal record and cannot be deleted.'
+                        }, 400);
+                }
+
+                const result = await context.env.DB.prepare(
+                        "DELETE FROM user_addresses WHERE customer_id = ? AND address = ?"
+                ).bind(user.uid, address).run();
+
+                return jsonResponse({
+                        success: true,
+                        deleted: result.meta?.changes || 0
+                });
+        } catch (err) {
+                return jsonResponse({ error: err.message }, 500);
+        }
+}

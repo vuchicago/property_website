@@ -606,6 +606,7 @@ ol {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: var(--space-4);
 }
 
 .logo {
@@ -641,8 +642,11 @@ ol {
 .nav-links {
     display: flex;
     align-items: center;
-    gap: var(--space-8);
+    gap: var(--space-5);
     list-style: none;
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
 }
 
 .nav-links li {
@@ -655,6 +659,14 @@ ol {
     color: var(--dark-600);
     padding: var(--space-2) 0;
     position: relative;
+    white-space: nowrap;
+}
+
+.nav-actions {
+    align-items: center;
+    display: flex;
+    flex-shrink: 0;
+    gap: var(--space-3);
 }
 
 .nav-links a::after {
@@ -689,6 +701,7 @@ ol {
     font-size: var(--font-size-sm);
     border-radius: var(--radius-lg);
     transition: all var(--transition-base);
+    white-space: nowrap;
 }
 
 .cta-btn svg {
