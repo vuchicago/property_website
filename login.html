@@ -11,6 +11,8 @@
                 gtag('config', 'G-KRM2FPST0T');
         </script>
         <script src="https://js.stripe.com/v3/"></script>
+        <script
+                src="https://www.google.com/recaptcha/enterprise.js?render=6LeNgd4sAAAAAKKCg97Ad6Pt5RjyqPBHV1unrCj7"></script>
 
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -452,6 +454,7 @@
                 const logoutBtn = document.getElementById('account-logout-btn');
 
                 let isLogin = true;
+                const recaptchaSiteKey = '6LeNgd4sAAAAAKKCg97Ad6Pt5RjyqPBHV1unrCj7';
 
                 toggleBtn.addEventListener('click', () => {
                         isLogin = !isLogin;
@@ -485,6 +488,15 @@
                         const password = passwordInput.value;
 
                         let result;
+                        const recaptchaResult = await verifyPasswordRecaptcha(isLogin ? 'password_login' : 'password_signup');
+                        if (!recaptchaResult.success) {
+                                errorAlert.textContent = recaptchaResult.error;
+                                errorAlert.style.display = 'block';
+                                submitBtn.disabled = false;
+                                submitBtn.textContent = isLogin ? 'Sign In' : 'Sign Up';
+                                return;
+                        }
+
                         if (isLogin) {
                                 result = await loginUser(email, password);
                         } else {
@@ -502,6 +514,42 @@
                                 submitBtn.textContent = isLogin ? 'Sign In' : 'Sign Up';
                         }
                 });
+
+                async function verifyPasswordRecaptcha(action) {
+                        try {
+                                if (!window.grecaptcha?.enterprise) {
+                                        return { success: false, error: 'reCAPTCHA did not load. Please refresh and try again.' };
+                                }
+
+                                const token = await new Promise((resolve, reject) => {
+                                        window.grecaptcha.enterprise.ready(async () => {
+                                                try {
+                                                        resolve(await window.grecaptcha.enterprise.execute(recaptchaSiteKey, { action }));
+                                                } catch (error) {
+                                                        reject(error);
+                                                }
+                                        });
+                                });
+
+                                const response = await fetch('/api/recaptcha-assess', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ token, action })
+                                });
+                                const data = await response.json().catch(() => ({}));
+
+                                if (!response.ok || !data.success) {
+                                        return {
+                                                success: false,
+                                                error: data.error || 'Could not verify reCAPTCHA. Please try again.'
+                                        };
+                                }
+
+                                return { success: true };
+                        } catch (error) {
+                                return { success: false, error: 'Could not verify reCAPTCHA. Please try again.' };
+                        }
+                }
 
                 googleAuthBtn.addEventListener('click', async () => {
                         errorAlert.style.display = 'none';

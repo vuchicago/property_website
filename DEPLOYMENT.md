@@ -157,6 +157,19 @@ APPEAL_HELP_AMOUNT_CENTS=9900
 `CLOUDFLARE_EMAIL_API_TOKEN` must be a Cloudflare API token with permission to send emails. `ADMIN_NOTIFICATION_EMAIL` defaults to `vu@cookcountytaxcompare.com` if it is not set. With Resend, `NOTIFICATION_FROM_EMAIL` should be a sender address verified in Resend for production delivery. With Cloudflare Email Sending, it must be an address on the outbound email domain. The default Cloudflare sender is `notifications@inquiry.cookcountytaxcompare.com`.
 `APPEAL_HELP_AMOUNT_CENTS` controls the Stripe Checkout amount for appeal help. Use cents, so `9900` is $99.00.
 
+## reCAPTCHA Enterprise
+
+Email/password login and account creation use reCAPTCHA Enterprise. Add these Cloudflare Pages environment variables:
+
+```bash
+RECAPTCHA_PROJECT_ID=your_google_cloud_project_id
+RECAPTCHA_ENTERPRISE_API_KEY=your_recaptcha_enterprise_api_key
+RECAPTCHA_SITE_KEY=6LeNgd4sAAAAAKKCg97Ad6Pt5RjyqPBHV1unrCj7
+RECAPTCHA_MIN_SCORE=0.5
+```
+
+`RECAPTCHA_MIN_SCORE` is optional and defaults to `0.5`. Google login does not use this check because Google OAuth already opens its own provider flow.
+
 ## What's Deployed
 
 - **Homepage**: `index.html` - Main landing page
