@@ -61,6 +61,10 @@ export async function sendNotificationEmail(env, email) {
                 return sendWithResend(env.RESEND_API_KEY, email);
         }
 
+        if (env.CLOUDFLARE_EMAIL_API_TOKEN && env.CLOUDFLARE_ACCOUNT_ID) {
+                return sendWithCloudflareEmailApi(env, email);
+        }
+
         if (env.EMAIL && typeof env.EMAIL.send === 'function') {
                 return sendWithCloudflareEmail(env.EMAIL, email);
         }
@@ -94,6 +98,35 @@ async function sendWithResend(apiKey, email) {
         return response.json();
 }
 
+async function sendWithCloudflareEmailApi(env, email) {
+        const response = await fetch(
+                `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/email/sending/send`,
+                {
+                        method: 'POST',
+                        headers: {
+                                'Authorization': `Bearer ${env.CLOUDFLARE_EMAIL_API_TOKEN}`,
+                                'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                                from: parseEmailIdentity(email.from),
+                                to: email.to,
+                                reply_to: email.replyTo,
+                                subject: email.subject,
+                                html: email.html,
+                                text: email.text || stripHtml(email.html || '')
+                        })
+                }
+        );
+
+        const result = await response.json().catch(() => null);
+        if (!response.ok || result?.success === false) {
+                const errorText = result ? JSON.stringify(result) : await response.text();
+                throw new Error(`Cloudflare email notification failed: ${errorText}`);
+        }
+
+        return { success: true, provider: 'cloudflare_email_api', result };
+}
+
 async function sendWithCloudflareEmail(binding, email) {
         await binding.send({
                 from: email.from,
@@ -104,6 +137,19 @@ async function sendWithCloudflareEmail(binding, email) {
                 text: email.text || stripHtml(email.html || '')
         });
         return { success: true, provider: 'cloudflare_email' };
+}
+
+function parseEmailIdentity(value) {
+        const input = String(value || '').trim();
+        const match = input.match(/^(.+?)\s*<([^>]+)>$/);
+        if (!match) {
+                return input;
+        }
+
+        return {
+                name: match[1].replace(/^["']|["']$/g, '').trim(),
+                address: match[2].trim()
+        };
 }
 
 function stripHtml(value) {
