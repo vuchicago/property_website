@@ -1,6 +1,6 @@
 // Firebase Authentication Logic
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
 
 // Firebase Configuration
@@ -46,6 +46,17 @@ export const loginUser = async (email, password) => {
 export const registerUser = async (email, password) => {
         try {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                return { success: true, user: userCredential.user };
+        } catch (error) {
+                return { success: false, error: error.message };
+        }
+};
+
+export const signInWithGoogle = async () => {
+        try {
+                const provider = new GoogleAuthProvider();
+                provider.setCustomParameters({ prompt: 'select_account' });
+                const userCredential = await signInWithPopup(auth, provider);
                 return { success: true, user: userCredential.user };
         } catch (error) {
                 return { success: false, error: error.message };
