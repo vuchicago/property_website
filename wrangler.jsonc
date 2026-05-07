@@ -9,6 +9,14 @@
                         "database_id": "ccbba211-1c8b-46b6-94f5-12e1cf840609"
                 }
         ],
+        "send_email": [
+                {
+                        "name": "EMAIL",
+                        "allowed_sender_addresses": [
+                                "notifications@inquiry.cookcountytaxcompare.com"
+                        ]
+                }
+        ],
         "observability": {
                 "enabled": true
         }

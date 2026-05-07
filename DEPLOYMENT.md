@@ -129,7 +129,21 @@ wrangler d1 execute appeal_db --remote --file=migrations/0007_add_property_addre
 
 ## Email Notifications
 
-Payment notification emails and contact form messages use Resend from Cloudflare Pages Functions. Set these environment variables in Cloudflare Pages:
+Payment notification emails and contact form messages can use either Cloudflare Email Sending or Resend from Cloudflare Pages Functions.
+
+Cloudflare Email Routing forwards inbound mail only. The contact form is outbound mail, so Pages also needs an Email Sending binding. This repo defines a binding named `EMAIL` in `wrangler.jsonc`; make sure Email Routing/Email Service is enabled for the outbound domain `inquiry.cookcountytaxcompare.com` before deploying.
+
+For Cloudflare Email Sending, set:
+
+```bash
+ADMIN_NOTIFICATION_EMAIL=vu@cookcountytaxcompare.com
+NOTIFICATION_FROM_EMAIL="Cook County Tax Compare <notifications@inquiry.cookcountytaxcompare.com>"
+APPEAL_HELP_AMOUNT_CENTS=9900
+```
+
+If Cloudflare requires the destination to be a verified destination address, set `ADMIN_NOTIFICATION_EMAIL` to your verified personal email instead. You can still use `NOTIFICATION_FROM_EMAIL="Cook County Tax Compare <notifications@inquiry.cookcountytaxcompare.com>"`.
+
+For Resend instead, set:
 
 ```bash
 RESEND_API_KEY=your_resend_api_key
@@ -138,7 +152,7 @@ NOTIFICATION_FROM_EMAIL="Cook County Tax Compare <alerts@yourdomain.com>"
 APPEAL_HELP_AMOUNT_CENTS=9900
 ```
 
-`ADMIN_NOTIFICATION_EMAIL` defaults to `vu@cookcountytaxcompare.com` if it is not set. `NOTIFICATION_FROM_EMAIL` should be a sender address verified in Resend for production delivery.
+`ADMIN_NOTIFICATION_EMAIL` defaults to `vu@cookcountytaxcompare.com` if it is not set. With Resend, `NOTIFICATION_FROM_EMAIL` should be a sender address verified in Resend for production delivery. With Cloudflare Email Sending, it must be an address on the outbound email domain. The default Cloudflare sender is `notifications@inquiry.cookcountytaxcompare.com`.
 `APPEAL_HELP_AMOUNT_CENTS` controls the Stripe Checkout amount for appeal help. Use cents, so `9900` is $99.00.
 
 ## What's Deployed

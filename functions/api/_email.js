@@ -1,14 +1,9 @@
 const DEFAULT_ADMIN_EMAIL = 'vu@cookcountytaxcompare.com';
+const DEFAULT_CLOUDFLARE_FROM_EMAIL = 'Cook County Tax Compare <notifications@inquiry.cookcountytaxcompare.com>';
 
 export async function sendPaymentNotification(env, payment) {
-        const apiKey = env.RESEND_API_KEY;
-        if (!apiKey) {
-                console.warn('RESEND_API_KEY is not configured; skipping payment notification email.');
-                return { skipped: true, reason: 'missing_resend_api_key' };
-        }
-
         const to = env.ADMIN_NOTIFICATION_EMAIL || DEFAULT_ADMIN_EMAIL;
-        const from = env.NOTIFICATION_FROM_EMAIL || 'Cook County Tax Compare <onboarding@resend.dev>';
+        const from = getDefaultFrom(env);
         const paymentDate = payment.paymentDate ? new Date(payment.paymentDate).toLocaleString('en-US', {
                 timeZone: 'America/Chicago',
                 dateStyle: 'medium',
@@ -52,6 +47,29 @@ export async function sendPaymentNotification(env, payment) {
                 `Stripe Session: ${payment.transactionId || 'Not provided'}`
         ].join('\n');
 
+        return sendNotificationEmail(env, {
+                from,
+                to,
+                subject: `Pending appeal: ${propertyAddress}`,
+                html,
+                text
+        });
+}
+
+export async function sendNotificationEmail(env, email) {
+        if (env.RESEND_API_KEY) {
+                return sendWithResend(env.RESEND_API_KEY, email);
+        }
+
+        if (env.EMAIL && typeof env.EMAIL.send === 'function') {
+                return sendWithCloudflareEmail(env.EMAIL, email);
+        }
+
+        console.warn('No outbound email provider is configured.');
+        return { skipped: true, reason: 'email_not_configured' };
+}
+
+async function sendWithResend(apiKey, email) {
         const response = await fetch('https://api.resend.com/emails', {
                 method: 'POST',
                 headers: {
@@ -59,11 +77,12 @@ export async function sendPaymentNotification(env, payment) {
                         'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                        from,
-                        to,
-                        subject: `Pending appeal: ${propertyAddress}`,
-                        html,
-                        text
+                        from: email.from,
+                        to: email.to,
+                        reply_to: email.replyTo,
+                        subject: email.subject,
+                        html: email.html,
+                        text: email.text
                 })
         });
 
@@ -75,6 +94,22 @@ export async function sendPaymentNotification(env, payment) {
         return response.json();
 }
 
+async function sendWithCloudflareEmail(binding, email) {
+        await binding.send({
+                from: email.from,
+                to: email.to,
+                replyTo: email.replyTo,
+                subject: email.subject,
+                html: email.html,
+                text: email.text || stripHtml(email.html || '')
+        });
+        return { success: true, provider: 'cloudflare_email' };
+}
+
+function stripHtml(value) {
+        return String(value || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '');
+}
+
 function escapeHtml(value) {
         return String(value || '').replace(/[&<>"']/g, char => ({
                 '&': '&amp;',
@@ -83,4 +118,16 @@ function escapeHtml(value) {
                 '"': '&quot;',
                 "'": '&#039;'
         })[char]);
+}
+
+function getDefaultFrom(env) {
+        if (env.NOTIFICATION_FROM_EMAIL) {
+                return env.NOTIFICATION_FROM_EMAIL;
+        }
+
+        if (env.RESEND_API_KEY) {
+                return 'Cook County Tax Compare <onboarding@resend.dev>';
+        }
+
+        return DEFAULT_CLOUDFLARE_FROM_EMAIL;
 }

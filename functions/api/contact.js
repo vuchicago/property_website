@@ -1,12 +1,8 @@
+import { sendNotificationEmail } from './_email.js';
+
 const ADMIN_EMAIL = 'vu@cookcountytaxcompare.com';
 
 export const onRequestPost = async (context) => {
-        const apiKey = context.env.RESEND_API_KEY;
-
-        if (!apiKey) {
-                return jsonResponse({ error: 'Email service is not configured' }, 500);
-        }
-
         try {
                 const { name, email, phone, propertyAddress, message } = await context.request.json();
 
@@ -20,7 +16,10 @@ export const onRequestPost = async (context) => {
                         timeStyle: 'short'
                 });
                 const to = context.env.ADMIN_NOTIFICATION_EMAIL || ADMIN_EMAIL;
-                const from = context.env.NOTIFICATION_FROM_EMAIL || 'Cook County Tax Compare <onboarding@resend.dev>';
+                const from = context.env.NOTIFICATION_FROM_EMAIL
+                        || (context.env.RESEND_API_KEY
+                                ? 'Cook County Tax Compare <onboarding@resend.dev>'
+                                : 'Cook County Tax Compare <notifications@inquiry.cookcountytaxcompare.com>');
 
                 const html = `
                         <h2>New Appeal Help Request</h2>
@@ -47,25 +46,17 @@ export const onRequestPost = async (context) => {
                         message || 'No message provided'
                 ].join('\n');
 
-                const response = await fetch('https://api.resend.com/emails', {
-                        method: 'POST',
-                        headers: {
-                                'Authorization': `Bearer ${apiKey}`,
-                                'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                                from,
-                                to,
-                                reply_to: email,
-                                subject: `Appeal help request from ${name}`,
-                                html,
-                                text
-                        })
+                const result = await sendNotificationEmail(context.env, {
+                        from,
+                        to,
+                        replyTo: email,
+                        subject: `Appeal help request from ${name}`,
+                        html,
+                        text
                 });
 
-                if (!response.ok) {
-                        const errorText = await response.text();
-                        throw new Error(errorText);
+                if (result?.skipped) {
+                        return jsonResponse({ error: 'Email service is not configured' }, 500);
                 }
 
                 return jsonResponse({ success: true });
