@@ -127,6 +127,18 @@ After all parts import and the count looks right, add the PIN index:
 wrangler d1 execute appeal_db --remote --file=migrations/0007_add_property_addresses_pin_index.sql
 ```
 
+Then add the lookup indexes used by the native property tax comparison app:
+
+```bash
+wrangler d1 execute appeal_db --remote --file=migrations/0009_add_property_compare_indexes.sql
+```
+
+Create the search logging table so property tax searches can be inspected later:
+
+```bash
+wrangler d1 execute appeal_db --remote --file=migrations/0010_create_property_searches.sql
+```
+
 ## Email Notifications
 
 Payment notification emails and contact form messages can use either Cloudflare Email Sending or Resend from Cloudflare Pages Functions.
@@ -173,7 +185,7 @@ RECAPTCHA_MIN_SCORE=0.5
 ## What's Deployed
 
 - **Homepage**: `index.html` - Main landing page
-- **Property Tax Tool**: `property-tax.html` → HF Space: `vuchicago/property_tax`
+- **Property Tax Tool**: `property-tax.html` → native Cloudflare Pages app backed by D1
 - **ROI Calculator**: `roi-calculator.html` → HF Space: `vuchicago/real-estate-roi`
 - **Loan Tool**: `loan-tool.html` → HF Space: `vuchicago/loan-details`
 - **Styles**: `styles.css`, `dark-mode.css`

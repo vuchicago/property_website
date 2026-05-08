@@ -6,64 +6,146 @@ export function normalizeAddress(value) {
                 .trim();
 }
 
-function addressTokens(value) {
+function canonicalAddress(value) {
+        const suffixes = new Map([
+                ['AVENUE', 'AVE'],
+                ['STREET', 'ST'],
+                ['ROAD', 'RD'],
+                ['BOULEVARD', 'BLVD'],
+                ['DRIVE', 'DR'],
+                ['COURT', 'CT'],
+                ['PLACE', 'PL'],
+                ['LANE', 'LN'],
+                ['TERRACE', 'TER'],
+                ['CIRCLE', 'CIR'],
+                ['PARKWAY', 'PKWY'],
+                ['HIGHWAY', 'HWY'],
+                ['NORTH', 'N'],
+                ['SOUTH', 'S'],
+                ['EAST', 'E'],
+                ['WEST', 'W']
+        ]);
+
         return normalizeAddress(value)
                 .split(' ')
+                .map(token => suffixes.get(token) || token)
+                .join(' ');
+}
+
+function addressTokens(value) {
+        return canonicalAddress(value)
+                .split(' ')
                 .filter(token => token.length > 1 || /^\d+$/.test(token));
+}
+
+function levenshteinRatio(left, right) {
+        if (left === right) {
+                return 100;
+        }
+
+        if (!left || !right) {
+                return 0;
+        }
+
+        const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+        const current = Array(right.length + 1).fill(0);
+
+        for (let i = 1; i <= left.length; i += 1) {
+                current[0] = i;
+                for (let j = 1; j <= right.length; j += 1) {
+                        const substitutionCost = left[i - 1] === right[j - 1] ? 0 : 1;
+                        current[j] = Math.min(
+                                current[j - 1] + 1,
+                                previous[j] + 1,
+                                previous[j - 1] + substitutionCost
+                        );
+                }
+                previous.splice(0, previous.length, ...current);
+        }
+
+        const distance = previous[right.length];
+        return Math.round((1 - distance / Math.max(left.length, right.length)) * 100);
+}
+
+function tokenSetRatio(left, right) {
+        const leftTokens = new Set(addressTokens(left));
+        const rightTokens = new Set(addressTokens(right));
+
+        if (!leftTokens.size || !rightTokens.size) {
+                return 0;
+        }
+
+        let intersection = 0;
+        leftTokens.forEach(token => {
+                if (rightTokens.has(token)) {
+                        intersection += 1;
+                }
+        });
+
+        return Math.round((2 * intersection / (leftTokens.size + rightTokens.size)) * 100);
 }
 
 function scoreAddressMatch(query, candidate) {
         const normalizedQuery = normalizeAddress(query);
         const normalizedCandidate = normalizeAddress(candidate.normalized_address || candidate.address);
+        const canonicalQuery = canonicalAddress(query);
+        const canonicalCandidate = canonicalAddress(candidate.normalized_address || candidate.address);
 
         if (!normalizedQuery || !normalizedCandidate) {
                 return 0;
         }
 
-        if (normalizedCandidate === normalizedQuery) {
-                return 1000;
+        if (canonicalCandidate === canonicalQuery) {
+                return 5000;
         }
 
         let score = 0;
 
-        if (normalizedCandidate.startsWith(normalizedQuery)) {
-                score += 700;
+        if (normalizedCandidate === normalizedQuery) {
+                score += 2500;
         }
 
-        if (normalizedCandidate.includes(normalizedQuery)) {
-                score += 600;
+        if (canonicalCandidate.startsWith(canonicalQuery)) {
+                score += 1400;
         }
 
-        if (normalizedQuery.includes(normalizedCandidate)) {
-                score += 500;
+        if (canonicalCandidate.includes(canonicalQuery)) {
+                score += 1200;
         }
 
-        const queryTokens = addressTokens(query);
-        const candidateTokens = addressTokens(normalizedCandidate);
+        if (canonicalQuery.includes(canonicalCandidate)) {
+                score += 900;
+        }
+
+        const queryTokens = addressTokens(canonicalQuery);
+        const candidateTokens = addressTokens(canonicalCandidate);
         const candidateTokenSet = new Set(candidateTokens);
         let matchedTokens = 0;
 
         queryTokens.forEach((token, index) => {
                 if (candidateTokenSet.has(token)) {
                         matchedTokens += 1;
-                        score += index === 0 && /^\d+$/.test(token) ? 120 : 55;
+                        score += index === 0 && /^\d+$/.test(token) ? 450 : 110;
                 } else if (candidateTokens.some(candidateToken => candidateToken.startsWith(token))) {
                         matchedTokens += 0.5;
-                        score += 25;
+                        score += 55;
                 }
         });
 
         if (queryTokens.length) {
-                score += Math.round((matchedTokens / queryTokens.length) * 200);
+                score += Math.round((matchedTokens / queryTokens.length) * 500);
         }
 
-        score -= Math.min(80, Math.abs(normalizedCandidate.length - normalizedQuery.length));
+        score += levenshteinRatio(canonicalQuery, canonicalCandidate) * 4;
+        score += tokenSetRatio(canonicalQuery, canonicalCandidate) * 3;
+        score -= Math.min(180, Math.abs(canonicalCandidate.length - canonicalQuery.length) * 3);
         return score;
 }
 
 function buildCandidateQuery(query, limit) {
         const normalizedQuery = normalizeAddress(query);
-        const tokens = addressTokens(query);
+        const canonicalQuery = canonicalAddress(query);
+        const tokens = addressTokens(canonicalQuery);
         const firstNumber = tokens.find(token => /^\d+$/.test(token));
         const streetToken = tokens.find(token => !/^\d+$/.test(token) && token.length >= 3);
         const params = [];
@@ -72,8 +154,16 @@ function buildCandidateQuery(query, limit) {
         clauses.push('normalized_address = ?');
         params.push(normalizedQuery);
 
+        if (canonicalQuery !== normalizedQuery) {
+                clauses.push('normalized_address = ?');
+                params.push(canonicalQuery);
+        }
+
         clauses.push('normalized_address LIKE ?');
         params.push(`${normalizedQuery}%`);
+
+        clauses.push('normalized_address LIKE ?');
+        params.push(`${canonicalQuery}%`);
 
         if (firstNumber && streetToken) {
                 clauses.push('normalized_address LIKE ?');
@@ -107,7 +197,7 @@ function buildCandidateQuery(query, limit) {
         };
 }
 
-export async function getAddressSuggestions(db, query, limit = 8) {
+export async function getAddressSuggestions(db, query, limit = 5) {
         const normalizedQuery = normalizeAddress(query);
 
         if (normalizedQuery.length < 3) {

@@ -178,11 +178,154 @@
     <section class="tool-page">
         <div class="container">
             <div class="tool-layout" style="display: block;">
-                <iframe src="https://vuchicago-property-tax.hf.space?embed=true" frameborder="0"
-                    style="width: 100%; height: 1000px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowfullscreen>
-                </iframe>
+                <div class="property-tax-app" id="property-tax-app">
+                    <div class="property-tax-search dashboard-card">
+                        <div class="property-tax-search-grid">
+                            <div class="input-group property-tax-address-field">
+                                <label for="property-address">Property address (Cook County, IL only)</label>
+                                <div class="address-search-wrap">
+                                    <div class="input-wrapper">
+                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                            <path d="M21 21L15.5 15.5M17 10.5C17 14.0899 14.0899 17 10.5 17C6.91015 17 4 14.0899 4 10.5C4 6.91015 6.91015 4 10.5 4C14.0899 4 17 6.91015 17 10.5Z"
+                                                stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                stroke-linejoin="round" />
+                                        </svg>
+                                        <input type="text" id="property-address"
+                                            placeholder="example: 123 main st chicago 60644" autocomplete="off">
+                                    </div>
+                                    <div class="address-suggestions" id="property-address-suggestions"></div>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label for="search-radius">Comps radius: <span id="radius-value">0.5</span> mi</label>
+                                <input type="range" id="search-radius" min="0.1" max="5" value="0.5" step="0.1">
+                            </div>
+                            <div class="property-tax-actions">
+                                <button type="button" class="btn btn-primary" id="search-property" disabled>
+                                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                        <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor"
+                                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                    Analyze
+                                </button>
+                                <button type="button" class="btn btn-secondary" id="reset-search">Clear</button>
+                            </div>
+                        </div>
+                        <p class="property-tax-picked" id="selected-property">Enter an address and choose the closest
+                            match.</p>
+                    </div>
+
+                    <div class="property-tax-empty dashboard-card" id="property-tax-empty">
+                        <h2>Ready when you are</h2>
+                        <p>Search a Cook County address, choose a match, set the radius, then run the comparison.</p>
+                    </div>
+
+                    <div class="property-tax-results" id="property-tax-results" hidden>
+                        <div class="property-tax-result-grid">
+                            <section class="dashboard-card decision-card" id="appeal-decision">
+                                <span class="result-eyebrow">Result</span>
+                                <h2 id="decision-label">Analysis pending</h2>
+                                <p id="decision-reason">Run an analysis to see whether the comps suggest an appeal.</p>
+                            </section>
+                            <section class="dashboard-card">
+                                <div class="property-tax-card-header">
+                                    <span class="result-eyebrow">Property Snapshot</span>
+                                    <strong id="snapshot-type">N/A</strong>
+                                </div>
+                                <div class="property-snapshot-grid">
+                                    <div><span>Taxable Value</span><strong id="your-value">$0</strong></div>
+                                    <div><span>Last Appeal</span><strong id="last-appeal">N/A</strong></div>
+                                    <div><span>Size</span><strong id="home-size">N/A</strong></div>
+                                    <div><span>Beds / Baths</span><strong id="beds-baths">N/A</strong></div>
+                                </div>
+                            </section>
+                        </div>
+
+                        <section class="dashboard-card summary-metrics-card">
+                            <div class="summary-metric">
+                                <span>Comps Found</span>
+                                <strong id="property-count">0</strong>
+                            </div>
+                            <div class="summary-metric">
+                                <span>Average Comp Value</span>
+                                <strong id="avg-value">$0</strong>
+                            </div>
+                            <div class="summary-metric">
+                                <span>Your Taxable Value</span>
+                                <strong id="summary-your-value">$0</strong>
+                            </div>
+                            <div class="summary-metric">
+                                <span>Lower-Valued Comps</span>
+                                <strong id="lower-value-count">0</strong>
+                            </div>
+                        </section>
+
+                        <div class="property-tax-tabs" role="tablist" aria-label="Property tax results">
+                            <button type="button" class="property-tax-tab is-active" data-tab="chart"
+                                role="tab">Comparable Properties</button>
+                            <button type="button" class="property-tax-tab" data-tab="data" role="tab">Comps Data</button>
+                            <button type="button" class="property-tax-tab" data-tab="map" role="tab">Radius Map</button>
+                        </div>
+
+                        <section class="dashboard-card property-tax-tab-panel is-active" id="tab-chart">
+                            <h3>Taxable Value Comparison</h3>
+                            <div class="property-tax-bar-chart" id="comparison-chart"></div>
+                        </section>
+
+                        <section class="dashboard-card property-tax-tab-panel" id="tab-data">
+                            <div class="property-tax-card-header">
+                                <h3>Comparable Properties</h3>
+                                <button type="button" class="btn btn-secondary" id="export-csv" disabled>Download
+                                    CSV</button>
+                            </div>
+                            <div class="table-wrapper">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Address</th>
+                                            <th>Taxable Value</th>
+                                            <th>Last Appeal</th>
+                                            <th>Home Size</th>
+                                            <th>Beds</th>
+                                            <th>Baths</th>
+                                            <th>Distance</th>
+                                            <th>Certified Land</th>
+                                            <th>Certified Building</th>
+                                            <th>Masonry</th>
+                                            <th>Basement</th>
+                                            <th>Single/Multi</th>
+                                            <th>Neighborhood</th>
+                                            <th>Garage</th>
+                                            <th>Class</th>
+                                            <th>PIN</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="comps-table-body">
+                                        <tr class="placeholder-row">
+                                            <td colspan="16">Search for a property to see comparables</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <section class="dashboard-card property-tax-tab-panel" id="tab-map">
+                            <h3>Radius Map</h3>
+                            <div class="map-container property-tax-map" id="property-map">
+                                <div class="map-placeholder" id="map-placeholder">
+                                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                        <path d="M12 21S5 15.75 5 9.5C5 5.634 8.134 2.5 12 2.5C15.866 2.5 19 5.634 19 9.5C19 15.75 12 21 12 21Z"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round" />
+                                        <path d="M12 12C13.3807 12 14.5 10.8807 14.5 9.5C14.5 8.11929 13.3807 7 12 7C10.6193 7 9.5 8.11929 9.5 9.5C9.5 10.8807 10.6193 12 12 12Z"
+                                            stroke="currentColor" stroke-width="2" />
+                                    </svg>
+                                    <p>Map will appear after search</p>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
             </div>
             <div class="tool-description-panel">
                 <div class="tool-description-grid">
