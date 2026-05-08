@@ -3,10 +3,16 @@ import { sendNotificationEmail } from './_email.js';
 const ADMIN_EMAIL = 'vu@cookcountytaxcompare.com';
 
 export const onRequestPost = async (context) => {
+        let savedMessageId = null;
+
         try {
                 const { name, email, phone, propertyAddress, message, inquiryType, insuranceTypes } = await context.request.json();
 
                 const isInsuranceInquiry = String(inquiryType || '').toLowerCase() === 'insurance';
+                const normalizedType = isInsuranceInquiry ? 'Insurance Inquiry' : 'Appeal Help Request';
+                const selectedInsurance = Array.isArray(insuranceTypes) && insuranceTypes.length
+                        ? insuranceTypes.join(', ')
+                        : 'Not provided';
 
                 if (!name || (!email && !isInsuranceInquiry)) {
                         return jsonResponse({ error: 'Name and email are required' }, 400);
@@ -21,15 +27,16 @@ export const onRequestPost = async (context) => {
                         dateStyle: 'medium',
                         timeStyle: 'short'
                 });
-                const to = context.env.ADMIN_NOTIFICATION_EMAIL || ADMIN_EMAIL;
-                const from = context.env.NOTIFICATION_FROM_EMAIL
-                        || (context.env.RESEND_API_KEY
-                                ? 'Cook County Tax Compare <onboarding@resend.dev>'
-                                : 'Cook County Tax Compare <notifications@inquiry.cookcountytaxcompare.com>');
-                const normalizedType = isInsuranceInquiry ? 'Insurance Inquiry' : 'Appeal Help Request';
-                const selectedInsurance = Array.isArray(insuranceTypes) && insuranceTypes.length
-                        ? insuranceTypes.join(', ')
-                        : 'Not provided';
+
+                savedMessageId = await saveContactMessage(context, {
+                        inquiryType: normalizedType,
+                        name,
+                        email,
+                        phone,
+                        propertyAddress,
+                        insuranceTypes: selectedInsurance,
+                        message
+                });
 
                 const html = `
                         <h2>New ${escapeHtml(normalizedType)}</h2>
@@ -60,6 +67,11 @@ export const onRequestPost = async (context) => {
                         message || 'No message provided'
                 ].join('\n');
 
+                const to = context.env.ADMIN_NOTIFICATION_EMAIL || ADMIN_EMAIL;
+                const from = context.env.NOTIFICATION_FROM_EMAIL
+                        || (context.env.RESEND_API_KEY
+                                ? 'Cook County Tax Compare <onboarding@resend.dev>'
+                                : 'Cook County Tax Compare <notifications@inquiry.cookcountytaxcompare.com>');
                 const result = await sendNotificationEmail(context.env, {
                         from,
                         to,
@@ -70,14 +82,79 @@ export const onRequestPost = async (context) => {
                 });
 
                 if (result?.skipped) {
-                        return jsonResponse({ error: 'Email service is not configured' }, 500);
+                        await markContactEmailResult(context.env.DB, savedMessageId, false, result.reason || 'email_not_configured');
+                        return jsonResponse({
+                                success: true,
+                                emailSent: false,
+                                captured: true,
+                                message: 'Message received. Email delivery is not configured, but the request was saved.'
+                        });
                 }
 
-                return jsonResponse({ success: true });
+                await markContactEmailResult(context.env.DB, savedMessageId, true, null);
+                return jsonResponse({ success: true, emailSent: true, captured: true });
         } catch (error) {
-                return jsonResponse({ error: 'Failed to send message' }, 500);
+                console.error('Contact form failed:', error.message);
+
+                if (savedMessageId) {
+                        await markContactEmailResult(context.env.DB, savedMessageId, false, error.message);
+                        return jsonResponse({
+                                success: true,
+                                emailSent: false,
+                                captured: true,
+                                message: 'Message received. Email delivery had an issue, but the request was saved.'
+                        });
+                }
+
+                return jsonResponse({ error: error.message || 'Failed to send message' }, 500);
         }
 };
+
+async function saveContactMessage(context, values) {
+        if (!context.env.DB) {
+                return null;
+        }
+
+        const result = await context.env.DB.prepare(
+                `INSERT INTO contact_messages (
+                        inquiry_type,
+                        name,
+                        email,
+                        phone,
+                        property_address,
+                        insurance_types,
+                        message,
+                        user_agent,
+                        country,
+                        cf_ray
+                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+                values.inquiryType,
+                values.name,
+                values.email || '',
+                values.phone || '',
+                values.propertyAddress || '',
+                values.insuranceTypes || '',
+                values.message || '',
+                context.request.headers.get('user-agent') || '',
+                context.request.cf?.country || '',
+                context.request.headers.get('cf-ray') || ''
+        ).run();
+
+        return result.meta?.last_row_id || null;
+}
+
+async function markContactEmailResult(db, id, sent, error) {
+        if (!db || !id) {
+                return;
+        }
+
+        await db.prepare(
+                `UPDATE contact_messages
+                 SET email_sent = ?, email_error = ?
+                 WHERE id = ?`
+        ).bind(sent ? 1 : 0, error || null, id).run();
+}
 
 function jsonResponse(body, status = 200) {
         return new Response(JSON.stringify(body), {

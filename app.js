@@ -259,7 +259,10 @@ function initContactForm() {
                 throw new Error(error.error || 'Message could not be sent.');
             }
 
-            showNotification('Message sent! We\'ll be in touch soon.', 'success');
+            const data = await response.json().catch(() => ({}));
+            showNotification(data.emailSent === false
+                ? 'Message received. We\'ll be in touch soon.'
+                : 'Message sent! We\'ll be in touch soon.', 'success');
             form.reset();
         } catch (error) {
             showNotification(error.message || 'Message could not be sent.', 'error');

@@ -194,7 +194,9 @@
                 }
 
                 form.reset();
-                showInsuranceAlert('Insurance request sent. We will be in touch soon.', 'success');
+                showInsuranceAlert(data.emailSent === false
+                    ? 'Insurance request received. We will be in touch soon.'
+                    : 'Insurance request sent. We will be in touch soon.', 'success');
             } catch (error) {
                 showInsuranceAlert(error.message || 'Insurance request could not be sent.', 'error');
             } finally {

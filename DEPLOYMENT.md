@@ -139,6 +139,12 @@ Create the search logging table so property tax searches can be inspected later:
 wrangler d1 execute appeal_db --remote --file=migrations/0010_create_property_searches.sql
 ```
 
+Create the contact backup table so contact and insurance form submissions are captured even if outbound email has a provider issue:
+
+```bash
+wrangler d1 execute appeal_db --remote --file=migrations/0011_create_contact_messages.sql
+```
+
 ## Email Notifications
 
 Payment notification emails and contact form messages can use either Cloudflare Email Sending or Resend from Cloudflare Pages Functions.
