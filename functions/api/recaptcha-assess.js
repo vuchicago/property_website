@@ -38,14 +38,23 @@ export const onRequestPost = async (context) => {
                 const assessment = await response.json();
 
                 if (!response.ok) {
-                        return jsonResponse({ error: 'Could not verify reCAPTCHA.' }, 500);
+                        console.error('reCAPTCHA Enterprise assessment request failed:', {
+                                status: response.status,
+                                assessment
+                        });
+                        return jsonResponse({
+                                error: 'Could not verify reCAPTCHA. Check the reCAPTCHA project ID, API key, and allowed domains.'
+                        }, 500);
                 }
 
                 const tokenProperties = assessment.tokenProperties || {};
                 const riskAnalysis = assessment.riskAnalysis || {};
 
                 if (!tokenProperties.valid) {
-                        return jsonResponse({ error: 'reCAPTCHA verification failed.' }, 403);
+                        console.warn('reCAPTCHA token was invalid:', tokenProperties);
+                        return jsonResponse({
+                                error: getInvalidTokenMessage(tokenProperties.invalidReason)
+                        }, 403);
                 }
 
                 if (tokenProperties.action && tokenProperties.action !== expectedAction) {
@@ -59,9 +68,29 @@ export const onRequestPost = async (context) => {
 
                 return jsonResponse({ success: true, score });
         } catch (error) {
-                return jsonResponse({ error: 'Could not verify reCAPTCHA.' }, 500);
+                console.error('reCAPTCHA verification error:', error);
+                return jsonResponse({
+                        error: 'Could not verify reCAPTCHA. Please refresh and try again.'
+                }, 500);
         }
 };
+
+function getInvalidTokenMessage(reason) {
+        switch (reason) {
+                case 'BROWSER_ERROR':
+                        return 'reCAPTCHA could not run in this browser. Please disable blockers or refresh and try again.';
+                case 'DUPE':
+                        return 'reCAPTCHA token was already used. Please try again.';
+                case 'EXPIRED':
+                        return 'reCAPTCHA token expired. Please try again.';
+                case 'MALFORMED':
+                        return 'reCAPTCHA token was invalid. Please refresh and try again.';
+                case 'MISSING':
+                        return 'reCAPTCHA token was missing. Please refresh and try again.';
+                default:
+                        return 'reCAPTCHA verification failed. Please refresh and try again.';
+        }
+}
 
 function jsonResponse(body, status = 200) {
         return new Response(JSON.stringify(body), {
