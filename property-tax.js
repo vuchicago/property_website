@@ -16,6 +16,7 @@ function initPropertyTaxTool() {
     const addressInput = document.getElementById('property-address');
     const suggestions = document.getElementById('property-address-suggestions');
     const exportCsvBtn = document.getElementById('export-csv');
+    const increaseRadiusBtn = document.getElementById('increase-radius-search');
 
     radiusSlider?.addEventListener('input', () => {
         radiusValue.textContent = Number(radiusSlider.value).toFixed(1);
@@ -31,6 +32,12 @@ function initPropertyTaxTool() {
     addressInput?.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
             hideSuggestions();
+        } else if (event.key === 'Enter' && document.getElementById('property-address-suggestions')?.classList.contains('is-visible')) {
+            const firstSuggestion = document.querySelector('#property-address-suggestions [data-property-id]');
+            if (firstSuggestion) {
+                event.preventDefault();
+                selectSuggestion(firstSuggestion);
+            }
         }
     });
 
@@ -44,15 +51,7 @@ function initPropertyTaxTool() {
         const button = event.target.closest('[data-property-id]');
         if (!button) return;
 
-        selectedProperty = {
-            id: Number(button.dataset.propertyId),
-            pin: button.dataset.pin || '',
-            address: button.dataset.address || button.textContent.trim()
-        };
-        addressInput.value = selectedProperty.address;
-        searchBtn.disabled = false;
-        setSelectedPropertyText(`Selected property: ${selectedProperty.address}`);
-        hideSuggestions();
+        selectSuggestion(button);
     });
 
     searchBtn?.addEventListener('click', () => {
@@ -66,10 +65,32 @@ function initPropertyTaxTool() {
 
     resetBtn?.addEventListener('click', resetPropertyResults);
     exportCsvBtn?.addEventListener('click', exportToCSV);
+    increaseRadiusBtn?.addEventListener('click', () => {
+        if (!selectedProperty) return;
+        const nextRadius = Math.min(5, Number((Number(radiusSlider.value) + 0.5).toFixed(1)));
+        radiusSlider.value = String(nextRadius);
+        radiusValue.textContent = nextRadius.toFixed(1);
+        searchProperty(nextRadius);
+    });
 
     document.querySelectorAll('.property-tax-tab').forEach(tab => {
         tab.addEventListener('click', () => activateTab(tab.dataset.tab));
     });
+}
+
+function selectSuggestion(button) {
+    const addressInput = document.getElementById('property-address');
+    const searchBtn = document.getElementById('search-property');
+
+    selectedProperty = {
+        id: Number(button.dataset.propertyId),
+        pin: button.dataset.pin || '',
+        address: button.dataset.address || button.textContent.trim()
+    };
+    addressInput.value = selectedProperty.address;
+    searchBtn.disabled = false;
+    setSelectedPropertyText(`Selected property: ${selectedProperty.address}`);
+    hideSuggestions();
 }
 
 function debounce(fn, wait) {
@@ -159,7 +180,11 @@ async function searchProperty(radius) {
 
         searchResults = data;
         updatePropertyResults(data);
-        initializeMap(data);
+        if (document.getElementById('tab-map')?.classList.contains('is-active')) {
+            initializeMap(data);
+        } else {
+            clearMap();
+        }
         showNotification(`Found ${data.comparables.length} comparable properties`, 'success');
     } catch (error) {
         showNotification(error.message || 'Error searching property', 'error');
@@ -177,6 +202,7 @@ function updatePropertyResults(data) {
     document.getElementById('property-tax-results').hidden = false;
 
     updateDecision(data.appeal);
+    updateWiderRadiusButton(data);
     setText('your-value', formatCurrency(target.taxableValue));
     setText('summary-your-value', formatCurrency(target.taxableValue));
     setText('avg-value', summary.averageComparableValue === null ? 'N/A' : formatCurrency(summary.averageComparableValue));
@@ -190,6 +216,18 @@ function updatePropertyResults(data) {
     renderComparableRows(data.comparables);
     updateComparisonChart(target.taxableValue, summary.averageComparableValue);
     document.getElementById('export-csv').disabled = data.comparables.length === 0;
+}
+
+function updateWiderRadiusButton(data) {
+    const button = document.getElementById('increase-radius-search');
+    if (!button) return;
+
+    const canWiden = data.summary.comparableCount < 5 && data.radius < 5;
+    button.hidden = !canWiden;
+    if (canWiden) {
+        const nextRadius = Math.min(5, Number((data.radius + 0.5).toFixed(1)));
+        button.textContent = `Try ${nextRadius.toFixed(1)} mi radius`;
+    }
 }
 
 function updateDecision(appeal) {
@@ -313,6 +351,19 @@ function initializeMap(data) {
     setTimeout(() => propertyMap?.invalidateSize(), 50);
 }
 
+function clearMap() {
+    const placeholder = document.getElementById('map-placeholder');
+
+    if (propertyMap) {
+        propertyMap.remove();
+        propertyMap = null;
+    }
+
+    if (placeholder) {
+        placeholder.style.display = 'flex';
+    }
+}
+
 function activateTab(tabName) {
     document.querySelectorAll('.property-tax-tab').forEach(tab => {
         tab.classList.toggle('is-active', tab.dataset.tab === tabName);
@@ -320,8 +371,12 @@ function activateTab(tabName) {
     document.querySelectorAll('.property-tax-tab-panel').forEach(panel => {
         panel.classList.toggle('is-active', panel.id === `tab-${tabName}`);
     });
-    if (tabName === 'map' && propertyMap) {
-        setTimeout(() => propertyMap.invalidateSize(), 80);
+    if (tabName === 'map' && searchResults) {
+        if (!propertyMap) {
+            initializeMap(searchResults);
+        } else {
+            setTimeout(() => propertyMap.invalidateSize(), 80);
+        }
     }
 }
 
@@ -335,13 +390,10 @@ function resetPropertyResults() {
     document.getElementById('property-tax-empty').hidden = false;
     document.getElementById('property-tax-results').hidden = true;
     document.getElementById('export-csv').disabled = true;
+    document.getElementById('increase-radius-search').hidden = true;
     setSelectedPropertyText('Enter an address and choose the closest match.');
     hideSuggestions();
-
-    if (propertyMap) {
-        propertyMap.remove();
-        propertyMap = null;
-    }
+    clearMap();
 }
 
 function exportToCSV() {

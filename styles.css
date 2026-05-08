@@ -2005,10 +2005,10 @@ ol {
 
 .property-tax-search {
     background:
-        linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.94)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(236, 253, 245, 0.82)),
         linear-gradient(135deg, rgba(37, 99, 235, 0.22), rgba(20, 184, 166, 0.18));
-    border: 1px solid rgba(15, 23, 42, 0.95);
-    box-shadow: 0 28px 80px -42px rgba(2, 6, 23, 0.9), 0 10px 28px -20px rgba(20, 184, 166, 0.45);
+    border: 1px solid rgba(37, 99, 235, 0.22);
+    box-shadow: 0 24px 70px -42px rgba(15, 23, 42, 0.72), 0 10px 28px -20px rgba(20, 184, 166, 0.45);
     overflow: visible;
     padding: var(--space-8);
     position: relative;
@@ -2050,10 +2050,10 @@ ol {
 
 .property-tax-picked {
     align-items: center;
-    background: rgba(15, 23, 42, 0.72);
-    border: 1px solid rgba(148, 163, 184, 0.42);
+    background: rgba(239, 246, 255, 0.78);
+    border: 1px solid rgba(37, 99, 235, 0.22);
     border-radius: var(--radius-md);
-    color: rgba(226, 232, 240, 0.92);
+    color: var(--dark-600);
     display: flex;
     font-size: var(--font-size-sm);
     font-weight: 600;
@@ -2063,25 +2063,15 @@ ol {
 }
 
 .property-tax-search .input-wrapper input {
-    background: rgba(248, 250, 252, 0.98);
-    border-color: rgba(15, 23, 42, 0.92);
+    background: rgba(255, 255, 255, 0.96);
+    border-color: rgba(148, 163, 184, 0.58);
     border-radius: var(--radius-md);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 0 0 1px rgba(148, 163, 184, 0.38), 0 14px 32px -24px rgba(2, 6, 23, 0.85);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 10px 28px -24px rgba(15, 23, 42, 0.5);
     min-height: 52px;
 }
 
 .property-tax-search .input-wrapper input:focus {
     background: var(--white);
-    border-color: rgba(15, 23, 42, 1);
-    box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.22), 0 18px 38px -26px rgba(2, 6, 23, 0.9);
-}
-
-.property-tax-search .input-group label {
-    color: rgba(248, 250, 252, 0.94);
-}
-
-.property-tax-search .input-wrapper svg {
-    color: var(--dark-700);
 }
 
 .property-tax-search input[type="range"] {
@@ -2150,6 +2140,10 @@ ol {
 .decision-card p {
     color: var(--dark-600);
     font-size: var(--font-size-lg);
+}
+
+.wider-radius-btn {
+    margin-top: var(--space-5);
 }
 
 .decision-card.decision-yes {
@@ -3631,6 +3625,32 @@ textarea {
 
     .property-tax-tab {
         width: 100%;
+    }
+
+    .property-tax-app {
+        padding: var(--space-3);
+    }
+
+    .property-tax-search {
+        padding: var(--space-5);
+    }
+
+    .property-tax-search-grid {
+        gap: var(--space-4);
+    }
+
+    .property-tax-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .property-tax-actions .btn,
+    .wider-radius-btn {
+        min-height: 48px;
+        width: 100%;
+    }
+
+    .address-suggestions {
+        max-height: min(320px, 52vh);
     }
 
 }
