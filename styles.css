@@ -684,6 +684,41 @@ ol {
     max-width: 720px;
 }
 
+.insurance-agent-card {
+    background: var(--white);
+    border: 1px solid var(--dark-200);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
+    margin-top: var(--space-8);
+    max-width: 720px;
+    overflow: hidden;
+}
+
+.insurance-agent-card img {
+    aspect-ratio: 16 / 9;
+    height: auto;
+    object-fit: cover;
+    object-position: center 28%;
+    width: 100%;
+}
+
+.insurance-agent-card figcaption {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-5);
+}
+
+.insurance-agent-card strong {
+    color: var(--dark-900);
+    font-size: var(--font-size-lg);
+}
+
+.insurance-agent-card span {
+    color: var(--dark-500);
+    line-height: 1.6;
+}
+
 .insurance-lines {
     display: flex;
     flex-wrap: wrap;
