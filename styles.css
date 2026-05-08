@@ -702,23 +702,6 @@ ol {
     width: 100%;
 }
 
-.insurance-agent-card figcaption {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    padding: var(--space-5);
-}
-
-.insurance-agent-card strong {
-    color: var(--dark-900);
-    font-size: var(--font-size-lg);
-}
-
-.insurance-agent-card span {
-    color: var(--dark-500);
-    line-height: 1.6;
-}
-
 .insurance-lines {
     display: flex;
     flex-wrap: wrap;
