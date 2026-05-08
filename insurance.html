@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Request help comparing life, health, home, auto, property, and casualty insurance options.">
+    <link rel="canonical" href="https://cookcountytaxcompare.com/insurance.html">
+    <title>Insurance | Cook County Tax Compare</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3 21H21M4 18H20M6 18V10M10 18V10M14 18V10M18 18V10M12 3L21 10H3L12 3Z"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </div>
+                <span>Cook County<br><span class="logo-accent">Tax Compare</span></span>
+            </a>
+            <ul class="nav-links" id="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="property-tax.html">Property Tax Tool</a></li>
+                <li class="nav-dropdown">
+                    <button type="button" class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">
+                        <span>Real-Estate Tools</span>
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round" />
+                        </svg>
+                    </button>
+                    <div class="nav-dropdown-menu">
+                        <a href="loan-tool.html">Loan Tool</a>
+                        <a href="roi-calculator.html">ROI Calculator</a>
+                    </div>
+                </li>
+                <li><a href="insurance.html" class="active">Insurance</a></li>
+                <li><a href="index.html#faq">FAQ</a></li>
+                <li><a href="index.html#contact">Contact</a></li>
+            </ul>
+            <div class="nav-actions">
+                <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+                    <svg class="sun-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2" />
+                        <path
+                            d="M12 2V4M12 20V22M4 12H2M6.31 6.31L4.9 4.9M17.69 6.31L19.1 4.9M6.31 17.69L4.9 19.1M17.69 17.69L19.1 19.1M22 12H20"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                    <svg class="moon-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </button>
+                <a href="#insurance-contact" class="cta-btn">
+                    <span>Get Quote Help</span>
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </a>
+                <button class="mobile-toggle" id="mobile-toggle" aria-label="Toggle Menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+        </div>
+        <div class="mobile-menu" id="mobile-menu">
+            <ul class="mobile-nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="property-tax.html">Property Tax Tool</a></li>
+                <li><a href="loan-tool.html">Loan Tool</a></li>
+                <li><a href="roi-calculator.html">ROI Calculator</a></li>
+                <li><a href="insurance.html" class="active">Insurance</a></li>
+                <li><a href="index.html#faq">FAQ</a></li>
+                <li><a href="index.html#contact">Contact</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="content-page insurance-page">
+        <section class="container insurance-hero">
+            <div class="insurance-copy">
+                <span class="section-badge">Insurance</span>
+                <h1>Save on Home, Auto, Life Insurance.</h1>
+                <p>Request help reviewing life, health, property, and casualty insurance options. Share your contact
+                    information and the coverage types you want to discuss.</p>
+                <div class="insurance-lines">
+                    <span>Life Insurance</span>
+                    <span>Health Insurance</span>
+                    <span>Home & Property</span>
+                    <span>Auto & Casualty</span>
+                </div>
+            </div>
+
+            <form class="contact-form insurance-form" id="insurance-form">
+                <h2>Request Insurance Help</h2>
+                <p class="text-muted">Add your name plus an email or phone number.</p>
+                <div id="insurance-form-alert" class="form-alert" style="display: none;"></div>
+                <div class="input-group">
+                    <label for="insurance-name">Full Name</label>
+                    <input type="text" id="insurance-name" required placeholder="Jane Doe">
+                </div>
+                <div class="form-row">
+                    <div class="input-group">
+                        <label for="insurance-email">Email Address</label>
+                        <input type="email" id="insurance-email" placeholder="jane@example.com">
+                    </div>
+                    <div class="input-group">
+                        <label for="insurance-phone">Phone Number</label>
+                        <input type="tel" id="insurance-phone" placeholder="(773) 555-1234">
+                    </div>
+                </div>
+                <fieldset class="insurance-fieldset">
+                    <legend>Coverage Interest</legend>
+                    <label><input type="checkbox" name="insurance-type" value="Life Insurance"> Life</label>
+                    <label><input type="checkbox" name="insurance-type" value="Health Insurance"> Health</label>
+                    <label><input type="checkbox" name="insurance-type" value="Property Insurance"> Property</label>
+                    <label><input type="checkbox" name="insurance-type" value="Casualty Insurance"> Casualty</label>
+                    <label><input type="checkbox" name="insurance-type" value="Home Insurance"> Home</label>
+                    <label><input type="checkbox" name="insurance-type" value="Auto Insurance"> Auto</label>
+                </fieldset>
+                <div class="input-group">
+                    <label for="insurance-message">Notes</label>
+                    <textarea id="insurance-message" rows="4"
+                        placeholder="Tell me what coverage you want to review..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">Send Insurance Request</button>
+                <p class="insurance-disclaimer">Submitting this form sends your request to Cook County Tax Compare. It
+                    does not bind coverage or create an insurance policy.</p>
+            </form>
+        </section>
+    </main>
+
+    <script src="components.js"></script>
+    <script src="app.js"></script>
+    <script type="module">
+        import { initAuthUI } from './auth.js';
+        initAuthUI();
+
+        const form = document.getElementById('insurance-form');
+        const alertBox = document.getElementById('insurance-form-alert');
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            alertBox.style.display = 'none';
+
+            const name = document.getElementById('insurance-name').value.trim();
+            const email = document.getElementById('insurance-email').value.trim();
+            const phone = document.getElementById('insurance-phone').value.trim();
+            const message = document.getElementById('insurance-message').value.trim();
+            const insuranceTypes = Array.from(document.querySelectorAll('input[name="insurance-type"]:checked'))
+                .map(input => input.value);
+
+            if (!email && !phone) {
+                showInsuranceAlert('Please add either an email address or phone number.', 'error');
+                return;
+            }
+
+            const button = form.querySelector('button[type="submit"]');
+            const originalText = button.textContent;
+            button.disabled = true;
+            button.textContent = 'Sending...';
+
+            try {
+                const response = await fetch('/api/contact', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        inquiryType: 'insurance',
+                        name,
+                        email,
+                        phone,
+                        insuranceTypes,
+                        message
+                    })
+                });
+                const data = await response.json().catch(() => ({}));
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Insurance request could not be sent.');
+                }
+
+                form.reset();
+                showInsuranceAlert('Insurance request sent. We will be in touch soon.', 'success');
+            } catch (error) {
+                showInsuranceAlert(error.message || 'Insurance request could not be sent.', 'error');
+            } finally {
+                button.disabled = false;
+                button.textContent = originalText;
+            }
+        });
+
+        function showInsuranceAlert(message, type) {
+            alertBox.textContent = message;
+            alertBox.className = `form-alert ${type === 'success' ? 'form-alert-success' : 'form-alert-error'}`;
+            alertBox.style.display = 'block';
+        }
+    </script>
+</body>
+
+</html>

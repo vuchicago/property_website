@@ -4,10 +4,16 @@ const ADMIN_EMAIL = 'vu@cookcountytaxcompare.com';
 
 export const onRequestPost = async (context) => {
         try {
-                const { name, email, phone, propertyAddress, message } = await context.request.json();
+                const { name, email, phone, propertyAddress, message, inquiryType, insuranceTypes } = await context.request.json();
 
-                if (!name || !email) {
+                const isInsuranceInquiry = String(inquiryType || '').toLowerCase() === 'insurance';
+
+                if (!name || (!email && !isInsuranceInquiry)) {
                         return jsonResponse({ error: 'Name and email are required' }, 400);
+                }
+
+                if (isInsuranceInquiry && !email && !phone) {
+                        return jsonResponse({ error: 'Please provide an email address or phone number.' }, 400);
                 }
 
                 const submittedAt = new Date().toLocaleString('en-US', {
@@ -20,13 +26,19 @@ export const onRequestPost = async (context) => {
                         || (context.env.RESEND_API_KEY
                                 ? 'Cook County Tax Compare <onboarding@resend.dev>'
                                 : 'Cook County Tax Compare <notifications@inquiry.cookcountytaxcompare.com>');
+                const normalizedType = isInsuranceInquiry ? 'Insurance Inquiry' : 'Appeal Help Request';
+                const selectedInsurance = Array.isArray(insuranceTypes) && insuranceTypes.length
+                        ? insuranceTypes.join(', ')
+                        : 'Not provided';
 
                 const html = `
-                        <h2>New Appeal Help Request</h2>
+                        <h2>New ${escapeHtml(normalizedType)}</h2>
                         <table cellpadding="8" cellspacing="0" style="border-collapse: collapse;">
+                                <tr><td><strong>Inquiry Type</strong></td><td>${escapeHtml(normalizedType)}</td></tr>
                                 <tr><td><strong>Name</strong></td><td>${escapeHtml(name)}</td></tr>
                                 <tr><td><strong>Email</strong></td><td>${escapeHtml(email)}</td></tr>
                                 <tr><td><strong>Phone</strong></td><td>${escapeHtml(phone || 'Not provided')}</td></tr>
+                                <tr><td><strong>Insurance Interest</strong></td><td>${escapeHtml(selectedInsurance)}</td></tr>
                                 <tr><td><strong>Property Address</strong></td><td>${escapeHtml(propertyAddress || 'Not provided')}</td></tr>
                                 <tr><td><strong>Submitted</strong></td><td>${escapeHtml(submittedAt)}</td></tr>
                         </table>
@@ -34,11 +46,13 @@ export const onRequestPost = async (context) => {
                         <p>${escapeHtml(message || 'No message provided').replace(/\n/g, '<br>')}</p>
                 `;
                 const text = [
-                        'New Appeal Help Request',
+                        `New ${normalizedType}`,
                         '',
+                        `Inquiry Type: ${normalizedType}`,
                         `Name: ${name}`,
                         `Email: ${email}`,
                         `Phone: ${phone || 'Not provided'}`,
+                        `Insurance Interest: ${selectedInsurance}`,
                         `Property Address: ${propertyAddress || 'Not provided'}`,
                         `Submitted: ${submittedAt}`,
                         '',
@@ -49,8 +63,8 @@ export const onRequestPost = async (context) => {
                 const result = await sendNotificationEmail(context.env, {
                         from,
                         to,
-                        replyTo: email,
-                        subject: `Appeal help request from ${name}`,
+                        replyTo: email || undefined,
+                        subject: `${normalizedType} from ${name}`,
                         html,
                         text
                 });
