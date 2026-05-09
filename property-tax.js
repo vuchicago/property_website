@@ -116,7 +116,7 @@ function hydratePropertyFromQuery() {
     setSelectedPropertyText(`Selected property: ${selectedProperty.address}`);
 
     if (params.get('auto') === '1') {
-        requestAnimationFrame(() => searchProperty(radius));
+        requestAnimationFrame(() => searchProperty(radius, { scrollToResults: true }));
     }
 }
 
@@ -200,7 +200,7 @@ function hideSuggestions() {
     document.getElementById('property-address-suggestions')?.classList.remove('is-visible');
 }
 
-async function searchProperty(radius) {
+async function searchProperty(radius, options = {}) {
     const searchBtn = document.getElementById('search-property');
     const originalHtml = searchBtn.innerHTML;
     searchBtn.disabled = true;
@@ -222,6 +222,9 @@ async function searchProperty(radius) {
 
         searchResults = data;
         updatePropertyResults(data);
+        if (options.scrollToResults) {
+            scrollPropertyResultsIntoView();
+        }
         if (document.getElementById('tab-map')?.classList.contains('is-active')) {
             initializeMap(data);
         } else {
@@ -234,6 +237,16 @@ async function searchProperty(radius) {
         searchBtn.disabled = !selectedProperty;
         searchBtn.innerHTML = originalHtml;
     }
+}
+
+function scrollPropertyResultsIntoView() {
+    const target = document.getElementById('property-tax-results') || document.getElementById('appeal-decision');
+    if (!target) return;
+
+    setTimeout(() => {
+        const top = target.getBoundingClientRect().top + window.scrollY - 96;
+        window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    }, 80);
 }
 
 function updatePropertyResults(data) {
