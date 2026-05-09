@@ -71,7 +71,7 @@ export const onRequestPut = async (context) => {
         try {
                 const { transactionId, newStatus } = await context.request.json();
 
-                if (!['Pending', 'Success', 'Denied'].includes(newStatus)) {
+                if (!['Pending', 'Finished', 'Denied'].includes(newStatus)) {
                         return jsonResponse({ error: 'Invalid status' }, 400);
                 }
 

@@ -1,4 +1,5 @@
 import { requireFirebaseUser, jsonResponse } from './_auth.js';
+import { findBestPropertyAddress, getPropertyAddressCount } from './_property_addresses.js';
 
 export const onRequestPost = async (context) => {
         const { user, response: authResponse } = await requireFirebaseUser(context.request);
@@ -14,24 +15,53 @@ export const onRequestPost = async (context) => {
         }
 
         try {
-                const { priceId, propertyAddress } = await context.request.json();
+                const { propertyAddress } = await context.request.json();
 
                 if (!propertyAddress) {
                         return jsonResponse({ error: 'Missing property address' }, 400);
                 }
 
-                const PRICE_ID = priceId || context.env.STRIPE_PRICE_ID || 'price_1T0bF2RrARHriB9TIqHffgW0';
+                if (!context.env.DB) {
+                        return jsonResponse({ error: 'Database not configured' }, 500);
+                }
+
+                const validatedProperty = await findBestPropertyAddress(context.env.DB, propertyAddress);
+
+                if (!validatedProperty) {
+                        const propertyAddressCount = await getPropertyAddressCount(context.env.DB);
+                        if (propertyAddressCount === 0) {
+                                return jsonResponse({
+                                        error: 'The Cook County property address database has not been imported yet. Please import property_addresses before starting payments.'
+                                }, 400);
+                        }
+
+                        return jsonResponse({
+                                error: 'Please choose a valid Cook County property address before starting an appeal.'
+                        }, 400);
+                }
+
+                const appealHelpAmountCents = Number(context.env.APPEAL_HELP_AMOUNT_CENTS || 9900);
+                if (!Number.isInteger(appealHelpAmountCents) || appealHelpAmountCents < 50) {
+                        return jsonResponse({ error: 'Invalid appeal help amount configured' }, 500);
+                }
+
                 const DOMAIN = context.env.YOUR_DOMAIN || new URL(context.request.url).origin;
 
                 // Construct form-urlencoded body manually for nested params
                 const body = new URLSearchParams();
                 body.append('mode', 'payment');
-                body.append('line_items[0][price]', PRICE_ID);
+                body.append('line_items[0][price_data][currency]', 'usd');
+                body.append('line_items[0][price_data][unit_amount]', String(appealHelpAmountCents));
+                body.append('line_items[0][price_data][product_data][name]', 'Cook County Property Tax Appeal Help');
+                body.append('line_items[0][price_data][product_data][description]', validatedProperty.address);
                 body.append('line_items[0][quantity]', '1');
                 body.append('success_url', `${DOMAIN}/return.html?session_id={CHECKOUT_SESSION_ID}`);
                 body.append('cancel_url', `${DOMAIN}/index.html`);
                 body.append('client_reference_id', user.uid);
-                body.append('metadata[propertyAddress]', propertyAddress);
+                body.append('metadata[propertyAddress]', validatedProperty.address);
+                if (validatedProperty.pin) {
+                        body.append('metadata[propertyPin]', validatedProperty.pin);
+                }
                 if (user.email) {
                         body.append('customer_email', user.email);
                         body.append('metadata[userEmail]', user.email);

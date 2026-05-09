@@ -1,5 +1,5 @@
 /* Dark Mode Styles */
-[data-theme="dark"] {
+:root[data-theme="dark"] {
     --primary-subtle: hsl(var(--primary-hue), 50%, 20%);
     --dark-900: hsl(222, 10%, 95%);
     --dark-800: hsl(222, 10%, 90%);
@@ -58,6 +58,12 @@
 
 [data-theme="dark"] .dashboard-preview {
     background: hsl(222, 30%, 15%);
+}
+
+[data-theme="dark"] .insurance-preview-link,
+[data-theme="dark"] .insurance-preview-link span,
+[data-theme="dark"] .insurance-preview-link svg {
+    color: hsl(222, 47%, 11%);
 }
 
 [data-theme="dark"] .feature-card,

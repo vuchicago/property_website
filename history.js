@@ -2,6 +2,11 @@ import { auth, authFetch } from './auth.js';
 
 let userAddresses = [];
 let allAppeals = [];
+let lookupTimer = null;
+let selectedAddressSuggestion = '';
+let currentSuggestions = [];
+let selectedAddressForImage = '';
+let selectedPinForImage = '';
 
 export async function loadAppealHistory() {
         const user = auth.currentUser;
@@ -16,6 +21,7 @@ export async function loadAppealHistory() {
         renderAccountSummary(user);
         renderAddressList();
         setupAddAddressForm();
+        setupPropertyImageUpload();
 }
 
 async function fetchAddresses() {
@@ -46,7 +52,12 @@ function renderAccountSummary(user) {
 
         if (emailEl) emailEl.textContent = user.email || 'Signed in';
         if (propertyCountEl) propertyCountEl.textContent = userAddresses.length;
-        if (appealCountEl) appealCountEl.textContent = allAppeals.length;
+        if (appealCountEl) {
+                appealCountEl.textContent = allAppeals.filter(appeal => {
+                        const status = (appeal.appealStatus || appeal.status || '').toLowerCase();
+                        return status && status !== 'pending';
+                }).length;
+        }
         if (pendingCountEl) {
                 pendingCountEl.textContent = allAppeals.filter(appeal => (appeal.appealStatus || appeal.status || '').toLowerCase() === 'pending').length;
         }
@@ -66,13 +77,20 @@ function renderAddressList() {
         userAddresses.forEach(addrObj => {
                 // Count appeals for this address
                 const appealCount = allAppeals.filter(a => a.propertyAddress === addrObj.address).length;
+                const canDelete = appealCount === 0;
 
                 const safeAddress = escapeHtml(addrObj.address);
 
                 html += `
             <li class="address-item" style="padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s;" data-address="${safeAddress}">
-                <div style="font-weight: 500; margin-bottom: 0.25rem;">${safeAddress}</div>
-                <div class="text-xs text-muted">${appealCount} appeal(s)</div>
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
+                        <div>
+                                <div style="font-weight: 500; margin-bottom: 0.25rem;">${safeAddress}</div>
+                                ${addrObj.pin ? `<div class="text-xs text-muted">PIN ${escapeHtml(addrObj.pin)}</div>` : ''}
+                                <div class="text-xs text-muted">${appealCount} appeal(s)</div>
+                        </div>
+                        ${canDelete ? `<button type="button" class="btn btn-secondary btn-sm delete-address-btn" data-address="${safeAddress}" aria-label="Delete ${safeAddress}">Delete</button>` : ''}
+                </div>
             </li>
         `;
         });
@@ -82,6 +100,10 @@ function renderAddressList() {
         // Add click event listeners
         listContainer.querySelectorAll('.address-item').forEach(item => {
                 item.addEventListener('click', (e) => {
+                        if (e.target.closest('.delete-address-btn')) {
+                                return;
+                        }
+
                         // Remove active class from all
                         listContainer.querySelectorAll('.address-item').forEach(i => i.style.borderColor = 'var(--border-color)');
                         listContainer.querySelectorAll('.address-item').forEach(i => i.style.background = 'transparent');
@@ -94,6 +116,42 @@ function renderAddressList() {
                         selectAddress(address);
                 });
         });
+
+        listContainer.querySelectorAll('.delete-address-btn').forEach(button => {
+                button.addEventListener('click', async (event) => {
+                        event.stopPropagation();
+                        const address = event.currentTarget.dataset.address;
+                        if (!address) return;
+
+                        await deleteAddress(address);
+                });
+        });
+}
+
+async function deleteAddress(address) {
+        const confirmed = window.confirm(`Delete ${address} from My Properties?`);
+        if (!confirmed) return;
+
+        try {
+                const response = await authFetch('/api/addresses', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ address })
+                });
+
+                if (!response.ok) {
+                        const err = await response.json();
+                        alert(`Failed to delete address: ${err.error}`);
+                        return;
+                }
+
+                await fetchAddresses();
+                renderAccountSummary(auth.currentUser);
+                renderAddressList();
+        } catch (error) {
+                console.error('Error deleting address:', error);
+                alert('An error occurred while deleting the address.');
+        }
 }
 
 function showEmptyDetailsPanel() {
@@ -108,16 +166,170 @@ function showEmptyDetailsPanel() {
 }
 
 function selectAddress(address) {
+        selectedAddressForImage = address;
+        selectedPinForImage = '';
         document.getElementById('no-address-selected-msg').style.display = 'none';
         const detailsPanel = document.getElementById('appeal-details-container');
         detailsPanel.style.display = 'block';
 
         document.getElementById('selected-address-title').textContent = address;
+        const selectedAddress = userAddresses.find(item => item.address === address);
+        const pinEl = document.getElementById('selected-address-pin');
+
+        if (pinEl) {
+                if (selectedAddress?.pin) {
+                        selectedPinForImage = selectedAddress.pin;
+                        pinEl.textContent = `PIN ${selectedAddress.pin}`;
+                        pinEl.style.display = 'block';
+                } else {
+                        pinEl.textContent = '';
+                        pinEl.style.display = 'none';
+                }
+        }
+
+        renderPropertyDetails(selectedAddress?.propertyDetails);
+        renderPropertyImage(selectedAddress?.pin);
 
         const filteredAppeals = allAppeals.filter(a => a.propertyAddress === address);
         document.getElementById('total-appeals-count').textContent = filteredAppeals.length;
 
         renderAppeals(filteredAppeals, address);
+}
+
+async function renderPropertyImage(pin) {
+        const preview = document.getElementById('property-image-preview');
+        const dateEl = document.getElementById('property-image-date');
+        if (!preview || !dateEl) return;
+
+        preview.style.display = 'none';
+        preview.removeAttribute('src');
+        if (!pin) {
+                dateEl.textContent = 'PIN unavailable. Image upload is disabled for this property.';
+                return;
+        }
+
+        dateEl.textContent = 'Loading image...';
+
+        try {
+                const response = await authFetch(`/api/property-image?pin=${encodeURIComponent(pin)}`);
+                if (!response.ok) throw new Error('Failed to load image');
+
+                const data = await response.json();
+                if (!data.image) {
+                        dateEl.textContent = 'No image uploaded.';
+                        return;
+                }
+
+                preview.src = data.image.image_data;
+                preview.style.display = 'block';
+                dateEl.textContent = `Uploaded ${new Date(data.image.uploaded_at).toLocaleString()}`;
+        } catch (error) {
+                console.error('Error loading property image:', error);
+                dateEl.textContent = 'Image could not be loaded.';
+        }
+}
+
+function setupPropertyImageUpload() {
+        const input = document.getElementById('property-image-input');
+        if (!input || input.dataset.bound === 'true') return;
+        input.dataset.bound = 'true';
+
+        input.addEventListener('change', async () => {
+                const file = input.files?.[0];
+                if (!file || !selectedAddressForImage || !selectedPinForImage) return;
+
+                try {
+                        const resized = await resizeImage(file, 400, 400);
+                        const response = await authFetch('/api/property-image', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                        address: selectedAddressForImage,
+                                        pin: selectedPinForImage,
+                                        imageData: resized.imageData,
+                                        mimeType: resized.mimeType
+                                })
+                        });
+
+                        if (!response.ok) {
+                                const err = await response.json();
+                                alert(`Failed to upload image: ${err.error}`);
+                                return;
+                        }
+
+                        await renderPropertyImage(selectedPinForImage);
+                } catch (error) {
+                        console.error('Error uploading image:', error);
+                        alert('The image could not be uploaded.');
+                } finally {
+                        input.value = '';
+                }
+        });
+}
+
+function resizeImage(file, maxWidth, maxHeight) {
+        return new Promise((resolve, reject) => {
+                const image = new Image();
+                const reader = new FileReader();
+
+                reader.onload = () => {
+                        image.onload = () => {
+                                const scale = Math.min(maxWidth / image.width, maxHeight / image.height, 1);
+                                const width = Math.max(1, Math.round(image.width * scale));
+                                const height = Math.max(1, Math.round(image.height * scale));
+                                const canvas = document.createElement('canvas');
+                                canvas.width = width;
+                                canvas.height = height;
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(image, 0, 0, width, height);
+
+                                resolve({
+                                        imageData: canvas.toDataURL('image/jpeg', 0.82),
+                                        mimeType: 'image/jpeg'
+                                });
+                        };
+                        image.onerror = reject;
+                        image.src = reader.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+        });
+}
+
+function renderPropertyDetails(details) {
+        const container = document.getElementById('selected-property-details');
+        if (!container) return;
+
+        const fields = [
+                ['Taxable Value', formatCurrency(details?.taxableValue)],
+                ['Home Size', formatNumber(details?.homeSize, ' sq ft')],
+                ['Last Appeal Year', details?.lastAppealYear],
+                ['Last Appeal Status', details?.lastAppealStatus],
+                ['Certified Land', formatCurrency(details?.certifiedLand)],
+                ['Certified Building', formatCurrency(details?.certifiedBuilding)],
+                ['Masonry Type', details?.masonryType],
+                ['Class Code', details?.classCode],
+                ['Neighborhood Code', details?.neighborhoodCode],
+                ['Bedrooms', formatNumber(details?.bedroomCount)],
+                ['Bathrooms', formatNumber(details?.bathroomCount)],
+                ['Single vs. Multi-Family', details?.singleVsMultiFamily],
+                ['PIN Proration Rate', formatPercent(details?.pinProrationRate)],
+                ['Property Class', details?.propertyClass]
+        ].filter(([, value]) => value !== null && value !== undefined && value !== '');
+
+        if (!fields.length) {
+                container.style.display = 'none';
+                container.innerHTML = '';
+                return;
+        }
+
+        container.innerHTML = fields.map(([label, value]) => `
+                <div class="property-detail-item">
+                        <span>${escapeHtml(label)}</span>
+                        <strong>${escapeHtml(value)}</strong>
+                </div>
+        `).join('');
+        container.style.display = 'grid';
 }
 
 function renderAppeals(appeals, address) {
@@ -165,11 +377,9 @@ function renderAppeals(appeals, address) {
         // Add Event Listeners for appeal buttons
         historyContainer.querySelectorAll('.appeal-again-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
-                        const addr = e.target.dataset.address;
-                        const { openAppealModal } = await import('./appeal.js');
-                        const addressInput = document.getElementById('appeal-address');
-                        if (addressInput) addressInput.value = addr;
-                        openAppealModal();
+                        const addr = e.currentTarget.dataset.address;
+                        const { openAppealModal } = await import('./appeal.js?v=20260506-address-suggestions');
+                        openAppealModal(addr);
                 });
         });
 }
@@ -183,7 +393,14 @@ function setupAddAddressForm() {
         form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const input = document.getElementById('new-property-address');
-                const address = input.value.trim();
+                const address = selectedAddressSuggestion;
+                const typedAddress = input.value.trim();
+                if (!address && typedAddress) {
+                        await updateAddressSuggestions(typedAddress, true);
+                        input.focus();
+                        return;
+                }
+
                 if (!address) return;
 
                 const btn = document.getElementById('add-address-btn');
@@ -200,6 +417,8 @@ function setupAddAddressForm() {
 
                         if (response.ok) {
                                 input.value = '';
+                                selectedAddressSuggestion = '';
+                                hideAddressSuggestions('property-address-suggestions');
                                 // Refresh data
                                 await fetchAddresses();
                                 renderAccountSummary(auth.currentUser);
@@ -216,12 +435,97 @@ function setupAddAddressForm() {
                         btn.disabled = false;
                 }
         });
+
+        const input = document.getElementById('new-property-address');
+        input?.addEventListener('input', () => {
+                selectedAddressSuggestion = '';
+                currentSuggestions = [];
+                window.clearTimeout(lookupTimer);
+                lookupTimer = window.setTimeout(() => {
+                        updateAddressSuggestions(input.value);
+                }, 250);
+        });
+
+        input?.addEventListener('focus', () => {
+                if (input.value.trim().length >= 3) {
+                        updateAddressSuggestions(input.value);
+                }
+        });
+
+        document.addEventListener('click', (event) => {
+                if (!event.target.closest('#add-address-form')) {
+                        hideAddressSuggestions('property-address-suggestions');
+                }
+        });
+}
+
+async function updateAddressSuggestions(query, forceVisible = false) {
+        const suggestionsPanel = document.getElementById('property-address-suggestions');
+        if (!suggestionsPanel) return;
+
+        if (!query || query.trim().length < 3) {
+                hideAddressSuggestions('property-address-suggestions');
+                return;
+        }
+
+        try {
+                const response = await authFetch(`/api/address-lookup?q=${encodeURIComponent(query)}&limit=5`);
+                if (!response.ok) return;
+
+                const data = await response.json();
+                currentSuggestions = data.suggestions || [];
+                renderAddressSuggestions('property-address-suggestions', currentSuggestions, (address) => {
+                        const input = document.getElementById('new-property-address');
+                        if (input) {
+                                input.value = address;
+                                input.focus();
+                        }
+                        selectedAddressSuggestion = address;
+                }, forceVisible ? 'Select the closest matching address before adding it.' : '');
+        } catch (error) {
+                console.error('Address lookup failed:', error);
+        }
+}
+
+function renderAddressSuggestions(containerId, suggestions, onSelect, helperText = '') {
+        const panel = document.getElementById(containerId);
+        if (!panel) return;
+
+        if (!suggestions.length) {
+                hideAddressSuggestions(containerId);
+                return;
+        }
+
+        panel.innerHTML = `
+                ${helperText ? `<div class="address-suggestion-helper">${escapeHtml(helperText)}</div>` : ''}
+                ${suggestions.slice(0, 5).map(item => `
+                <button type="button" class="address-suggestion" role="option" data-address="${escapeHtml(item.address)}">
+                        ${escapeHtml(item.address)}
+                        <span>PIN ${escapeHtml(item.pin || 'not available')}</span>
+                </button>
+        `).join('')}`;
+        panel.classList.add('is-visible');
+
+        panel.querySelectorAll('.address-suggestion').forEach(button => {
+                button.addEventListener('click', () => {
+                        onSelect(button.dataset.address);
+                        hideAddressSuggestions(containerId);
+                });
+        });
+}
+
+function hideAddressSuggestions(containerId) {
+        const panel = document.getElementById(containerId);
+        if (!panel) return;
+        panel.innerHTML = '';
+        panel.classList.remove('is-visible');
 }
 
 function getStatusClass(status) {
         switch (status) {
                 case 'completed': return 'status-success';
                 case 'success': return 'status-success';
+                case 'finished': return 'status-success';
                 case 'pending': return 'status-pending';
                 case 'failed': return 'status-error';
                 case 'denied': return 'status-error';
@@ -232,6 +536,25 @@ function getStatusClass(status) {
 function capitalize(str) {
         if (!str) return '';
         return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function formatCurrency(value) {
+        if (value === null || value === undefined || value === '') return '';
+        return Number(value).toLocaleString('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                maximumFractionDigits: 0
+        });
+}
+
+function formatNumber(value, suffix = '') {
+        if (value === null || value === undefined || value === '') return '';
+        return `${Number(value).toLocaleString('en-US', { maximumFractionDigits: 1 })}${suffix}`;
+}
+
+function formatPercent(value) {
+        if (value === null || value === undefined || value === '') return '';
+        return `${Number(value).toLocaleString('en-US', { maximumFractionDigits: 3 })}`;
 }
 
 function escapeHtml(value) {

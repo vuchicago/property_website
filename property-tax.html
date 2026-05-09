@@ -14,13 +14,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description"
-        content="Property Tax Comparison Tool - Compare your Cook County property assessment with nearby comparable properties using interactive maps.">
+        content="Compare Cook County property tax assessments by address with nearby comps before checking official county records or preparing an appeal.">
+    <link rel="canonical" href="https://cookcountytaxcompare.com/property-tax">
+    <link rel="image_src" href="https://cookcountytaxcompare.com/assets/og-preview.png">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://cookcountytaxcompare.com/property-tax">
+    <meta property="og:title" content="Cook County Property Tax Assessment Comparison Tool">
+    <meta property="og:description"
+        content="Compare Cook County property tax assessments by address using public property data and nearby comps.">
+    <meta property="og:site_name" content="Cook County Tax Compare">
+    <meta property="og:image" content="https://cookcountytaxcompare.com/assets/og-preview.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Cook County Tax Compare property tax comparison preview">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Cook County Property Tax Assessment Comparison Tool">
+    <meta name="twitter:description"
+        content="Compare Cook County property tax assessments by address.">
+    <meta name="twitter:image" content="https://cookcountytaxcompare.com/assets/og-preview.png">
 
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml"
-        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 
-    <title>Property Tax Comparison Tool | Cook County Tax Compare</title>
+    <title>Cook County Property Tax Assessment Comparison Tool</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
@@ -28,6 +44,41 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <link rel="stylesheet" href="styles.css">
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@graph": [
+                {
+                    "@type": "WebApplication",
+                    "@id": "https://cookcountytaxcompare.com/property-tax#tool",
+                    "name": "Cook County Property Tax Assessment Comparison Tool",
+                    "applicationCategory": "FinanceApplication",
+                    "operatingSystem": "Web",
+                    "url": "https://cookcountytaxcompare.com/property-tax",
+                    "description": "Compare Cook County property tax assessments by address using public property data and nearby comps.",
+                    "image": "https://cookcountytaxcompare.com/assets/og-preview.png"
+                },
+                {
+                    "@type": "BreadcrumbList",
+                    "@id": "https://cookcountytaxcompare.com/property-tax#breadcrumb",
+                    "itemListElement": [
+                        {
+                            "@type": "ListItem",
+                            "position": 1,
+                            "name": "Home",
+                            "item": "https://cookcountytaxcompare.com/"
+                        },
+                        {
+                            "@type": "ListItem",
+                            "position": 2,
+                            "name": "Property Tax Tool",
+                            "item": "https://cookcountytaxcompare.com/property-tax"
+                        }
+                    ]
+                }
+            ]
+        }
+    </script>
 </head>
 
 <body>
@@ -46,8 +97,20 @@
             <ul class="nav-links" id="nav-links">
                 <li><a href="index.html">Home</a></li>
                 <li><a href="property-tax.html" class="active">Property Tax Tool</a></li>
-                <li><a href="index.html#why-appeal">How Appeals Work</a></li>
-                <li><a href="index.html#pricing">Pricing</a></li>
+                <li class="nav-dropdown">
+                    <button type="button" class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">
+                        <span>Real-Estate Tools</span>
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round" />
+                        </svg>
+                    </button>
+                    <div class="nav-dropdown-menu">
+                        <a href="loan-tool.html">Loan Tool</a>
+                        <a href="roi-calculator.html">ROI Calculator</a>
+                    </div>
+                </li>
+                <li><a href="insurance.html">Insurance</a></li>
                 <li><a href="index.html#faq">FAQ</a></li>
                 <li><a href="index.html#contact">Contact</a></li>
             </ul>
@@ -82,8 +145,9 @@
             <ul class="mobile-nav-links">
                 <li><a href="index.html">Home</a></li>
                 <li><a href="property-tax.html" class="active">Property Tax Tool</a></li>
-                <li><a href="index.html#why-appeal">How Appeals Work</a></li>
-                <li><a href="index.html#pricing">Pricing</a></li>
+                <li><a href="loan-tool.html">Loan Tool</a></li>
+                <li><a href="roi-calculator.html">ROI Calculator</a></li>
+                <li><a href="insurance.html">Insurance</a></li>
                 <li><a href="index.html#faq">FAQ</a></li>
                 <li><a href="index.html#contact">Contact</a></li>
             </ul>
@@ -101,7 +165,10 @@
                 </svg>
                 <span>Property Tax Tool</span>
             </div>
-            <h1>Property Tax Comparison Tool</h1>
+            <span class="section-badge">What The Tool Does</span>
+            <h1>Compare Your <span>Cook County Property Tax Assessment</span></h1>
+            <p class="page-header-description">Search a Cook County address to compare nearby property tax assessment
+                comps before checking official records or preparing an appeal.</p>
         </div>
     </section>
 
@@ -109,11 +176,193 @@
     <section class="tool-page">
         <div class="container">
             <div class="tool-layout" style="display: block;">
-                <iframe src="https://vuchicago-property-tax.hf.space?embed=true" frameborder="0"
-                    style="width: 100%; height: 1000px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowfullscreen>
-                </iframe>
+                <div class="property-tax-app" id="property-tax-app">
+                    <div class="property-tax-search dashboard-card">
+                        <div class="property-tax-search-grid">
+                            <div class="input-group property-tax-address-field">
+                                <label for="property-address">Property address (Cook County, IL only)</label>
+                                <div class="address-search-wrap">
+                                    <div class="input-wrapper">
+                                        <svg class="search-border-light" viewBox="0 0 100 100" preserveAspectRatio="none"
+                                            aria-hidden="true">
+                                            <defs>
+                                                <linearGradient id="search-border-gradient" x1="0%" y1="0%" x2="100%"
+                                                    y2="100%">
+                                                    <stop offset="0%" stop-color="#ec4899" />
+                                                    <stop offset="24%" stop-color="#f59e0b" />
+                                                    <stop offset="48%" stop-color="#22c55e" />
+                                                    <stop offset="72%" stop-color="#06b6d4" />
+                                                    <stop offset="100%" stop-color="#8b5cf6" />
+                                                </linearGradient>
+                                            </defs>
+                                            <rect x="1" y="1" width="98" height="98" rx="8" ry="8" pathLength="100" />
+                                        </svg>
+                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                            <path d="M3 11.5L12 4L21 11.5" stroke="currentColor" stroke-width="2"
+                                                stroke-linecap="round" stroke-linejoin="round" />
+                                            <path d="M5.5 10V20H18.5V10" stroke="currentColor" stroke-width="2"
+                                                stroke-linecap="round" stroke-linejoin="round" />
+                                            <path d="M9.5 20V14H14.5V20"
+                                                stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                stroke-linejoin="round" />
+                                        </svg>
+                                        <input type="text" id="property-address"
+                                            placeholder="example: 123 main st chicago 60644" autocomplete="off">
+                                    </div>
+                                    <div class="address-suggestions" id="property-address-suggestions"></div>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label for="search-radius">Comps radius: <span id="radius-value">0.5</span> mi</label>
+                                <input type="range" id="search-radius" min="0.1" max="5" value="0.5" step="0.1">
+                            </div>
+                            <div class="property-tax-actions">
+                                <button type="button" class="btn btn-primary" id="search-property" disabled>
+                                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                        <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor"
+                                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                    Analyze
+                                </button>
+                                <button type="button" class="btn btn-secondary" id="reset-search">Clear</button>
+                            </div>
+                        </div>
+                        <p class="property-tax-picked" id="selected-property">Enter an address and choose the closest
+                            match.</p>
+                    </div>
+
+                    <div class="property-tax-empty dashboard-card" id="property-tax-empty">
+                        <h2>Ready when you are</h2>
+                        <p>Is your property overvalued by the county? Search above to find out</p>
+                    </div>
+
+                    <div class="property-tax-results" id="property-tax-results" hidden>
+                        <div class="property-tax-result-grid">
+                            <section class="dashboard-card decision-card" id="appeal-decision">
+                                <span class="result-eyebrow">Result</span>
+                                <h2 id="decision-label">Analysis pending</h2>
+                                <p id="decision-reason">Run an analysis to see whether the comps suggest an appeal.</p>
+                                <button type="button" class="btn btn-secondary result-action-btn"
+                                    id="increase-radius-search" hidden>Try a wider radius</button>
+                            </section>
+                            <section class="dashboard-card">
+                                <div class="property-tax-card-header">
+                                    <span class="result-eyebrow">Property Snapshot</span>
+                                    <strong id="snapshot-type">N/A</strong>
+                                </div>
+                                <div class="property-snapshot-grid">
+                                    <div><span>Taxable Value</span><strong id="your-value">$0</strong></div>
+                                    <div><span>Last Appeal</span><strong id="last-appeal">N/A</strong></div>
+                                    <div><span>Size</span><strong id="home-size">N/A</strong></div>
+                                    <div><span>Beds / Baths</span><strong id="beds-baths">N/A</strong></div>
+                                </div>
+                            </section>
+                        </div>
+
+                        <section class="dashboard-card summary-metrics-card">
+                            <div class="summary-metric">
+                                <span>Comps Found</span>
+                                <strong id="property-count">0</strong>
+                            </div>
+                            <div class="summary-metric">
+                                <span>Average Comp Value</span>
+                                <strong id="avg-value">$0</strong>
+                            </div>
+                            <div class="summary-metric">
+                                <span>Your Taxable Value</span>
+                                <strong id="summary-your-value">$0</strong>
+                            </div>
+                            <div class="summary-metric">
+                                <span>Lower-Valued Comps</span>
+                                <strong id="lower-value-count">0</strong>
+                            </div>
+                        </section>
+
+                        <div class="property-tax-tabs" role="tablist" aria-label="Property tax results">
+                            <button type="button" class="property-tax-tab is-active" data-tab="chart"
+                                role="tab">Comparable Properties</button>
+                            <button type="button" class="property-tax-tab" data-tab="data" role="tab">Comps Data</button>
+                            <button type="button" class="property-tax-tab" data-tab="map" role="tab">Radius Map</button>
+                        </div>
+
+                        <section class="dashboard-card property-tax-tab-panel is-active" id="tab-chart">
+                            <h3>Taxable Value Comparison</h3>
+                            <div class="property-tax-bar-chart" id="comparison-chart"></div>
+                        </section>
+
+                        <section class="dashboard-card property-tax-tab-panel" id="tab-data">
+                            <div class="property-tax-card-header">
+                                <h3>Comparable Properties</h3>
+                                <button type="button" class="btn btn-secondary" id="export-csv" disabled>Download
+                                    CSV</button>
+                            </div>
+                            <div class="table-wrapper">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Address</th>
+                                            <th>Taxable Value</th>
+                                            <th>Last Appeal</th>
+                                            <th>Home Size</th>
+                                            <th>Beds</th>
+                                            <th>Baths</th>
+                                            <th>Distance</th>
+                                            <th>Certified Land</th>
+                                            <th>Certified Building</th>
+                                            <th>Masonry</th>
+                                            <th>Basement</th>
+                                            <th>Single/Multi</th>
+                                            <th>Neighborhood</th>
+                                            <th>Garage</th>
+                                            <th>Class</th>
+                                            <th>PIN</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="comps-table-body">
+                                        <tr class="placeholder-row">
+                                            <td colspan="16">Search for a property to see comparables</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <section class="dashboard-card property-tax-tab-panel" id="tab-map">
+                            <h3>Radius Map</h3>
+                            <div class="map-container property-tax-map" id="property-map">
+                                <div class="map-placeholder" id="map-placeholder">
+                                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                        <path d="M12 21S5 15.75 5 9.5C5 5.634 8.134 2.5 12 2.5C15.866 2.5 19 5.634 19 9.5C19 15.75 12 21 12 21Z"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round" />
+                                        <path d="M12 12C13.3807 12 14.5 10.8807 14.5 9.5C14.5 8.11929 13.3807 7 12 7C10.6193 7 9.5 8.11929 9.5 9.5C9.5 10.8807 10.6193 12 12 12Z"
+                                            stroke="currentColor" stroke-width="2" />
+                                    </svg>
+                                    <p>Map will appear after search</p>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+            <div class="tool-description-panel">
+                <div class="tool-description-grid">
+                    <article class="dashboard-card tool-description-card">
+                        <h3>Find Nearby Comparables</h3>
+                        <p>Search for a Cook County property and review nearby parcels that may be useful for comparing
+                            assessed value, building size, property class, and location.</p>
+                    </article>
+                    <article class="dashboard-card tool-description-card">
+                        <h3>Review Assessment Signals</h3>
+                        <p>Use the comparison view to spot whether your property appears higher than similar nearby
+                            properties. The tool is a research starting point, not a guarantee of savings.</p>
+                    </article>
+                    <article class="dashboard-card tool-description-card">
+                        <h3>Prepare For Next Steps</h3>
+                        <p>After comparing properties, confirm the PIN, appeal window, exemptions, and filing rules with
+                            official Cook County sources before submitting an appeal.</p>
+                    </article>
+                </div>
             </div>
         </div>
     </section>
@@ -140,6 +389,7 @@
                         <h4>Tools</h4>
                         <ul>
                             <li><a href="property-tax.html">Property Tax Tool</a></li>
+                            <li><a href="insurance.html">Insurance</a></li>
                             <li><a href="roi-calculator.html">ROI Calculator</a></li>
                             <li><a href="loan-tool.html">Loan Tool</a></li>
                         </ul>

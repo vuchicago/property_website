@@ -1,6 +1,6 @@
 // Firebase Authentication Logic
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
 
 // Firebase Configuration
@@ -37,6 +37,14 @@ export { app, auth };
 export const loginUser = async (email, password) => {
         try {
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                if (!userCredential.user.emailVerified) {
+                        await sendEmailVerification(userCredential.user).catch(() => { });
+                        await signOut(auth).catch(() => { });
+                        return {
+                                success: false,
+                                error: 'Please verify your email address before signing in. We sent another verification email.'
+                        };
+                }
                 return { success: true, user: userCredential.user };
         } catch (error) {
                 return { success: false, error: error.message };
@@ -46,6 +54,35 @@ export const loginUser = async (email, password) => {
 export const registerUser = async (email, password) => {
         try {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                try {
+                        await sendEmailVerification(userCredential.user);
+                        await signOut(auth).catch(() => { });
+                        return {
+                                success: true,
+                                user: userCredential.user,
+                                emailVerificationSent: true,
+                                requiresEmailVerification: true
+                        };
+                } catch (verificationError) {
+                        await signOut(auth).catch(() => { });
+                        return {
+                                success: true,
+                                user: userCredential.user,
+                                emailVerificationSent: false,
+                                requiresEmailVerification: true,
+                                warning: 'Account created, but the verification email could not be sent. Please try signing in to resend it.'
+                        };
+                }
+        } catch (error) {
+                return { success: false, error: error.message };
+        }
+};
+
+export const signInWithGoogle = async () => {
+        try {
+                const provider = new GoogleAuthProvider();
+                provider.setCustomParameters({ prompt: 'select_account' });
+                const userCredential = await signInWithPopup(auth, provider);
                 return { success: true, user: userCredential.user };
         } catch (error) {
                 return { success: false, error: error.message };
@@ -160,7 +197,7 @@ const updateAuthButton = (container, user) => {
 
         if (user) {
                 // User is logged in
-                import('./appeal.js').then(module => {
+                import('./appeal.js?v=20260506-address-suggestions').then(module => {
                         window.openAppealModal = module.openAppealModal;
                 });
 
@@ -236,7 +273,7 @@ const updateMobileMenu = (ulElement, user) => {
                 li.innerHTML = `<a href="#" onclick="window.handleLogout(event)">Logout (${user.email})</a>`;
                 // Add appeal link to mobile menu too if desired
                 const appealLi = document.createElement('li');
-                appealLi.innerHTML = `<a href="#" onclick="import('./appeal.js').then(m=>m.openAppealModal())">Appeal Now</a>`;
+                appealLi.innerHTML = `<a href="#" onclick="import('./appeal.js?v=20260506-address-suggestions').then(m=>m.openAppealModal())">Appeal Now</a>`;
                 ulElement.insertBefore(appealLi, li);
         } else {
                 li.innerHTML = `<a href="login.html">Login</a>`;
