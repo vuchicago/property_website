@@ -4,6 +4,7 @@ let searchResults = null;
 let suggestionAbort = null;
 let propertyTabCycleTimer = null;
 let propertyTabCycleStopped = false;
+const desktopTabCycleQuery = window.matchMedia('(min-width: 1025px)');
 
 document.addEventListener('DOMContentLoaded', initPropertyTaxTool);
 
@@ -86,6 +87,8 @@ function initPropertyTaxTool() {
             activateTab(tab.dataset.tab);
         });
     });
+
+    desktopTabCycleQuery.addEventListener('change', handlePropertyTabCycleViewportChange);
 
     hydratePropertyFromQuery();
 }
@@ -456,7 +459,11 @@ function activateTab(tabName) {
 }
 
 function startPropertyTabCycle() {
-    if (propertyTabCycleStopped) return;
+    if (propertyTabCycleStopped || !desktopTabCycleQuery.matches) {
+        clearInterval(propertyTabCycleTimer);
+        propertyTabCycleTimer = null;
+        return;
+    }
 
     clearInterval(propertyTabCycleTimer);
     const tabs = Array.from(document.querySelectorAll('.property-tax-tab'));
@@ -473,6 +480,18 @@ function stopPropertyTabCycle() {
     propertyTabCycleStopped = true;
     clearInterval(propertyTabCycleTimer);
     propertyTabCycleTimer = null;
+}
+
+function handlePropertyTabCycleViewportChange(event) {
+    if (!event.matches) {
+        clearInterval(propertyTabCycleTimer);
+        propertyTabCycleTimer = null;
+        return;
+    }
+
+    if (searchResults && !propertyTabCycleStopped) {
+        startPropertyTabCycle();
+    }
 }
 
 function resetPropertyResults() {
