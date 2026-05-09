@@ -1377,11 +1377,74 @@ ol {
     flex-wrap: wrap;
 }
 
+.hero-address-cta {
+    align-items: flex-start;
+    flex-direction: column;
+    max-width: 560px;
+}
+
+.home-property-search {
+    display: grid;
+    gap: var(--space-3);
+    width: min(100%, 560px);
+}
+
+.home-property-search label {
+    color: var(--dark-700);
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+}
+
+.home-search-input {
+    overflow: visible;
+}
+
+.home-property-search .home-search-input input {
+    background: rgba(255, 255, 255, 0.96);
+    border: 2px solid rgba(148, 163, 184, 0.22);
+    border-radius: var(--radius-md);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.75),
+        0 12px 28px -24px rgba(15, 23, 42, 0.5);
+    min-height: 52px;
+    padding-left: calc(var(--space-4) + 58px);
+    position: relative;
+    z-index: 1;
+}
+
+.home-property-search .home-search-input input:focus {
+    background: var(--white);
+    border-color: rgba(148, 163, 184, 0.34);
+}
+
+.home-search-input>svg:not(.search-border-light) {
+    z-index: 2;
+}
+
+.home-search-input .search-border-light rect {
+    stroke: url(#home-search-border-gradient);
+}
+
+.home-analyze-btn {
+    align-self: flex-start;
+    min-width: 180px;
+}
+
+.home-analyze-btn[hidden] {
+    display: none;
+}
+
 .hero-stats {
     display: flex;
     align-items: center;
     gap: var(--space-8);
     flex-wrap: wrap;
+}
+
+/* Waitlist CTA is parked for later. Remove this rule to restore it. */
+.hero-stats,
+.pricing-cta.waitlist-cta {
+    display: none;
 }
 
 .stat {

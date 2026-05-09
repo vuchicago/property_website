@@ -81,6 +81,43 @@ function initPropertyTaxTool() {
     document.querySelectorAll('.property-tax-tab').forEach(tab => {
         tab.addEventListener('click', () => activateTab(tab.dataset.tab));
     });
+
+    hydratePropertyFromQuery();
+}
+
+function hydratePropertyFromQuery() {
+    const params = new URLSearchParams(window.location.search);
+    const id = Number(params.get('propertyId') || params.get('id'));
+    const address = params.get('address') || '';
+    if (!id || !address) return;
+
+    const addressInput = document.getElementById('property-address');
+    const searchBtn = document.getElementById('search-property');
+    const radiusSlider = document.getElementById('search-radius');
+    const radiusValue = document.getElementById('radius-value');
+    const radius = Math.max(0.1, Math.min(5, Number(params.get('radius') || radiusSlider?.value || 0.5)));
+
+    selectedProperty = {
+        id,
+        pin: params.get('pin') || '',
+        address
+    };
+
+    if (addressInput) {
+        addressInput.value = selectedProperty.address;
+    }
+    if (searchBtn) {
+        searchBtn.disabled = false;
+    }
+    if (radiusSlider && radiusValue) {
+        radiusSlider.value = String(radius);
+        radiusValue.textContent = radius.toFixed(1);
+    }
+    setSelectedPropertyText(`Selected property: ${selectedProperty.address}`);
+
+    if (params.get('auto') === '1') {
+        requestAnimationFrame(() => searchProperty(radius));
+    }
 }
 
 function selectSuggestion(button) {
