@@ -1,6 +1,8 @@
 // Main App JavaScript - Shared functionality across all pages
 let selectedContactProperty = null;
 let contactSuggestionAbort = null;
+let selectedHomeProperty = null;
+let homeSuggestionAbort = null;
 
 document.addEventListener('DOMContentLoaded', function () {
     initThemeToggle();
@@ -11,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initPreviewTools();
     initFAQ();
     initContactForm();
+    initHomePropertySearch();
 });
 
 // ========================================
@@ -284,6 +287,132 @@ function initContactForm() {
             btn.disabled = false;
         }
     });
+}
+
+function initHomePropertySearch() {
+    const search = document.getElementById('home-property-search');
+    if (!search) return;
+
+    const addressInput = document.getElementById('home-property-address');
+    const suggestions = document.getElementById('home-address-suggestions');
+    const analyzeBtn = document.getElementById('home-analyze-property');
+    if (!addressInput || !suggestions || !analyzeBtn) return;
+
+    addressInput.addEventListener('input', debounceContact(() => {
+        selectedHomeProperty = null;
+        analyzeBtn.hidden = true;
+        fetchHomeAddressSuggestions(addressInput.value.trim());
+    }, 220));
+
+    addressInput.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            hideHomeAddressSuggestions();
+        } else if (event.key === 'Enter' && suggestions.classList.contains('is-visible')) {
+            const firstSuggestion = suggestions.querySelector('[data-property-id]');
+            if (firstSuggestion) {
+                event.preventDefault();
+                selectHomeAddressSuggestion(firstSuggestion);
+            }
+        }
+    });
+
+    suggestions.addEventListener('click', event => {
+        const button = event.target.closest('[data-property-id]');
+        if (!button) return;
+        selectHomeAddressSuggestion(button);
+    });
+
+    analyzeBtn.addEventListener('click', () => {
+        if (!selectedHomeProperty) {
+            showNotification('Please choose a property from the suggestions', 'error');
+            return;
+        }
+
+        const params = new URLSearchParams({
+            propertyId: String(selectedHomeProperty.id),
+            pin: selectedHomeProperty.pin || '',
+            address: selectedHomeProperty.address,
+            auto: '1'
+        });
+        window.location.href = `property-tax.html?${params.toString()}`;
+    });
+
+    document.addEventListener('click', event => {
+        if (!event.target.closest('#home-property-search .address-search-wrap')) {
+            hideHomeAddressSuggestions();
+        }
+    });
+}
+
+async function fetchHomeAddressSuggestions(query) {
+    const suggestions = document.getElementById('home-address-suggestions');
+    if (!suggestions) return;
+
+    if (homeSuggestionAbort) {
+        homeSuggestionAbort.abort();
+    }
+
+    if (query.length < 3) {
+        suggestions.innerHTML = '';
+        suggestions.classList.remove('is-visible');
+        return;
+    }
+
+    homeSuggestionAbort = new AbortController();
+    suggestions.innerHTML = '<div class="address-suggestion-helper">Searching Cook County addresses...</div>';
+    suggestions.classList.add('is-visible');
+
+    try {
+        const response = await fetch(`/api/property/suggest?q=${encodeURIComponent(query)}&limit=5`, {
+            signal: homeSuggestionAbort.signal
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Unable to load suggestions');
+
+        renderHomeAddressSuggestions(data.suggestions || []);
+    } catch (error) {
+        if (error.name === 'AbortError') return;
+        suggestions.innerHTML = '<div class="address-suggestion-helper">Could not load suggestions.</div>';
+    }
+}
+
+function renderHomeAddressSuggestions(items) {
+    const suggestions = document.getElementById('home-address-suggestions');
+    if (!suggestions) return;
+
+    if (!items.length) {
+        suggestions.innerHTML = '<div class="address-suggestion-helper">No close matches yet. Try the full street number, street name, city, or ZIP.</div>';
+        suggestions.classList.add('is-visible');
+        return;
+    }
+
+    suggestions.innerHTML = items.map(item => `
+        <button type="button" class="address-suggestion" data-property-id="${escapeHtml(item.id)}"
+            data-address="${escapeHtml(item.address)}" data-pin="${escapeHtml(item.pin || '')}">
+            ${escapeHtml(item.address)}
+            <span>${item.pin ? `PIN ${escapeHtml(item.pin)}` : 'Cook County property record'}</span>
+        </button>
+    `).join('');
+    suggestions.classList.add('is-visible');
+}
+
+function selectHomeAddressSuggestion(button) {
+    const addressInput = document.getElementById('home-property-address');
+    const analyzeBtn = document.getElementById('home-analyze-property');
+    if (!addressInput || !analyzeBtn) return;
+
+    selectedHomeProperty = {
+        id: Number(button.dataset.propertyId),
+        pin: button.dataset.pin || '',
+        address: button.dataset.address || button.textContent.trim()
+    };
+    addressInput.value = selectedHomeProperty.address;
+    analyzeBtn.hidden = false;
+    hideHomeAddressSuggestions();
+}
+
+function hideHomeAddressSuggestions() {
+    document.getElementById('home-address-suggestions')?.classList.remove('is-visible');
 }
 
 function initContactAddressSearch(form) {
