@@ -862,7 +862,7 @@ ol {
 
 .waitlist-cta {
     background: transparent;
-    border: 20;
+    border: 100;
     border-radius: var(--radius-lg);
     box-shadow: none;
     color: var(--dark-900);
