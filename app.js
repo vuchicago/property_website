@@ -1,4 +1,7 @@
 // Main App JavaScript - Shared functionality across all pages
+let selectedContactProperty = null;
+let contactSuggestionAbort = null;
+
 document.addEventListener('DOMContentLoaded', function () {
     initThemeToggle();
     initMobileMenu();
@@ -232,16 +235,23 @@ function initFAQ() {
 // ========================================
 function initContactForm() {
     const form = document.getElementById('contact-form');
+    if (!form) return;
 
-    form?.addEventListener('submit', async e => {
+    initContactAddressSearch(form);
+    initContactFieldValidation(form);
+
+    form.addEventListener('submit', async e => {
         e.preventDefault();
 
         const btn = form.querySelector('button[type="submit"]');
         const originalText = btn.innerHTML;
-        btn.innerHTML = '<svg class="spinner" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" opacity="0.3" fill="none"/><path d="M12 2C6.47715 2 2 6.47715 2 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg> Sending...';
-        btn.disabled = true;
 
         try {
+            if (!validateContactForm(form)) return;
+
+            btn.innerHTML = '<svg class="spinner" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" opacity="0.3" fill="none"/><path d="M12 2C6.47715 2 2 6.47715 2 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg> Sending...';
+            btn.disabled = true;
+
             const response = await fetch('/api/contact', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -250,6 +260,7 @@ function initContactForm() {
                     email: document.getElementById('email')?.value.trim(),
                     phone: document.getElementById('phone')?.value.trim(),
                     propertyAddress: document.getElementById('property-address-contact')?.value.trim(),
+                    inquiryType: document.getElementById('inquiry-type')?.value.trim(),
                     message: document.getElementById('message')?.value.trim()
                 })
             });
@@ -264,6 +275,8 @@ function initContactForm() {
                 ? 'Message received. We\'ll be in touch soon.'
                 : 'Message sent! We\'ll be in touch soon.', 'success');
             form.reset();
+            selectedContactProperty = null;
+            hideContactAddressSuggestions();
         } catch (error) {
             showNotification(error.message || 'Message could not be sent.', 'error');
         } finally {
@@ -271,6 +284,171 @@ function initContactForm() {
             btn.disabled = false;
         }
     });
+}
+
+function initContactAddressSearch(form) {
+    const addressInput = form.querySelector('#property-address-contact');
+    const suggestions = form.querySelector('#contact-address-suggestions');
+    if (!addressInput || !suggestions) return;
+
+    addressInput.addEventListener('input', debounceContact(() => {
+        selectedContactProperty = null;
+        addressInput.setCustomValidity('');
+        fetchContactAddressSuggestions(addressInput.value.trim());
+    }, 220));
+
+    addressInput.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            hideContactAddressSuggestions();
+        } else if (event.key === 'Enter' && suggestions.classList.contains('is-visible')) {
+            const firstSuggestion = suggestions.querySelector('[data-property-id]');
+            if (firstSuggestion) {
+                event.preventDefault();
+                selectContactAddressSuggestion(firstSuggestion);
+            }
+        }
+    });
+
+    suggestions.addEventListener('click', event => {
+        const button = event.target.closest('[data-property-id]');
+        if (!button) return;
+        selectContactAddressSuggestion(button);
+    });
+
+    document.addEventListener('click', event => {
+        if (!event.target.closest('#contact-form .address-search-wrap')) {
+            hideContactAddressSuggestions();
+        }
+    });
+}
+
+function initContactFieldValidation(form) {
+    const emailInput = form.querySelector('#email');
+    const phoneInput = form.querySelector('#phone');
+
+    emailInput?.addEventListener('input', () => emailInput.setCustomValidity(''));
+    phoneInput?.addEventListener('input', () => phoneInput.setCustomValidity(''));
+}
+
+async function fetchContactAddressSuggestions(query) {
+    const suggestions = document.getElementById('contact-address-suggestions');
+    if (!suggestions) return;
+
+    if (contactSuggestionAbort) {
+        contactSuggestionAbort.abort();
+    }
+
+    if (query.length < 3) {
+        suggestions.innerHTML = '';
+        suggestions.classList.remove('is-visible');
+        return;
+    }
+
+    contactSuggestionAbort = new AbortController();
+    suggestions.innerHTML = '<div class="address-suggestion-helper">Searching Cook County addresses...</div>';
+    suggestions.classList.add('is-visible');
+
+    try {
+        const response = await fetch(`/api/property/suggest?q=${encodeURIComponent(query)}&limit=5`, {
+            signal: contactSuggestionAbort.signal
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Unable to load suggestions');
+
+        renderContactAddressSuggestions(data.suggestions || []);
+    } catch (error) {
+        if (error.name === 'AbortError') return;
+        suggestions.innerHTML = '<div class="address-suggestion-helper">Could not load suggestions.</div>';
+    }
+}
+
+function renderContactAddressSuggestions(items) {
+    const suggestions = document.getElementById('contact-address-suggestions');
+    if (!suggestions) return;
+
+    if (!items.length) {
+        suggestions.innerHTML = '<div class="address-suggestion-helper">No close matches yet. Try the full street number, street name, city, or ZIP.</div>';
+        suggestions.classList.add('is-visible');
+        return;
+    }
+
+    suggestions.innerHTML = items.map(item => `
+        <button type="button" class="address-suggestion" data-property-id="${escapeHtml(item.id)}"
+            data-address="${escapeHtml(item.address)}" data-pin="${escapeHtml(item.pin || '')}">
+            ${escapeHtml(item.address)}
+            <span>${item.pin ? `PIN ${escapeHtml(item.pin)}` : 'Cook County property record'}</span>
+        </button>
+    `).join('');
+    suggestions.classList.add('is-visible');
+}
+
+function selectContactAddressSuggestion(button) {
+    const addressInput = document.getElementById('property-address-contact');
+    if (!addressInput) return;
+
+    selectedContactProperty = {
+        id: Number(button.dataset.propertyId),
+        pin: button.dataset.pin || '',
+        address: button.dataset.address || button.textContent.trim()
+    };
+    addressInput.value = selectedContactProperty.address;
+    addressInput.setCustomValidity('');
+    hideContactAddressSuggestions();
+}
+
+function hideContactAddressSuggestions() {
+    document.getElementById('contact-address-suggestions')?.classList.remove('is-visible');
+}
+
+function validateContactForm(form) {
+    const emailInput = form.querySelector('#email');
+    const phoneInput = form.querySelector('#phone');
+    const addressInput = form.querySelector('#property-address-contact');
+    const email = emailInput?.value.trim() || '';
+    const phone = phoneInput?.value.trim() || '';
+    const address = addressInput?.value.trim() || '';
+
+    emailInput?.setCustomValidity(isValidEmail(email) ? '' : 'Enter a valid email address.');
+    phoneInput?.setCustomValidity(isValidPhone(phone) ? '' : 'Enter a valid 10-digit phone number.');
+
+    if (addressInput) {
+        const hasSelectedAddress = selectedContactProperty?.address === address;
+        addressInput.setCustomValidity(hasSelectedAddress ? '' : 'Choose a property address from the suggestions.');
+    }
+
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return false;
+    }
+
+    return true;
+}
+
+function isValidEmail(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
+}
+
+function isValidPhone(value) {
+    const digits = value.replace(/\D/g, '');
+    return digits.length === 10 || (digits.length === 11 && digits.startsWith('1'));
+}
+
+function debounceContact(fn, wait) {
+    let timeout = null;
+    return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => fn(...args), wait);
+    };
+}
+
+function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    })[char]);
 }
 
 // ========================================

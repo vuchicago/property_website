@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Cook County Tax Compare">
+  <rect width="96" height="96" rx="22" fill="#1f2937"/>
+  <path d="M18 41h60L48 20 18 41Z" fill="#ffffff"/>
+  <path d="M24 44h48v34H24V44Z" fill="#ffffff"/>
+  <path d="M31 50h7v22h-7V50Zm13 0h8v22h-8V50Zm14 0h7v22h-7V50Z" fill="#7c3aed"/>
+  <path d="M20 78h56" stroke="#c4b5fd" stroke-width="6" stroke-linecap="round"/>
+</svg>

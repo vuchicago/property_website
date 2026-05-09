@@ -17,6 +17,7 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Login - Cook County Tax Compare</title>
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg">
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
                 rel="stylesheet">
         <link rel="stylesheet" href="styles.css">
@@ -476,8 +477,11 @@
                 const addAppealBtn = document.getElementById('account-add-appeal-btn');
                 const logoutBtn = document.getElementById('account-logout-btn');
 
-                let isLogin = true;
+                const authMode = new URLSearchParams(window.location.search).get('mode');
+                let isLogin = authMode !== 'signup' && authMode !== 'create-account';
                 const recaptchaSiteKey = '6LeNgd4sAAAAAKKCg97Ad6Pt5RjyqPBHV1unrCj7';
+
+                updateUI();
 
                 toggleBtn.addEventListener('click', () => {
                         isLogin = !isLogin;

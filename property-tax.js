@@ -66,6 +66,11 @@ function initPropertyTaxTool() {
     resetBtn?.addEventListener('click', resetPropertyResults);
     exportCsvBtn?.addEventListener('click', exportToCSV);
     increaseRadiusBtn?.addEventListener('click', () => {
+        if (increaseRadiusBtn.dataset.action === 'appeal') {
+            window.location.href = 'login.html?mode=signup&source=property-tax-appeal';
+            return;
+        }
+
         if (!selectedProperty) return;
         const nextRadius = Math.min(5, Number((Number(radiusSlider.value) + 0.5).toFixed(1)));
         radiusSlider.value = String(nextRadius);
@@ -222,11 +227,25 @@ function updateWiderRadiusButton(data) {
     const button = document.getElementById('increase-radius-search');
     if (!button) return;
 
+    if (data.appeal?.decision === 'Yes, Appeal') {
+        button.hidden = false;
+        button.dataset.action = 'appeal';
+        button.classList.remove('btn-secondary');
+        button.classList.add('btn-primary', 'appeal-cta-btn');
+        button.textContent = 'I want to appeal';
+        return;
+    }
+
     const canWiden = data.summary.comparableCount < 5 && data.radius < 5;
     button.hidden = !canWiden;
+    button.dataset.action = 'widen';
+    button.classList.remove('btn-primary', 'appeal-cta-btn');
+    button.classList.add('btn-secondary');
     if (canWiden) {
         const nextRadius = Math.min(5, Number((data.radius + 0.5).toFixed(1)));
         button.textContent = `Try ${nextRadius.toFixed(1)} mi radius`;
+    } else {
+        button.textContent = 'Try a wider radius';
     }
 }
 
@@ -390,10 +409,21 @@ function resetPropertyResults() {
     document.getElementById('property-tax-empty').hidden = false;
     document.getElementById('property-tax-results').hidden = true;
     document.getElementById('export-csv').disabled = true;
-    document.getElementById('increase-radius-search').hidden = true;
+    resetResultActionButton();
     setSelectedPropertyText('Enter an address and choose the closest match.');
     hideSuggestions();
     clearMap();
+}
+
+function resetResultActionButton() {
+    const button = document.getElementById('increase-radius-search');
+    if (!button) return;
+
+    button.hidden = true;
+    button.dataset.action = 'widen';
+    button.classList.remove('btn-primary', 'appeal-cta-btn');
+    button.classList.add('btn-secondary');
+    button.textContent = 'Try a wider radius';
 }
 
 function exportToCSV() {

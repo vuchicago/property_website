@@ -8,8 +8,14 @@ export const onRequestPost = async (context) => {
         try {
                 const { name, email, phone, propertyAddress, message, inquiryType, insuranceTypes } = await context.request.json();
 
-                const isInsuranceInquiry = String(inquiryType || '').toLowerCase() === 'insurance';
-                const normalizedType = isInsuranceInquiry ? 'Insurance Inquiry' : 'Appeal Help Request';
+                const inquiryKind = String(inquiryType || '').toLowerCase();
+                const isInsuranceInquiry = inquiryKind === 'insurance';
+                const isWaitlistInquiry = inquiryKind === 'property-tax-waitlist' || inquiryKind === 'waitlist';
+                const normalizedType = isInsuranceInquiry
+                        ? 'Insurance Inquiry'
+                        : isWaitlistInquiry
+                                ? 'Property Tax Appeal Waitlist'
+                                : 'Appeal Help Request';
                 const selectedInsurance = Array.isArray(insuranceTypes) && insuranceTypes.length
                         ? insuranceTypes.join(', ')
                         : 'Not provided';
@@ -18,8 +24,24 @@ export const onRequestPost = async (context) => {
                         return jsonResponse({ error: 'Name and email are required' }, 400);
                 }
 
+                if (email && !isValidEmail(email)) {
+                        return jsonResponse({ error: 'Please enter a valid email address.' }, 400);
+                }
+
                 if (isInsuranceInquiry && !email && !phone) {
                         return jsonResponse({ error: 'Please provide an email address or phone number.' }, 400);
+                }
+
+                if (phone && !isValidPhone(phone)) {
+                        return jsonResponse({ error: 'Please enter a valid 10-digit phone number.' }, 400);
+                }
+
+                if (isWaitlistInquiry && !phone) {
+                        return jsonResponse({ error: 'Phone number is required for the waitlist.' }, 400);
+                }
+
+                if (isWaitlistInquiry && !propertyAddress) {
+                        return jsonResponse({ error: 'Property address is required for the waitlist.' }, 400);
                 }
 
                 const submittedAt = new Date().toLocaleString('en-US', {
@@ -171,4 +193,13 @@ function escapeHtml(value) {
                 '"': '&quot;',
                 "'": '&#039;'
         })[char]);
+}
+
+function isValidEmail(value) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(value || '').trim());
+}
+
+function isValidPhone(value) {
+        const digits = String(value || '').replace(/\D/g, '');
+        return digits.length === 10 || (digits.length === 11 && digits.startsWith('1'));
 }
