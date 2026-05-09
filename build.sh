@@ -6,8 +6,8 @@ mkdir -p dist
 # Note: we specifically ignore the python backend files and node_modules
 cp *.html *.css *.js dist/
 
-# Copy crawl/indexing metadata when present
-cp robots.txt sitemap.xml llms.txt dist/ 2>/dev/null || true
+# Copy crawl/indexing metadata and Pages routing rules when present
+cp robots.txt sitemap.xml llms.txt _redirects dist/ 2>/dev/null || true
 
 # Copy public assets used by social previews, favicons, and page images
 cp -r assets/ dist/assets/ 2>/dev/null || true
