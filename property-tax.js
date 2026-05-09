@@ -2,6 +2,8 @@ let propertyMap = null;
 let selectedProperty = null;
 let searchResults = null;
 let suggestionAbort = null;
+let propertyTabCycleTimer = null;
+let propertyTabCycleStopped = false;
 
 document.addEventListener('DOMContentLoaded', initPropertyTaxTool);
 
@@ -79,7 +81,10 @@ function initPropertyTaxTool() {
     });
 
     document.querySelectorAll('.property-tax-tab').forEach(tab => {
-        tab.addEventListener('click', () => activateTab(tab.dataset.tab));
+        tab.addEventListener('click', () => {
+            stopPropertyTabCycle();
+            activateTab(tab.dataset.tab);
+        });
     });
 
     hydratePropertyFromQuery();
@@ -271,6 +276,7 @@ function updatePropertyResults(data) {
     renderComparableRows(data.comparables);
     updateComparisonChart(target.taxableValue, summary.averageComparableValue);
     document.getElementById('export-csv').disabled = data.comparables.length === 0;
+    startPropertyTabCycle();
 }
 
 function updateWiderRadiusButton(data) {
@@ -449,6 +455,26 @@ function activateTab(tabName) {
     }
 }
 
+function startPropertyTabCycle() {
+    if (propertyTabCycleStopped) return;
+
+    clearInterval(propertyTabCycleTimer);
+    const tabs = Array.from(document.querySelectorAll('.property-tax-tab'));
+    if (tabs.length < 2) return;
+
+    propertyTabCycleTimer = setInterval(() => {
+        const activeIndex = Math.max(0, tabs.findIndex(tab => tab.classList.contains('is-active')));
+        const nextTab = tabs[(activeIndex + 1) % tabs.length];
+        activateTab(nextTab.dataset.tab);
+    }, 3000);
+}
+
+function stopPropertyTabCycle() {
+    propertyTabCycleStopped = true;
+    clearInterval(propertyTabCycleTimer);
+    propertyTabCycleTimer = null;
+}
+
 function resetPropertyResults() {
     selectedProperty = null;
     searchResults = null;
@@ -463,6 +489,10 @@ function resetPropertyResults() {
     setSelectedPropertyText('Enter an address and choose the closest match.');
     hideSuggestions();
     clearMap();
+    clearInterval(propertyTabCycleTimer);
+    propertyTabCycleTimer = null;
+    propertyTabCycleStopped = false;
+    activateTab('chart');
 }
 
 function resetResultActionButton() {
