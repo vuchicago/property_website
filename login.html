@@ -11,9 +11,6 @@
                 gtag('config', 'G-KRM2FPST0T');
         </script>
         <script src="https://js.stripe.com/v3/"></script>
-        <script
-                src="https://www.google.com/recaptcha/enterprise.js?render=6LeNgd4sAAAAAKKCg97Ad6Pt5RjyqPBHV1unrCj7"></script>
-
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Login - Cook County Tax Compare</title>
@@ -128,19 +125,6 @@
                 .google-auth-btn svg {
                         height: 20px;
                         width: 20px;
-                }
-
-                .recaptcha-notice {
-                        color: var(--dark-400);
-                        font-size: 0.72rem;
-                        line-height: 1.5;
-                        margin-top: var(--space-4);
-                        text-align: center;
-                }
-
-                .recaptcha-notice a {
-                        color: var(--primary);
-                        font-weight: 600;
                 }
 
                 .error-message {
@@ -359,15 +343,6 @@
                                 <a id="toggle-btn">Create one</a>
                         </div>
 
-                        <p class="recaptcha-notice">
-                                This site is protected by reCAPTCHA and the Google
-                                <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Privacy
-                                        Policy</a>
-                                and
-                                <a href="https://policies.google.com/terms" target="_blank" rel="noopener">Terms of
-                                        Service</a>
-                                apply.
-                        </p>
                 </div>
         </div>
 
@@ -479,8 +454,6 @@
 
                 const authMode = new URLSearchParams(window.location.search).get('mode');
                 let isLogin = authMode !== 'signup' && authMode !== 'create-account';
-                const recaptchaSiteKey = '6LeNgd4sAAAAAKKCg97Ad6Pt5RjyqPBHV1unrCj7';
-
                 updateUI();
 
                 toggleBtn.addEventListener('click', () => {
@@ -515,14 +488,6 @@
                         const password = passwordInput.value;
 
                         let result;
-                        const recaptchaResult = await verifyPasswordRecaptcha(isLogin ? 'password_login' : 'password_signup');
-                        if (!recaptchaResult.success) {
-                                errorAlert.textContent = recaptchaResult.error;
-                                errorAlert.style.display = 'block';
-                                submitBtn.disabled = false;
-                                submitBtn.textContent = isLogin ? 'Sign In' : 'Sign Up';
-                                return;
-                        }
 
                         if (isLogin) {
                                 result = await loginUser(email, password);
@@ -533,6 +498,15 @@
                         if (result.success) {
                                 submitBtn.disabled = false;
                                 submitBtn.textContent = isLogin ? 'Sign In' : 'Sign Up';
+                                if (result.requiresEmailVerification) {
+                                        isLogin = true;
+                                        updateUI();
+                                        errorAlert.textContent = result.emailVerificationSent
+                                                ? 'Account created. Please check your email and verify your address before signing in.'
+                                                : result.warning;
+                                        errorAlert.style.display = 'block';
+                                        return;
+                                }
                                 await showDashboard();
                         } else {
                                 errorAlert.textContent = result.error;
@@ -541,42 +515,6 @@
                                 submitBtn.textContent = isLogin ? 'Sign In' : 'Sign Up';
                         }
                 });
-
-                async function verifyPasswordRecaptcha(action) {
-                        try {
-                                if (!window.grecaptcha?.enterprise) {
-                                        return { success: false, error: 'reCAPTCHA did not load. Please refresh and try again.' };
-                                }
-
-                                const token = await new Promise((resolve, reject) => {
-                                        window.grecaptcha.enterprise.ready(async () => {
-                                                try {
-                                                        resolve(await window.grecaptcha.enterprise.execute(recaptchaSiteKey, { action }));
-                                                } catch (error) {
-                                                        reject(error);
-                                                }
-                                        });
-                                });
-
-                                const response = await fetch('/api/recaptcha-assess', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ token, action })
-                                });
-                                const data = await response.json().catch(() => ({}));
-
-                                if (!response.ok || !data.success) {
-                                        return {
-                                                success: false,
-                                                error: data.error || 'Could not verify reCAPTCHA. Please try again.'
-                                        };
-                                }
-
-                                return { success: true };
-                        } catch (error) {
-                                return { success: false, error: 'Could not verify reCAPTCHA. Please try again.' };
-                        }
-                }
 
                 googleAuthBtn.addEventListener('click', async () => {
                         errorAlert.style.display = 'none';
@@ -598,6 +536,15 @@
 
                 onAuthUserChanged(async (user) => {
                         if (user) {
+                                if (!user.emailVerified) {
+                                        await logoutUser();
+                                        authContainer.style.display = 'flex';
+                                        dashboard.style.display = 'none';
+                                        errorAlert.textContent = 'Please verify your email address before signing in.';
+                                        errorAlert.style.display = 'block';
+                                        return;
+                                }
+
                                 await showDashboard();
                         } else {
                                 authContainer.style.display = 'flex';

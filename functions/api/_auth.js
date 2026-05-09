@@ -89,10 +89,15 @@ export async function requireFirebaseUser(request) {
                         throw new Error('Invalid token claims');
                 }
 
+                if (payload.email && payload.email_verified === false) {
+                        throw new Error('Email is not verified');
+                }
+
                 return {
                         user: {
                                 uid: payload.sub,
-                                email: payload.email || null
+                                email: payload.email || null,
+                                emailVerified: payload.email_verified !== false
                         }
                 };
         } catch (error) {

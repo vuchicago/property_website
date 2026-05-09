@@ -1688,8 +1688,9 @@ ol {
     align-items: flex-end;
     justify-content: center;
     gap: var(--space-6);
-    height: 96px;
+    height: 116px;
     margin-bottom: var(--space-5);
+    padding-top: var(--space-5);
 }
 
 .chart-bar {
@@ -1711,9 +1712,11 @@ ol {
 
 .bar-label {
     position: absolute;
-    bottom: -30px;
+    bottom: calc(100% + var(--space-2));
     font-size: var(--font-size-xs);
     color: var(--dark-500);
+    line-height: 1.2;
+    text-align: center;
     white-space: nowrap;
 }
 

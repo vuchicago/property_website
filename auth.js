@@ -1,6 +1,6 @@
 // Firebase Authentication Logic
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
 
 // Firebase Configuration
@@ -37,6 +37,14 @@ export { app, auth };
 export const loginUser = async (email, password) => {
         try {
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                if (!userCredential.user.emailVerified) {
+                        await sendEmailVerification(userCredential.user).catch(() => { });
+                        await signOut(auth).catch(() => { });
+                        return {
+                                success: false,
+                                error: 'Please verify your email address before signing in. We sent another verification email.'
+                        };
+                }
                 return { success: true, user: userCredential.user };
         } catch (error) {
                 return { success: false, error: error.message };
@@ -46,7 +54,25 @@ export const loginUser = async (email, password) => {
 export const registerUser = async (email, password) => {
         try {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                return { success: true, user: userCredential.user };
+                try {
+                        await sendEmailVerification(userCredential.user);
+                        await signOut(auth).catch(() => { });
+                        return {
+                                success: true,
+                                user: userCredential.user,
+                                emailVerificationSent: true,
+                                requiresEmailVerification: true
+                        };
+                } catch (verificationError) {
+                        await signOut(auth).catch(() => { });
+                        return {
+                                success: true,
+                                user: userCredential.user,
+                                emailVerificationSent: false,
+                                requiresEmailVerification: true,
+                                warning: 'Account created, but the verification email could not be sent. Please try signing in to resend it.'
+                        };
+                }
         } catch (error) {
                 return { success: false, error: error.message };
         }
