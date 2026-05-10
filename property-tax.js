@@ -2,6 +2,9 @@ let propertyMap = null;
 let selectedProperty = null;
 let searchResults = null;
 let suggestionAbort = null;
+let propertyTabCycleTimer = null;
+let propertyTabCycleStopped = false;
+const desktopTabCycleQuery = window.matchMedia('(min-width: 1025px)');
 
 document.addEventListener('DOMContentLoaded', initPropertyTaxTool);
 
@@ -79,8 +82,13 @@ function initPropertyTaxTool() {
     });
 
     document.querySelectorAll('.property-tax-tab').forEach(tab => {
-        tab.addEventListener('click', () => activateTab(tab.dataset.tab));
+        tab.addEventListener('click', () => {
+            stopPropertyTabCycle();
+            activateTab(tab.dataset.tab);
+        });
     });
+
+    desktopTabCycleQuery.addEventListener('change', handlePropertyTabCycleViewportChange);
 
     hydratePropertyFromQuery();
 }
@@ -116,7 +124,7 @@ function hydratePropertyFromQuery() {
     setSelectedPropertyText(`Selected property: ${selectedProperty.address}`);
 
     if (params.get('auto') === '1') {
-        requestAnimationFrame(() => searchProperty(radius));
+        requestAnimationFrame(() => searchProperty(radius, { scrollToResults: true }));
     }
 }
 
@@ -200,7 +208,7 @@ function hideSuggestions() {
     document.getElementById('property-address-suggestions')?.classList.remove('is-visible');
 }
 
-async function searchProperty(radius) {
+async function searchProperty(radius, options = {}) {
     const searchBtn = document.getElementById('search-property');
     const originalHtml = searchBtn.innerHTML;
     searchBtn.disabled = true;
@@ -222,6 +230,9 @@ async function searchProperty(radius) {
 
         searchResults = data;
         updatePropertyResults(data);
+        if (options.scrollToResults) {
+            scrollPropertyResultsIntoView();
+        }
         if (document.getElementById('tab-map')?.classList.contains('is-active')) {
             initializeMap(data);
         } else {
@@ -234,6 +245,16 @@ async function searchProperty(radius) {
         searchBtn.disabled = !selectedProperty;
         searchBtn.innerHTML = originalHtml;
     }
+}
+
+function scrollPropertyResultsIntoView() {
+    const target = document.getElementById('property-tax-results') || document.getElementById('appeal-decision');
+    if (!target) return;
+
+    setTimeout(() => {
+        const top = target.getBoundingClientRect().top + window.scrollY - 96;
+        window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    }, 80);
 }
 
 function updatePropertyResults(data) {
@@ -258,6 +279,7 @@ function updatePropertyResults(data) {
     renderComparableRows(data.comparables);
     updateComparisonChart(target.taxableValue, summary.averageComparableValue);
     document.getElementById('export-csv').disabled = data.comparables.length === 0;
+    startPropertyTabCycle();
 }
 
 function updateWiderRadiusButton(data) {
@@ -436,6 +458,42 @@ function activateTab(tabName) {
     }
 }
 
+function startPropertyTabCycle() {
+    if (propertyTabCycleStopped || !desktopTabCycleQuery.matches) {
+        clearInterval(propertyTabCycleTimer);
+        propertyTabCycleTimer = null;
+        return;
+    }
+
+    clearInterval(propertyTabCycleTimer);
+    const tabs = Array.from(document.querySelectorAll('.property-tax-tab'));
+    if (tabs.length < 2) return;
+
+    propertyTabCycleTimer = setInterval(() => {
+        const activeIndex = Math.max(0, tabs.findIndex(tab => tab.classList.contains('is-active')));
+        const nextTab = tabs[(activeIndex + 1) % tabs.length];
+        activateTab(nextTab.dataset.tab);
+    }, 3000);
+}
+
+function stopPropertyTabCycle() {
+    propertyTabCycleStopped = true;
+    clearInterval(propertyTabCycleTimer);
+    propertyTabCycleTimer = null;
+}
+
+function handlePropertyTabCycleViewportChange(event) {
+    if (!event.matches) {
+        clearInterval(propertyTabCycleTimer);
+        propertyTabCycleTimer = null;
+        return;
+    }
+
+    if (searchResults && !propertyTabCycleStopped) {
+        startPropertyTabCycle();
+    }
+}
+
 function resetPropertyResults() {
     selectedProperty = null;
     searchResults = null;
@@ -450,6 +508,10 @@ function resetPropertyResults() {
     setSelectedPropertyText('Enter an address and choose the closest match.');
     hideSuggestions();
     clearMap();
+    clearInterval(propertyTabCycleTimer);
+    propertyTabCycleTimer = null;
+    propertyTabCycleStopped = false;
+    activateTab('chart');
 }
 
 function resetResultActionButton() {
