@@ -1383,6 +1383,10 @@ ol {
     max-width: 560px;
 }
 
+.hero-address-cta>.btn-secondary {
+    align-self: center;
+}
+
 .home-property-search {
     display: grid;
     gap: var(--space-3);
@@ -3620,11 +3624,11 @@ textarea {
         radial-gradient(circle at 20% 0%, rgba(124, 58, 237, 0.12), transparent 30%),
         linear-gradient(180deg, var(--primary-50) 0%, var(--white) 42%, var(--dark-50) 100%);
     color: var(--dark-800);
-    padding-top: 84px;
+    padding-top: 132px;
 }
 
 .legal-hero {
-    padding: var(--space-20) 0 var(--space-12);
+    padding: var(--space-16) 0 var(--space-12);
 }
 
 .legal-hero h1 {
