@@ -1418,6 +1418,7 @@ ol {
     padding-right: 178px;
     position: relative;
     text-align: left;
+    text-overflow: ellipsis;
     z-index: 1;
 }
 
@@ -4234,28 +4235,28 @@ textarea {
     }
 
     .home-property-search .home-search-input input {
-        font-size: 0.96rem;
+        font-size: 0.9rem;
         padding-left: calc(var(--space-4) + 46px);
-        padding-right: 126px;
+        padding-right: 108px;
     }
 
     .home-search-badges {
         pointer-events: none;
         position: absolute;
-        right: var(--space-3);
-        top: 50%;
+        right: var(--space-2);
+        top: 32%;
         transform: translateY(-50%);
-        width: 108px;
+        width: 98px;
     }
 
     .home-search-badge {
-        font-size: 0.58rem;
+        font-size: 0.5rem;
         gap: 4px;
     }
 
     .home-search-badge svg {
-        height: 11px;
-        width: 11px;
+        height: 9px;
+        width: 9px;
     }
 
     .stat-divider {
