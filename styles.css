@@ -1417,6 +1417,7 @@ ol {
     padding-left: calc(var(--space-4) + 60px);
     padding-right: 178px;
     position: relative;
+    text-align: left;
     z-index: 1;
 }
 
@@ -4233,15 +4234,28 @@ textarea {
     }
 
     .home-property-search .home-search-input input {
-        padding-right: var(--space-4);
+        font-size: 0.96rem;
+        padding-left: calc(var(--space-4) + 46px);
+        padding-right: 126px;
     }
 
     .home-search-badges {
-        margin-top: var(--space-2);
-        pointer-events: auto;
-        position: static;
-        transform: none;
-        width: 100%;
+        pointer-events: none;
+        position: absolute;
+        right: var(--space-3);
+        top: 50%;
+        transform: translateY(-50%);
+        width: 108px;
+    }
+
+    .home-search-badge {
+        font-size: 0.58rem;
+        gap: 4px;
+    }
+
+    .home-search-badge svg {
+        height: 11px;
+        width: 11px;
     }
 
     .stat-divider {
