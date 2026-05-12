@@ -1648,6 +1648,29 @@ ol {
     animation: floatGlow 6s ease-in-out infinite;
 }
 
+.hero-phone-preview {
+    animation: heroPhoneBounce 5.5s ease-in-out infinite;
+    display: block;
+    filter:
+        drop-shadow(0 34px 44px rgba(15, 23, 42, 0.18))
+        drop-shadow(0 18px 65px rgba(124, 58, 237, 0.12));
+    height: auto;
+    max-width: min(620px, 100%);
+    width: 100%;
+}
+
+@keyframes heroPhoneBounce {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-18px);
+    }
+}
+
 @keyframes floatGlow {
 
     0%,
@@ -4050,6 +4073,10 @@ textarea {
         padding: var(--space-8) var(--container-padding);
     }
 
+    .hero-phone-preview {
+        max-width: min(520px, 94vw);
+    }
+
     .why-appeal .container,
     .deadlines-section .container,
     .contact-section .container {
@@ -4232,6 +4259,10 @@ textarea {
     .hero-stats {
         flex-direction: column;
         gap: var(--space-4);
+    }
+
+    .hero-phone-preview {
+        max-width: 100%;
     }
 
     .home-property-search .home-search-input input {
