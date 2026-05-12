@@ -4236,21 +4236,25 @@ textarea {
 
     .home-property-search .home-search-input input {
         font-size: 0.9rem;
+        min-height: 76px;
         padding-left: calc(var(--space-4) + 46px);
-        padding-right: 108px;
+        padding-right: var(--space-4);
+        padding-top: 28px;
     }
 
     .home-search-badges {
+        justify-items: center;
+        left: 50%;
         pointer-events: none;
         position: absolute;
-        right: var(--space-2);
-        top: 32%;
-        transform: translateY(-50%);
-        width: 98px;
+        right: auto;
+        top: 9px;
+        transform: translateX(-50%);
+        width: max-content;
     }
 
     .home-search-badge {
-        font-size: 0.5rem;
+        font-size: 0.58rem;
         gap: 4px;
     }
 
