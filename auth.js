@@ -39,11 +39,6 @@ export const loginUser = async (email, password) => {
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
                 if (!userCredential.user.emailVerified) {
                         await sendEmailVerification(userCredential.user).catch(() => { });
-                        await signOut(auth).catch(() => { });
-                        return {
-                                success: false,
-                                error: 'Please verify your email address before signing in. We sent another verification email.'
-                        };
                 }
                 return { success: true, user: userCredential.user };
         } catch (error) {
@@ -56,21 +51,17 @@ export const registerUser = async (email, password) => {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 try {
                         await sendEmailVerification(userCredential.user);
-                        await signOut(auth).catch(() => { });
                         return {
                                 success: true,
                                 user: userCredential.user,
-                                emailVerificationSent: true,
-                                requiresEmailVerification: true
+                                emailVerificationSent: true
                         };
                 } catch (verificationError) {
-                        await signOut(auth).catch(() => { });
                         return {
                                 success: true,
                                 user: userCredential.user,
                                 emailVerificationSent: false,
-                                requiresEmailVerification: true,
-                                warning: 'Account created, but the verification email could not be sent. Please try signing in to resend it.'
+                                warning: 'Account created, but the verification email could not be sent.'
                         };
                 }
         } catch (error) {
