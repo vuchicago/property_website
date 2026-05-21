@@ -326,7 +326,7 @@ function updateDecision(appeal) {
 function renderComparableRows(comparables) {
     const body = document.getElementById('comps-table-body');
     if (!comparables.length) {
-        body.innerHTML = '<tr class="placeholder-row"><td colspan="16">No comparable properties matched the current filters.</td></tr>';
+        body.innerHTML = '<tr class="placeholder-row"><td colspan="18">No comparable properties matched the current filters.</td></tr>';
         return;
     }
 
@@ -336,12 +336,14 @@ function renderComparableRows(comparables) {
             <td>${formatCurrency(c.taxableValue)}</td>
             <td>${escapeHtml(formatLastAppeal(c.lastAppealYear))}</td>
             <td>${c.homeSize ? `${formatNumber(c.homeSize)} sqft` : 'N/A'}</td>
+            <td>${c.yearBuilt ? formatNumber(c.yearBuilt) : 'N/A'}</td>
             <td>${c.bedroomCount === null ? 'N/A' : formatNumber(c.bedroomCount)}</td>
             <td>${c.bathroomCount === null ? 'N/A' : formatNumber(c.bathroomCount)}</td>
             <td>${c.distanceMiles.toFixed(2)} mi</td>
             <td>${c.certifiedLand === null ? 'N/A' : formatCurrency(c.certifiedLand)}</td>
             <td>${c.certifiedBuilding === null ? 'N/A' : formatCurrency(c.certifiedBuilding)}</td>
             <td>${escapeHtml(c.masonryType || 'N/A')}</td>
+            <td>${escapeHtml(c.repairCondition || 'N/A')}</td>
             <td>${escapeHtml(c.finishedBasement || 'N/A')}</td>
             <td>${escapeHtml(c.singleVsMultiFamily || 'N/A')}</td>
             <td>${escapeHtml(c.neighborhoodCode || 'N/A')}</td>
@@ -529,7 +531,7 @@ function exportToCSV() {
     if (!searchResults) return;
 
     const rows = [
-        ['Address', 'Taxable Value', 'Last Appeal Year', 'Certified Land', 'Certified Building', 'Home Size', 'Last Appeal Status', 'Beds', 'Baths', 'Masonry Type', 'Finished Basement', 'Single vs Multi Family', 'Neighborhood Code', 'Garage Size', 'Class Description', 'PIN Proration Rate', 'PIN', 'Latitude', 'Longitude', 'Class Code', 'Distance Miles'],
+        ['Address', 'Taxable Value', 'Last Appeal Year', 'Certified Land', 'Certified Building', 'Home Size', 'Year Built', 'Last Appeal Status', 'Beds', 'Baths', 'Masonry Type', 'Repair Condition', 'Finished Basement', 'Single vs Multi Family', 'Neighborhood Code', 'Garage Size', 'Class Description', 'PIN Proration Rate', 'PIN', 'PIN10', 'Latitude', 'Longitude', 'Class Code', 'Condo Unit Sqft', 'Condo Parking Space', 'Condo Common Area', 'Distance Miles'],
         [
             searchResults.target.address,
             searchResults.target.taxableValue,
@@ -537,10 +539,12 @@ function exportToCSV() {
             searchResults.target.certifiedLand || '',
             searchResults.target.certifiedBuilding || '',
             searchResults.target.homeSize || '',
+            searchResults.target.yearBuilt || '',
             searchResults.target.lastAppealStatus || '',
             searchResults.target.bedroomCount || '',
             searchResults.target.bathroomCount || '',
             searchResults.target.masonryType || '',
+            searchResults.target.repairCondition || '',
             searchResults.target.finishedBasement || '',
             searchResults.target.singleVsMultiFamily || '',
             searchResults.target.neighborhoodCode || '',
@@ -548,9 +552,13 @@ function exportToCSV() {
             searchResults.target.propertyClass || '',
             searchResults.target.pinProrationRate || '',
             searchResults.target.pin || '',
+            searchResults.target.pin10 || '',
             searchResults.target.latitude || '',
             searchResults.target.longitude || '',
             searchResults.target.classCode || '',
+            searchResults.target.condoUnitSqft || '',
+            searchResults.target.condoParkingSpace || '',
+            searchResults.target.condoCommonArea || '',
             'Your Property'
         ],
         ...searchResults.comparables.map(c => [
@@ -560,10 +568,12 @@ function exportToCSV() {
             c.certifiedLand || '',
             c.certifiedBuilding || '',
             c.homeSize || '',
+            c.yearBuilt || '',
             c.lastAppealStatus || '',
             c.bedroomCount || '',
             c.bathroomCount || '',
             c.masonryType || '',
+            c.repairCondition || '',
             c.finishedBasement || '',
             c.singleVsMultiFamily || '',
             c.neighborhoodCode || '',
@@ -571,9 +581,13 @@ function exportToCSV() {
             c.propertyClass || '',
             c.pinProrationRate || '',
             c.pin || '',
+            c.pin10 || '',
             c.latitude || '',
             c.longitude || '',
             c.classCode || '',
+            c.condoUnitSqft || '',
+            c.condoParkingSpace || '',
+            c.condoCommonArea || '',
             c.distanceMiles.toFixed(3)
         ])
     ];

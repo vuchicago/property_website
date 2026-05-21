@@ -435,7 +435,7 @@
 
         <!-- Auth Logic Script -->
         <script type="module">
-                import { loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged } from './auth.js?v=20260507-google-auth';
+                import { loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged } from './auth.js?v=20260521-email-auth';
 
                 const form = document.getElementById('auth-form');
                 const emailInput = document.getElementById('email');
@@ -498,15 +498,6 @@
                         if (result.success) {
                                 submitBtn.disabled = false;
                                 submitBtn.textContent = isLogin ? 'Sign In' : 'Sign Up';
-                                if (result.requiresEmailVerification) {
-                                        isLogin = true;
-                                        updateUI();
-                                        errorAlert.textContent = result.emailVerificationSent
-                                                ? 'Account created. Please check your email and verify your address before signing in.'
-                                                : result.warning;
-                                        errorAlert.style.display = 'block';
-                                        return;
-                                }
                                 await showDashboard();
                         } else {
                                 errorAlert.textContent = result.error;
@@ -536,15 +527,6 @@
 
                 onAuthUserChanged(async (user) => {
                         if (user) {
-                                if (!user.emailVerified) {
-                                        await logoutUser();
-                                        authContainer.style.display = 'flex';
-                                        dashboard.style.display = 'none';
-                                        errorAlert.textContent = 'Please verify your email address before signing in.';
-                                        errorAlert.style.display = 'block';
-                                        return;
-                                }
-
                                 await showDashboard();
                         } else {
                                 authContainer.style.display = 'flex';
@@ -567,7 +549,7 @@
                 async function showDashboard() {
                         authContainer.style.display = 'none';
                         dashboard.style.display = 'block';
-                        const { loadAppealHistory } = await import('./history.js');
+                        const { loadAppealHistory } = await import('./history.js?v=20260521-property-details');
                         await loadAppealHistory();
                 }
         </script>

@@ -20,21 +20,37 @@ PROPERTY_COLUMNS = [
     "certified_land",
     "certified_building",
     "home_size",
+    "year_built",
     "last_appeal_status",
     "bedroom_count",
     "bathroom_count",
     "masonry_type",
     "finished_basement",
+    "repair_condition",
     "single_vs_multi_family",
     "neighborhood_code",
     "garage_size",
     "property_class",
     "pin_proration_rate",
+    "pin10",
     "latitude",
     "longitude",
-    "latitude_raw",
-    "longitude_raw",
     "class_code",
+    "tax_district_code",
+    "municipality_number",
+    "municipality_name",
+    "tax_municipality_name",
+    "cmap_walkability_total_score",
+    "cmap_walkability_no_transit_score",
+    "flood_fs_factor",
+    "chicago_community_area",
+    "condo_unit_sqft",
+    "condo_building_sqft",
+    "condo_building_non_units",
+    "condo_building_pins",
+    "condo_building_mixed_use",
+    "condo_parking_space",
+    "condo_common_area",
 ]
 
 
@@ -77,6 +93,26 @@ def clean_number(value, integer: bool = False):
     return int(value) if integer else float(value)
 
 
+def clean_bool(value):
+    if value is None:
+        return None
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    if isinstance(value, bool):
+        return int(value)
+
+    text = clean_string(value)
+    if text is None:
+        return None
+
+    normalized = text.lower()
+    if normalized in {"true", "t", "yes", "y", "1"}:
+        return 1
+    if normalized in {"false", "f", "no", "n", "0"}:
+        return 0
+    return text
+
+
 def sql_literal(value) -> str:
     if value is None:
         return "NULL"
@@ -99,21 +135,37 @@ def row_to_values(row: dict) -> list:
         clean_number(row.get("Certified Land"), integer=True),
         clean_number(row.get("Certified Building"), integer=True),
         clean_number(row.get("Home Size")),
+        clean_number(row.get("Year Built")),
         clean_string(row.get("Last Appeal Status")),
         clean_number(row.get("Bedroom Count")),
         clean_number(row.get("Bathroom Count")),
         clean_string(row.get("Masonry Type")),
         clean_string(row.get("Finished Basement")),
+        clean_string(row.get("Repair Condition")),
         clean_string(row.get("Single vs Multi Family")),
         clean_string(row.get("Neighborhood Code")),
         clean_string(row.get("Garage Size")),
         clean_string(row.get("Class Description")),
         clean_number(row.get("PIN Proration Rate")),
+        clean_pin(row.get("pin10")),
         clean_number(row.get("lat")),
         clean_number(row.get("lon")),
-        clean_string(row.get("latitude")),
-        clean_string(row.get("longitude")),
         clean_string(row.get("class")),
+        clean_number(row.get("Tax District Code"), integer=True),
+        clean_number(row.get("Municipality Number"), integer=True),
+        clean_string(row.get("Municipality Name")),
+        clean_string(row.get("Tax Municipality Name")),
+        clean_number(row.get("CMAP Walkability Total Score")),
+        clean_number(row.get("CMAP Walkability No Transit Score")),
+        clean_number(row.get("Flood FS Factor")),
+        clean_string(row.get("Chicago Community Area")),
+        clean_number(row.get("Condo Unit Sqft")),
+        clean_number(row.get("Condo Building Sqft")),
+        clean_number(row.get("Condo Building Non-Units")),
+        clean_number(row.get("Condo Building PINs")),
+        clean_bool(row.get("Condo Building Mixed Use")),
+        clean_bool(row.get("Condo Parking Space")),
+        clean_bool(row.get("Condo Common Area")),
     ]
 
 

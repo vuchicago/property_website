@@ -300,9 +300,15 @@ function renderPropertyDetails(details) {
         const container = document.getElementById('selected-property-details');
         if (!container) return;
 
+        const showChicagoCommunityArea = String(details?.taxMunicipalityName || '').trim().toUpperCase() === 'CITY OF CHICAGO';
         const fields = [
                 ['Taxable Value', formatCurrency(details?.taxableValue)],
                 ['Home Size', formatNumber(details?.homeSize, ' sq ft')],
+                ['Year Built', formatWholeNumber(details?.yearBuilt)],
+                ['Walkability Score', formatNumber(details?.cmapWalkabilityTotalScore)],
+                ['Flood Factor Score', formatNumber(details?.floodFsFactor)],
+                ['Municipality', details?.municipalityName],
+                showChicagoCommunityArea ? ['Chicago Community Area', details?.chicagoCommunityArea] : null,
                 ['Last Appeal Year', details?.lastAppealYear],
                 ['Last Appeal Status', details?.lastAppealStatus],
                 ['Certified Land', formatCurrency(details?.certifiedLand)],
@@ -315,7 +321,7 @@ function renderPropertyDetails(details) {
                 ['Single vs. Multi-Family', details?.singleVsMultiFamily],
                 ['PIN Proration Rate', formatPercent(details?.pinProrationRate)],
                 ['Property Class', details?.propertyClass]
-        ].filter(([, value]) => value !== null && value !== undefined && value !== '');
+        ].filter(field => field && field[1] !== null && field[1] !== undefined && field[1] !== '');
 
         if (!fields.length) {
                 container.style.display = 'none';
@@ -550,6 +556,11 @@ function formatCurrency(value) {
 function formatNumber(value, suffix = '') {
         if (value === null || value === undefined || value === '') return '';
         return `${Number(value).toLocaleString('en-US', { maximumFractionDigits: 1 })}${suffix}`;
+}
+
+function formatWholeNumber(value) {
+        if (value === null || value === undefined || value === '') return '';
+        return Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
 function formatPercent(value) {
