@@ -5,6 +5,26 @@ let suggestionAbort = null;
 let propertyTabCycleTimer = null;
 let propertyTabCycleStopped = false;
 const desktopTabCycleQuery = window.matchMedia('(min-width: 1025px)');
+const COMPARABLE_COLUMNS = [
+    { label: 'Address', value: c => escapeHtml(c.address) },
+    { label: 'Taxable Value', value: c => formatCurrency(c.taxableValue) },
+    { label: 'Last Appeal', value: c => escapeHtml(formatLastAppeal(c.lastAppealYear)) },
+    { label: 'Home Size', value: c => c.homeSize ? `${formatNumber(c.homeSize)} sqft` : 'N/A' },
+    { label: 'Year Built', value: c => c.yearBuilt ? formatYear(c.yearBuilt) : 'N/A' },
+    { label: 'Beds', value: c => c.bedroomCount === null ? 'N/A' : formatNumber(c.bedroomCount) },
+    { label: 'Baths', value: c => c.bathroomCount === null ? 'N/A' : formatNumber(c.bathroomCount) },
+    { label: 'Distance', value: c => c.distanceMiles === null || c.distanceMiles === undefined ? 'N/A' : `${c.distanceMiles.toFixed(2)} mi` },
+    { label: 'Certified Land', value: c => c.certifiedLand === null ? 'N/A' : formatCurrency(c.certifiedLand) },
+    { label: 'Certified Building', value: c => c.certifiedBuilding === null ? 'N/A' : formatCurrency(c.certifiedBuilding) },
+    { label: 'Masonry', value: c => escapeHtml(c.masonryType || 'N/A') },
+    { label: 'Repair', value: c => escapeHtml(c.repairCondition || 'N/A') },
+    { label: 'Basement', value: c => escapeHtml(c.finishedBasement || 'N/A') },
+    { label: 'Single/Multi', value: c => escapeHtml(c.singleVsMultiFamily || 'N/A') },
+    { label: 'Neighborhood', value: c => escapeHtml(c.neighborhoodCode || 'N/A') },
+    { label: 'Garage', value: c => escapeHtml(c.garageSize || 'N/A') },
+    { label: 'Class', value: c => escapeHtml(c.propertyClass || c.classCode || 'N/A') },
+    { label: 'PIN', value: c => escapeHtml(c.pin || 'N/A') }
+];
 
 document.addEventListener('DOMContentLoaded', initPropertyTaxTool);
 
@@ -20,6 +40,8 @@ function initPropertyTaxTool() {
     const suggestions = document.getElementById('property-address-suggestions');
     const exportCsvBtn = document.getElementById('export-csv');
     const increaseRadiusBtn = document.getElementById('increase-radius-search');
+
+    renderComparableHeader();
 
     radiusSlider?.addEventListener('input', () => {
         radiusValue.textContent = Number(radiusSlider.value).toFixed(1);
@@ -325,33 +347,27 @@ function updateDecision(appeal) {
 
 function renderComparableRows(comparables) {
     const body = document.getElementById('comps-table-body');
+    renderComparableHeader();
+
     if (!comparables.length) {
-        body.innerHTML = '<tr class="placeholder-row"><td colspan="18">No comparable properties matched the current filters.</td></tr>';
+        body.innerHTML = `<tr class="placeholder-row"><td colspan="${COMPARABLE_COLUMNS.length}">No comparable properties matched the current filters.</td></tr>`;
         return;
     }
 
     body.innerHTML = comparables.map(c => `
         <tr>
-            <td>${escapeHtml(c.address)}</td>
-            <td>${formatCurrency(c.taxableValue)}</td>
-            <td>${escapeHtml(formatLastAppeal(c.lastAppealYear))}</td>
-            <td>${c.homeSize ? `${formatNumber(c.homeSize)} sqft` : 'N/A'}</td>
-            <td>${c.yearBuilt ? formatNumber(c.yearBuilt) : 'N/A'}</td>
-            <td>${c.bedroomCount === null ? 'N/A' : formatNumber(c.bedroomCount)}</td>
-            <td>${c.bathroomCount === null ? 'N/A' : formatNumber(c.bathroomCount)}</td>
-            <td>${c.distanceMiles.toFixed(2)} mi</td>
-            <td>${c.certifiedLand === null ? 'N/A' : formatCurrency(c.certifiedLand)}</td>
-            <td>${c.certifiedBuilding === null ? 'N/A' : formatCurrency(c.certifiedBuilding)}</td>
-            <td>${escapeHtml(c.masonryType || 'N/A')}</td>
-            <td>${escapeHtml(c.repairCondition || 'N/A')}</td>
-            <td>${escapeHtml(c.finishedBasement || 'N/A')}</td>
-            <td>${escapeHtml(c.singleVsMultiFamily || 'N/A')}</td>
-            <td>${escapeHtml(c.neighborhoodCode || 'N/A')}</td>
-            <td>${escapeHtml(c.garageSize || 'N/A')}</td>
-            <td>${escapeHtml(c.propertyClass || c.classCode || 'N/A')}</td>
-            <td>${escapeHtml(c.pin || 'N/A')}</td>
+            ${COMPARABLE_COLUMNS.map(column => `<td>${column.value(c)}</td>`).join('')}
         </tr>
     `).join('');
+}
+
+function renderComparableHeader() {
+    const headerRow = document.getElementById('comps-table-header');
+    if (!headerRow) return;
+
+    headerRow.innerHTML = COMPARABLE_COLUMNS
+        .map(column => `<th>${escapeHtml(column.label)}</th>`)
+        .join('');
 }
 
 function updateComparisonChart(yourValue, avgValue) {
@@ -630,6 +646,12 @@ function formatNumber(value) {
     const number = Number(value);
     if (!Number.isFinite(number)) return 'N/A';
     return new Intl.NumberFormat('en-US', { maximumFractionDigits: number % 1 ? 1 : 0 }).format(number);
+}
+
+function formatYear(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 'N/A';
+    return String(Math.trunc(number));
 }
 
 function formatLastAppeal(value) {
