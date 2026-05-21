@@ -400,6 +400,8 @@
                         style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
                         <div>
                             <h3 id="selected-address-title">Selected Address</h3>
+                            <div id="selected-address-pin" class="selected-address-meta text-sm text-muted"
+                                style="display: none;"></div>
                             <p class="text-sm text-muted">Appeal history for this property</p>
                         </div>
                         <div class="stats-badge"
@@ -408,6 +410,30 @@
                         </div>
                     </div>
 
+                    <div id="selected-property-details" class="property-details-grid" style="display: none;"></div>
+                    <div id="property-image-panel" class="property-image-panel">
+                        <div>
+                            <h4>Property Image</h4>
+                            <p id="property-image-date" class="text-sm text-muted">No image uploaded.</p>
+                        </div>
+                        <div class="property-image-content">
+                            <img id="property-image-preview" alt="Uploaded property" style="display: none;">
+                            <label class="btn btn-secondary btn-sm" for="property-image-input">Upload Image</label>
+                            <input type="file" id="property-image-input" accept="image/*" style="display: none;">
+                        </div>
+                    </div>
+                    <div id="government-id-panel" class="property-image-panel">
+                        <div>
+                            <h4>Government Identification</h4>
+                            <p id="government-id-date" class="text-sm text-muted">No ID uploaded.</p>
+                        </div>
+                        <div class="property-image-content">
+                            <img id="government-id-preview" alt="Uploaded government identification"
+                                style="display: none;">
+                            <label class="btn btn-secondary btn-sm" for="government-id-input">Upload ID</label>
+                            <input type="file" id="government-id-input" accept="image/*" style="display: none;">
+                        </div>
+                    </div>
                     <div id="appeal-history-list">
                         <!-- History items will be loaded here by history.js -->
                     </div>
@@ -1174,7 +1200,7 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script type="module" src="components.js"></script>
     <script type="module">
-        import { initAuthUI } from './auth.js';
+        import { initAuthUI } from './auth.js?v=20260521-dashboard-docs';
         initAuthUI();
     </script>
     <script type="module" src="appeal.js?v=20260521-address-suggestions"></script>

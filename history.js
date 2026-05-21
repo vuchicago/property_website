@@ -22,6 +22,7 @@ export async function loadAppealHistory() {
         renderAddressList();
         setupAddAddressForm();
         setupPropertyImageUpload();
+        setupGovernmentIdUpload();
 }
 
 async function fetchAddresses() {
@@ -174,21 +175,29 @@ function selectAddress(address) {
 
         document.getElementById('selected-address-title').textContent = address;
         const selectedAddress = userAddresses.find(item => item.address === address);
+        const details = selectedAddress?.propertyDetails;
         const pinEl = document.getElementById('selected-address-pin');
 
         if (pinEl) {
-                if (selectedAddress?.pin) {
-                        selectedPinForImage = selectedAddress.pin;
-                        pinEl.textContent = `PIN ${selectedAddress.pin}`;
+                const meta = [
+                        selectedAddress?.pin ? `PIN ${selectedAddress.pin}` : '',
+                        details?.pinProrationRate ? `PIN Proration Code ${formatPercent(details.pinProrationRate)}` : '',
+                        details?.lastAppealYear ? `Last Appeal ${details.lastAppealYear}` : ''
+                ].filter(Boolean);
+
+                if (meta.length) {
+                        selectedPinForImage = selectedAddress?.pin || '';
+                        pinEl.innerHTML = meta.map(item => `<span>${escapeHtml(item)}</span>`).join('');
                         pinEl.style.display = 'block';
                 } else {
-                        pinEl.textContent = '';
+                        pinEl.innerHTML = '';
                         pinEl.style.display = 'none';
                 }
         }
 
-        renderPropertyDetails(selectedAddress?.propertyDetails);
+        renderPropertyDetails(details);
         renderPropertyImage(selectedAddress?.pin);
+        renderGovernmentIdImage();
 
         const filteredAppeals = allAppeals.filter(a => a.propertyAddress === address);
         document.getElementById('total-appeals-count').textContent = filteredAppeals.length;
@@ -226,6 +235,34 @@ async function renderPropertyImage(pin) {
         } catch (error) {
                 console.error('Error loading property image:', error);
                 dateEl.textContent = 'Image could not be loaded.';
+        }
+}
+
+async function renderGovernmentIdImage() {
+        const preview = document.getElementById('government-id-preview');
+        const dateEl = document.getElementById('government-id-date');
+        if (!preview || !dateEl) return;
+
+        preview.style.display = 'none';
+        preview.removeAttribute('src');
+        dateEl.textContent = 'Loading ID...';
+
+        try {
+                const response = await authFetch('/api/government-id-image');
+                if (!response.ok) throw new Error('Failed to load government ID');
+
+                const data = await response.json();
+                if (!data.image) {
+                        dateEl.textContent = 'No ID uploaded.';
+                        return;
+                }
+
+                preview.src = data.image.image_data;
+                preview.style.display = 'block';
+                dateEl.textContent = `Uploaded ${new Date(data.image.uploaded_at).toLocaleString()}`;
+        } catch (error) {
+                console.error('Error loading government ID:', error);
+                dateEl.textContent = 'ID could not be loaded.';
         }
 }
 
@@ -267,6 +304,42 @@ function setupPropertyImageUpload() {
         });
 }
 
+function setupGovernmentIdUpload() {
+        const input = document.getElementById('government-id-input');
+        if (!input || input.dataset.bound === 'true') return;
+        input.dataset.bound = 'true';
+
+        input.addEventListener('change', async () => {
+                const file = input.files?.[0];
+                if (!file) return;
+
+                try {
+                        const resized = await resizeImage(file, 900, 900);
+                        const response = await authFetch('/api/government-id-image', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                        imageData: resized.imageData,
+                                        mimeType: resized.mimeType
+                                })
+                        });
+
+                        if (!response.ok) {
+                                const err = await response.json();
+                                alert(`Failed to upload ID: ${err.error}`);
+                                return;
+                        }
+
+                        await renderGovernmentIdImage();
+                } catch (error) {
+                        console.error('Error uploading government ID:', error);
+                        alert('The government ID image could not be uploaded.');
+                } finally {
+                        input.value = '';
+                }
+        });
+}
+
 function resizeImage(file, maxWidth, maxHeight) {
         return new Promise((resolve, reject) => {
                 const image = new Image();
@@ -300,27 +373,21 @@ function renderPropertyDetails(details) {
         const container = document.getElementById('selected-property-details');
         if (!container) return;
 
-        const showChicagoCommunityArea = String(details?.taxMunicipalityName || '').trim().toUpperCase() === 'CITY OF CHICAGO';
         const fields = [
                 ['Taxable Value', formatCurrency(details?.taxableValue)],
-                ['Home Size', formatNumber(details?.homeSize, ' sq ft')],
-                ['Year Built', formatWholeNumber(details?.yearBuilt)],
-                ['Walkability Score', formatNumber(details?.cmapWalkabilityTotalScore)],
-                ['Flood Factor Score', formatNumber(details?.floodFsFactor)],
-                ['Municipality', details?.municipalityName],
-                showChicagoCommunityArea ? ['Chicago Community Area', details?.chicagoCommunityArea] : null,
-                ['Last Appeal Year', details?.lastAppealYear],
-                ['Last Appeal Status', details?.lastAppealStatus],
-                ['Certified Land', formatCurrency(details?.certifiedLand)],
-                ['Certified Building', formatCurrency(details?.certifiedBuilding)],
-                ['Masonry Type', details?.masonryType],
-                ['Class Code', details?.classCode],
-                ['Neighborhood Code', details?.neighborhoodCode],
                 ['Bedrooms', formatNumber(details?.bedroomCount)],
                 ['Bathrooms', formatNumber(details?.bathroomCount)],
-                ['Single vs. Multi-Family', details?.singleVsMultiFamily],
-                ['PIN Proration Rate', formatPercent(details?.pinProrationRate)],
-                ['Property Class', details?.propertyClass]
+                ['Year Built', formatWholeNumber(details?.yearBuilt)],
+                ['Property Class', details?.propertyClass],
+                ['Single vs Multi-Family', details?.singleVsMultiFamily],
+                ['Municipality', details?.municipalityName],
+                ['Walkability Score', formatNumber(details?.cmapWalkabilityTotalScore)],
+                ['Masonry Type', details?.masonryType],
+                ['Repair', details?.repairCondition],
+                ['Basement', details?.finishedBasement],
+                ['Garage', details?.garageSize],
+                ['Certified Land', formatCurrency(details?.certifiedLand)],
+                ['Certified Property', formatCurrency(details?.certifiedBuilding)]
         ].filter(field => field && field[1] !== null && field[1] !== undefined && field[1] !== '');
 
         if (!fields.length) {
@@ -581,7 +648,9 @@ function formatNumber(value, suffix = '') {
 
 function formatWholeNumber(value) {
         if (value === null || value === undefined || value === '') return '';
-        return Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 });
+        const number = Number(value);
+        if (!Number.isFinite(number)) return '';
+        return String(Math.trunc(number));
 }
 
 function formatPercent(value) {

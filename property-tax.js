@@ -2,9 +2,6 @@ let propertyMap = null;
 let selectedProperty = null;
 let searchResults = null;
 let suggestionAbort = null;
-let propertyTabCycleTimer = null;
-let propertyTabCycleStopped = false;
-const desktopTabCycleQuery = window.matchMedia('(min-width: 1025px)');
 const COMPARABLE_COLUMNS = [
     { label: 'Address', value: c => escapeHtml(c.address) },
     { label: 'Taxable Value', value: c => formatCurrency(c.taxableValue) },
@@ -23,6 +20,8 @@ const COMPARABLE_COLUMNS = [
     { label: 'Neighborhood', value: c => escapeHtml(c.neighborhoodCode || 'N/A') },
     { label: 'Garage', value: c => escapeHtml(c.garageSize || 'N/A') },
     { label: 'Class', value: c => escapeHtml(c.propertyClass || c.classCode || 'N/A') },
+    { label: 'Walkability Score', value: c => c.cmapWalkabilityTotalScore === null || c.cmapWalkabilityTotalScore === undefined ? 'N/A' : formatNumber(c.cmapWalkabilityTotalScore) },
+    { label: 'Municipality', value: c => escapeHtml(c.municipalityName || 'N/A') },
     { label: 'PIN', value: c => escapeHtml(c.pin || 'N/A') }
 ];
 
@@ -105,12 +104,9 @@ function initPropertyTaxTool() {
 
     document.querySelectorAll('.property-tax-tab').forEach(tab => {
         tab.addEventListener('click', () => {
-            stopPropertyTabCycle();
             activateTab(tab.dataset.tab);
         });
     });
-
-    desktopTabCycleQuery.addEventListener('change', handlePropertyTabCycleViewportChange);
 
     hydratePropertyFromQuery();
 }
@@ -296,12 +292,13 @@ function updatePropertyResults(data) {
     setText('last-appeal', formatLastAppeal(target.lastAppealYear));
     setText('home-size', target.homeSize ? `${formatNumber(target.homeSize)} sqft` : 'N/A');
     setText('beds-baths', target.bedroomCount !== null && target.bathroomCount !== null ? `${formatNumber(target.bedroomCount)} / ${formatNumber(target.bathroomCount)}` : 'N/A');
+    setText('snapshot-year-built', target.yearBuilt ? formatYear(target.yearBuilt) : 'N/A');
+    setText('snapshot-municipality', target.municipalityName || 'N/A');
     setText('snapshot-type', target.propertyClass || target.classCode || 'N/A');
 
     renderComparableRows(data.comparables);
     updateComparisonChart(target.taxableValue, summary.averageComparableValue);
     document.getElementById('export-csv').disabled = data.comparables.length === 0;
-    startPropertyTabCycle();
 }
 
 function updateWiderRadiusButton(data) {
@@ -476,42 +473,6 @@ function activateTab(tabName) {
     }
 }
 
-function startPropertyTabCycle() {
-    if (propertyTabCycleStopped || !desktopTabCycleQuery.matches) {
-        clearInterval(propertyTabCycleTimer);
-        propertyTabCycleTimer = null;
-        return;
-    }
-
-    clearInterval(propertyTabCycleTimer);
-    const tabs = Array.from(document.querySelectorAll('.property-tax-tab'));
-    if (tabs.length < 2) return;
-
-    propertyTabCycleTimer = setInterval(() => {
-        const activeIndex = Math.max(0, tabs.findIndex(tab => tab.classList.contains('is-active')));
-        const nextTab = tabs[(activeIndex + 1) % tabs.length];
-        activateTab(nextTab.dataset.tab);
-    }, 3000);
-}
-
-function stopPropertyTabCycle() {
-    propertyTabCycleStopped = true;
-    clearInterval(propertyTabCycleTimer);
-    propertyTabCycleTimer = null;
-}
-
-function handlePropertyTabCycleViewportChange(event) {
-    if (!event.matches) {
-        clearInterval(propertyTabCycleTimer);
-        propertyTabCycleTimer = null;
-        return;
-    }
-
-    if (searchResults && !propertyTabCycleStopped) {
-        startPropertyTabCycle();
-    }
-}
-
 function resetPropertyResults() {
     selectedProperty = null;
     searchResults = null;
@@ -526,9 +487,6 @@ function resetPropertyResults() {
     setSelectedPropertyText('Enter an address and choose the closest match.');
     hideSuggestions();
     clearMap();
-    clearInterval(propertyTabCycleTimer);
-    propertyTabCycleTimer = null;
-    propertyTabCycleStopped = false;
     activateTab('chart');
 }
 
