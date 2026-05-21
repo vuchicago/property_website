@@ -164,6 +164,23 @@
                         gap: var(--space-2);
                 }
 
+                .browser-warning {
+                        background: #fff7ed;
+                        border: 1px solid #fed7aa;
+                        border-radius: var(--radius-md);
+                        color: var(--dark-800);
+                        display: none;
+                        font-size: var(--font-size-sm);
+                        margin-bottom: var(--space-4);
+                        padding: var(--space-4);
+                }
+
+                .browser-warning strong {
+                        color: var(--dark-900);
+                        display: block;
+                        margin-bottom: var(--space-1);
+                }
+
                 .account-shell {
                         display: none;
                         padding: var(--space-10) var(--container-padding) var(--space-16);
@@ -337,6 +354,7 @@
                         </div>
 
                         <div id="error-alert" class="error-message"></div>
+                        <div id="browser-warning" class="browser-warning"></div>
                         <div id="verification-panel" class="verification-panel"></div>
 
                         <form id="auth-form" class="auth-form">
@@ -463,7 +481,7 @@
 
         <!-- Auth Logic Script -->
         <script type="module">
-                import { loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, sendCurrentUserVerificationEmail, refreshCurrentUser } from './auth.js?v=20260521-email-verify-return';
+                import { loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, sendCurrentUserVerificationEmail, refreshCurrentUser } from './auth.js?v=20260521-email-verify-browser';
 
                 const form = document.getElementById('auth-form');
                 const emailInput = document.getElementById('email');
@@ -474,6 +492,7 @@
                 const submitBtn = form.querySelector('button');
                 const toggleText = document.getElementById('toggle-text');
                 const errorAlert = document.getElementById('error-alert');
+                const browserWarning = document.getElementById('browser-warning');
                 const verificationPanel = document.getElementById('verification-panel');
                 const googleAuthBtn = document.getElementById('google-auth-btn');
                 const authContainer = document.getElementById('auth-container');
@@ -486,8 +505,10 @@
                 const pageParams = new URLSearchParams(window.location.search);
                 const authMode = pageParams.get('mode');
                 const returnedFromVerification = pageParams.get('verified') === '1';
+                const inBlockedOAuthBrowser = isBlockedOAuthBrowser();
                 let isLogin = authMode !== 'signup' && authMode !== 'create-account';
                 updateUI();
+                updateBrowserWarning();
 
                 toggleBtn.addEventListener('click', () => {
                         isLogin = !isLogin;
@@ -547,6 +568,12 @@
 
                 googleAuthBtn.addEventListener('click', async () => {
                         errorAlert.style.display = 'none';
+
+                        if (inBlockedOAuthBrowser) {
+                                showBrowserWarning(true);
+                                return;
+                        }
+
                         googleAuthBtn.disabled = true;
                         googleAuthBtn.querySelector('span').textContent = 'Opening Google...';
 
@@ -652,6 +679,37 @@
                                 await logoutUser();
                                 hideVerificationPanel();
                         });
+                }
+
+                function updateBrowserWarning() {
+                        if (!inBlockedOAuthBrowser) {
+                                showBrowserWarning(false);
+                                return;
+                        }
+
+                        googleAuthBtn.disabled = true;
+                        googleAuthBtn.querySelector('span').textContent = 'Open in Safari or Chrome for Google sign-in';
+                        showBrowserWarning(true);
+                }
+
+                function showBrowserWarning(show) {
+                        if (!browserWarning) return;
+                        if (!show) {
+                                browserWarning.style.display = 'none';
+                                browserWarning.innerHTML = '';
+                                return;
+                        }
+
+                        browserWarning.innerHTML = `
+                                <strong>Open this page in Safari or Chrome for Google sign-in.</strong>
+                                Facebook, Messenger, and Instagram open links in an embedded browser that Google blocks. Tap the share/menu button, choose “Open in Browser” or “Open in Safari,” then sign in again. Email and password sign-up can still be used here.
+                        `;
+                        browserWarning.style.display = 'block';
+                }
+
+                function isBlockedOAuthBrowser() {
+                        const userAgent = navigator.userAgent || '';
+                        return /FBAN|FBAV|FB_IAB|Messenger|Instagram|Line\/|Twitter|LinkedInApp|Pinterest/i.test(userAgent);
                 }
 
                 function hideVerificationPanel() {
