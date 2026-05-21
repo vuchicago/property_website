@@ -20,15 +20,15 @@ Your site is now configured for Cloudflare Pages deployment with all three calcu
    - Select your repository and the `feature/huggingface` branch
 
 3. **Configure build settings:**
-   - **Project name**: `cook-county-tax-compare` (or your choice)
-   - **Production branch**: `feature/huggingface` (or `main` after merging)
+   - **Project name**: `cookcountytaxcomparev2` (or your choice)
+   - **Production branch**: `Production`
    - **Build command**: Leave empty
    - **Build output directory**: `/`
    - **Root directory**: Leave empty
 
 4. **Deploy:**
    - Click **Save and Deploy**
-   - Your site will be live at: `https://cook-county-tax-compare.pages.dev`
+   - Your site will be live at: `https://cookcountytaxcomparev2.pages.dev`
 
 ### Deploy via Wrangler CLI
 
@@ -40,7 +40,7 @@ npm install -g wrangler
 wrangler login
 
 # Deploy
-npx wrangler pages deploy . --project-name=cook-county-tax-compare
+npx wrangler pages deploy . --project-name=cookcountytaxcomparev2
 ```
 
 ## Database Setup
@@ -77,7 +77,7 @@ This does not delete user accounts, saved user properties, or appeal/payment his
 
 Older repair migrations are kept for history, but use `0006_rebuild_property_addresses_full.sql` for the current full Parquet table.
 
-The `property_addresses` table is the import target for the Cook County address dataset. It stores `pin`, the display address from `Nearby Address`, a generated `normalized_address` used for matching, and the remaining assessment/appeal columns from `output_all_2025.parquet`.
+The `property_addresses` table is the import target for the Cook County address dataset. It stores `pin`, the display address from `Nearby Address`, a generated `normalized_address` used for matching, and the remaining assessment/appeal columns from `output_all_2025.parquet`, including `Year Built`, `Repair Condition`, `pin10`, municipality fields, walkability/flood scores, Chicago community area, and condo characteristics.
 
 The full rebuild intentionally creates the table without secondary indexes to reduce D1 rows-written during bulk import. Add the PIN index only after the import succeeds.
 
@@ -111,6 +111,13 @@ Then import each generated part in order:
 
 ```bash
 bash scripts/import_property_addresses_parts.sh
+```
+
+To generate and push the updated 2025 table using a separate import filename stem:
+
+```bash
+python3 scripts/export_property_addresses_sql.py --output import/property_addresses_2025_updated.sql --rows-per-file 10000
+bash scripts/push_property_addresses_2025_updated.sh
 ```
 
 The import script passes `--yes` to Wrangler so you do not have to approve each split file manually.

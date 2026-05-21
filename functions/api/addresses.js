@@ -26,18 +26,32 @@ export const onRequestGet = async (context) => {
                                     'pin', pin,
                                     'taxableValue', taxable_value,
                                     'homeSize', home_size,
+                                    'yearBuilt', year_built,
                                     'lastAppealYear', last_appeal_year,
                                     'lastAppealStatus', last_appeal_status,
                                     'certifiedLand', certified_land,
                                     'certifiedBuilding', certified_building,
                                     'masonryType', masonry_type,
+                                    'repairCondition', repair_condition,
                                     'classCode', class_code,
                                     'neighborhoodCode', neighborhood_code,
                                     'bedroomCount', bedroom_count,
                                     'bathroomCount', bathroom_count,
                                     'singleVsMultiFamily', single_vs_multi_family,
                                     'pinProrationRate', pin_proration_rate,
-                                    'propertyClass', property_class
+                                    'propertyClass', property_class,
+                                    'pin10', pin10,
+                                    'taxDistrictCode', tax_district_code,
+                                    'municipalityNumber', municipality_number,
+                                    'municipalityName', municipality_name,
+                                    'taxMunicipalityName', tax_municipality_name,
+                                    'cmapWalkabilityTotalScore', cmap_walkability_total_score,
+                                    'cmapWalkabilityNoTransitScore', cmap_walkability_no_transit_score,
+                                    'floodFsFactor', flood_fs_factor,
+                                    'chicagoCommunityArea', chicago_community_area,
+                                    'condoUnitSqft', condo_unit_sqft,
+                                    'condoParkingSpace', condo_parking_space,
+                                    'condoCommonArea', condo_common_area
                                   )
                                   FROM property_addresses
                                   WHERE property_addresses.address = user_addresses.address

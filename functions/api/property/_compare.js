@@ -5,6 +5,7 @@ const RESIDENTIAL_CLASS_CODES = new Set([
         '202', '203', '204', '205', '206', '207', '208', '209', '210',
         '211', '212', '218', '219', '234', '278', '295'
 ]);
+const APPEAL_MODEL_APPLICABLE_CLASS_CODES = new Set([...RESIDENTIAL_CLASS_CODES, '299']);
 
 const PROPERTY_SELECT = `
         id,
@@ -16,21 +17,37 @@ const PROPERTY_SELECT = `
         certified_land,
         certified_building,
         home_size,
+        year_built,
         last_appeal_status,
         bedroom_count,
         bathroom_count,
         masonry_type,
         finished_basement,
+        repair_condition,
         single_vs_multi_family,
         neighborhood_code,
         garage_size,
         property_class,
         pin_proration_rate,
+        pin10,
         latitude,
         longitude,
-        latitude_raw,
-        longitude_raw,
-        class_code
+        class_code,
+        tax_district_code,
+        municipality_number,
+        municipality_name,
+        tax_municipality_name,
+        cmap_walkability_total_score,
+        cmap_walkability_no_transit_score,
+        flood_fs_factor,
+        chicago_community_area,
+        condo_unit_sqft,
+        condo_building_sqft,
+        condo_building_non_units,
+        condo_building_pins,
+        condo_building_mixed_use,
+        condo_parking_space,
+        condo_common_area
 `;
 
 function toNumber(value) {
@@ -61,19 +78,37 @@ function rowToProperty(row) {
                 certifiedLand: toNumber(row.certified_land),
                 certifiedBuilding: toNumber(row.certified_building),
                 homeSize: toNumber(row.home_size),
+                yearBuilt: toNumber(row.year_built),
                 lastAppealStatus: row.last_appeal_status,
                 bedroomCount: toNumber(row.bedroom_count),
                 bathroomCount: toNumber(row.bathroom_count),
                 masonryType: row.masonry_type,
                 finishedBasement: row.finished_basement,
+                repairCondition: row.repair_condition,
                 singleVsMultiFamily: row.single_vs_multi_family,
                 neighborhoodCode: row.neighborhood_code,
                 garageSize: row.garage_size,
                 propertyClass: row.property_class,
                 pinProrationRate: toNumber(row.pin_proration_rate),
+                pin10: row.pin10,
                 latitude: toNumber(row.latitude),
                 longitude: toNumber(row.longitude),
-                classCode: normalizeClassCode(row.class_code)
+                classCode: normalizeClassCode(row.class_code),
+                taxDistrictCode: toNumber(row.tax_district_code),
+                municipalityNumber: toNumber(row.municipality_number),
+                municipalityName: row.municipality_name,
+                taxMunicipalityName: row.tax_municipality_name,
+                cmapWalkabilityTotalScore: toNumber(row.cmap_walkability_total_score),
+                cmapWalkabilityNoTransitScore: toNumber(row.cmap_walkability_no_transit_score),
+                floodFsFactor: toNumber(row.flood_fs_factor),
+                chicagoCommunityArea: row.chicago_community_area,
+                condoUnitSqft: toNumber(row.condo_unit_sqft),
+                condoBuildingSqft: toNumber(row.condo_building_sqft),
+                condoBuildingNonUnits: toNumber(row.condo_building_non_units),
+                condoBuildingPins: toNumber(row.condo_building_pins),
+                condoBuildingMixedUse: row.condo_building_mixed_use,
+                condoParkingSpace: row.condo_parking_space,
+                condoCommonArea: row.condo_common_area
         };
 }
 
@@ -100,10 +135,107 @@ function sameValue(left, right) {
         return String(left) === String(right);
 }
 
+function validText(value) {
+        return value !== null &&
+                value !== undefined &&
+                String(value).trim() !== '' &&
+                !['none', 'nan', '0'].includes(String(value).trim().toLowerCase());
+}
+
+function optionalSameValue(candidateValue, targetValue) {
+        return !validText(targetValue) || sameValue(candidateValue, targetValue);
+}
+
+function optionalNumericRange(value, center, lowerMult, upperMult, absoluteDelta = null) {
+        if (center === null || center === undefined || center <= 0) {
+                return true;
+        }
+
+        if (value === null || value === undefined) {
+                return false;
+        }
+
+        if (absoluteDelta !== null) {
+                return within(value, center - absoluteDelta, center + absoluteDelta);
+        }
+
+        return within(value, center * lowerMult, center * upperMult);
+}
+
+function valuePerSqft(value, sqft) {
+        if (value === null || value === undefined || sqft === null || sqft === undefined || sqft <= 0) {
+                return null;
+        }
+
+        return value / sqft;
+}
+
+function compUniformityStats(target, comparables) {
+        const value = target?.taxableValue ?? null;
+        const subjectValuePerSqft = valuePerSqft(value, target?.homeSize);
+        const taxableValues = comparables
+                .map(item => item.taxableValue)
+                .filter(value => value !== null && value !== undefined);
+        const compValuePerSqft = comparables
+                .map(item => valuePerSqft(item.taxableValue, item.homeSize))
+                .filter(value => value !== null && Number.isFinite(value))
+                .sort((a, b) => a - b);
+        const averageValue = taxableValues.length
+                ? taxableValues.reduce((sum, item) => sum + item, 0) / taxableValues.length
+                : null;
+        const medianValuePerSqft = compValuePerSqft.length
+                ? (
+                        compValuePerSqft.length % 2
+                                ? compValuePerSqft[Math.floor(compValuePerSqft.length / 2)]
+                                : (compValuePerSqft[compValuePerSqft.length / 2 - 1] + compValuePerSqft[compValuePerSqft.length / 2]) / 2
+                )
+                : null;
+
+        return {
+                value,
+                averageValue,
+                lowerValueCount: value === null ? 0 : taxableValues.filter(item => item < value).length,
+                subjectValuePerSqft,
+                medianValuePerSqft,
+                lowerValuePerSqftCount: subjectValuePerSqft === null
+                        ? 0
+                        : compValuePerSqft.filter(item => item < subjectValuePerSqft).length,
+                validValuePerSqftComparables: compValuePerSqft.length
+        };
+}
+
+function hasUniformityAppealSignal(stats) {
+        if (
+                stats.validValuePerSqftComparables >= 5 &&
+                stats.subjectValuePerSqft !== null &&
+                stats.medianValuePerSqft !== null
+        ) {
+                return stats.subjectValuePerSqft > stats.medianValuePerSqft * 1.05 &&
+                        stats.lowerValuePerSqftCount >= 3;
+        }
+
+        if (stats.averageValue !== null && stats.averageValue > 0 && stats.value !== null) {
+                return stats.value > stats.averageValue * 1.10 &&
+                        stats.lowerValueCount >= 3;
+        }
+
+        return false;
+}
+
+function compContext(target) {
+        return target?.classCode === '299'
+                ? 'same condo building or closely similar condo units'
+                : 'similar nearby properties matched on class, neighborhood, size, bedrooms, baths, construction, proration, and available age/condition fields';
+}
+
 function matchesComparableRules(candidate, target) {
         const classCode = target.classCode;
 
         if (classCode === 'EX') {
+                return false;
+        }
+
+        if (!APPEAL_MODEL_APPLICABLE_CLASS_CODES.has(classCode)) {
                 return false;
         }
 
@@ -120,27 +252,29 @@ function matchesComparableRules(candidate, target) {
                 return (
                         candidate.homeSize !== null &&
                         candidate.homeSize >= target.homeSize * 0.9 &&
+                        candidate.homeSize <= target.homeSize * 1.15 &&
                         within(candidate.certifiedLand, target.certifiedLand * 0.8, target.certifiedLand * 1.2) &&
                         within(candidate.bedroomCount, target.bedroomCount, target.bedroomCount + 1) &&
                         within(candidate.bathroomCount, target.bathroomCount, target.bathroomCount + 1) &&
                         sameValue(candidate.masonryType, target.masonryType) &&
                         sameValue(candidate.pinProrationRate, target.pinProrationRate) &&
-                        sameValue(candidate.singleVsMultiFamily, target.singleVsMultiFamily)
+                        sameValue(candidate.singleVsMultiFamily, target.singleVsMultiFamily) &&
+                        optionalNumericRange(candidate.yearBuilt, target.yearBuilt, null, null, 15) &&
+                        optionalSameValue(candidate.repairCondition, target.repairCondition)
                 );
         }
 
-        if ((classCode === '100' || classCode === '241') && target.homeSize !== null) {
-                return true;
+        if (classCode === '299') {
+                return optionalSameValue(candidate.pin10, target.pin10) &&
+                        optionalNumericRange(candidate.homeSize, target.homeSize, 0.85, 1.15) &&
+                        optionalNumericRange(candidate.bedroomCount, target.bedroomCount, null, null, 0) &&
+                        optionalNumericRange(candidate.bathroomCount, target.bathroomCount, null, null, 1) &&
+                        optionalNumericRange(candidate.pinProrationRate, target.pinProrationRate, 0.9, 1.1) &&
+                        optionalSameValue(candidate.condoParkingSpace, target.condoParkingSpace) &&
+                        optionalSameValue(candidate.condoCommonArea, target.condoCommonArea);
         }
 
-        if (target.taxableValue === null || target.certifiedLand === null) {
-                return false;
-        }
-
-        return (
-                within(candidate.taxableValue, target.taxableValue * 0.9, target.taxableValue * 1.15) &&
-                within(candidate.certifiedLand, target.certifiedLand * 0.8, target.certifiedLand * 1.2)
-        );
+        return false;
 }
 
 function decisionFor(target, comparables, radius, now = new Date()) {
@@ -149,6 +283,14 @@ function decisionFor(target, comparables, radius, now = new Date()) {
                         decision: 'Please Enter Valid Cook County Address',
                         label: 'Please enter a valid Cook County address',
                         reason: ''
+                };
+        }
+
+        if (!APPEAL_MODEL_APPLICABLE_CLASS_CODES.has(target.classCode)) {
+                return {
+                        decision: 'Not Applicable',
+                        label: 'Not applicable',
+                        reason: `Property Class Type is ${target.propertyClass || target.classCode || 'Unknown'}`
                 };
         }
 
@@ -168,18 +310,8 @@ function decisionFor(target, comparables, radius, now = new Date()) {
                 };
         }
 
-        const average = comparables.reduce((sum, item) => sum + (item.taxableValue || 0), 0) / comparables.length;
-        const lowerValueCount = comparables.filter(item => item.taxableValue !== null && item.taxableValue < target.taxableValue).length;
         const lastAppealYear = toInt(target.lastAppealYear);
         const currentYear = now.getFullYear();
-
-        if (average && (target.taxableValue - average) / average > 0.02) {
-                return {
-                        decision: 'Yes, Appeal',
-                        label: 'Appeal recommended',
-                        reason: `Your taxable value is ${((target.taxableValue - average) / average * 100).toFixed(2)}% higher than average comps and ${lowerValueCount} comps have lower taxable value.`
-                };
-        }
 
         if (lastAppealYear === currentYear) {
                 return {
@@ -189,26 +321,48 @@ function decisionFor(target, comparables, radius, now = new Date()) {
                 };
         }
 
-        if (lowerValueCount > 4) {
+        const stats = compUniformityStats(target, comparables);
+        const context = compContext(target);
+
+        if (hasUniformityAppealSignal(stats)) {
+                if (
+                        stats.validValuePerSqftComparables >= 5 &&
+                        stats.subjectValuePerSqft !== null &&
+                        stats.medianValuePerSqft !== null
+                ) {
+                        const pctHigher = (stats.subjectValuePerSqft - stats.medianValuePerSqft) / stats.medianValuePerSqft;
+                        return {
+                                decision: 'Yes, Appeal',
+                                label: 'Appeal recommended',
+                                reason: `Uniformity signal: your assessed value per sqft is ${(pctHigher * 100).toFixed(1)}% above the median of ${comparables.length} ${context}; ${stats.lowerValuePerSqftCount} comps have lower assessed value per sqft.`
+                        };
+                }
+
+                const pctHigher = (stats.value - stats.averageValue) / stats.averageValue;
                 return {
                         decision: 'Yes, Appeal',
                         label: 'Appeal recommended',
-                        reason: `Your taxable value is higher than ${lowerValueCount} comps. There are ${comparables.length} comps in radius.`
+                        reason: `Uniformity signal: your taxable value is ${(pctHigher * 100).toFixed(1)}% above the average of ${comparables.length} ${context}; ${stats.lowerValueCount} comps have lower taxable value.`
                 };
         }
 
-        if (lastAppealYear !== null && lastAppealYear < currentYear - 3) {
+        if (
+                stats.validValuePerSqftComparables >= 5 &&
+                stats.subjectValuePerSqft !== null &&
+                stats.medianValuePerSqft !== null
+        ) {
+                const pctDiff = (stats.subjectValuePerSqft - stats.medianValuePerSqft) / stats.medianValuePerSqft;
                 return {
-                        decision: 'Yes, Appeal',
-                        label: 'Appeal recommended',
-                        reason: "It's been more than 3 years since last appeal."
+                        decision: 'No Need to Appeal',
+                        label: 'Appeal likely not needed',
+                        reason: `Your assessed value per sqft is ${(pctDiff * 100).toFixed(1)}% versus the median of ${comparables.length} ${context}; this does not show a strong uniformity appeal signal.`
                 };
         }
 
         return {
                 decision: 'No Need to Appeal',
                 label: 'Appeal likely not needed',
-                reason: 'Your taxable value is in line with comps.'
+                reason: `Your taxable value is in line with ${comparables.length} ${context}; this does not show a strong uniformity appeal signal.`
         };
 }
 
@@ -240,14 +394,17 @@ export async function findTargetProperty(db, { id, pin, address }) {
 }
 
 export async function findComparableProperties(db, target, radius) {
-        if (!target?.latitude || !target?.longitude || !target.neighborhoodCode || !target.classCode) {
+        if (!target?.latitude || !target?.longitude || !target.classCode) {
+                return [];
+        }
+
+        if (!APPEAL_MODEL_APPLICABLE_CLASS_CODES.has(target.classCode)) {
                 return [];
         }
 
         const latDelta = radius / 69;
         const lonDelta = radius / Math.max(1, Math.cos(target.latitude * Math.PI / 180) * 69);
         const clauses = [
-                'neighborhood_code = ?',
                 'class_code = ?',
                 'latitude BETWEEN ? AND ?',
                 'longitude BETWEEN ? AND ?',
@@ -255,7 +412,6 @@ export async function findComparableProperties(db, target, radius) {
                 'longitude IS NOT NULL'
         ];
         const params = [
-                target.neighborhoodCode,
                 target.classCode,
                 target.latitude - latDelta,
                 target.latitude + latDelta,
@@ -268,6 +424,10 @@ export async function findComparableProperties(db, target, radius) {
         }
 
         if (RESIDENTIAL_CLASS_CODES.has(target.classCode)) {
+                if (!target.neighborhoodCode) {
+                        return [];
+                }
+
                 if (
                         target.homeSize === null ||
                         target.certifiedLand === null ||
@@ -278,7 +438,9 @@ export async function findComparableProperties(db, target, radius) {
                 }
 
                 clauses.push(
+                        'neighborhood_code = ?',
                         'home_size >= ?',
+                        'home_size <= ?',
                         'certified_land BETWEEN ? AND ?',
                         'bedroom_count BETWEEN ? AND ?',
                         'bathroom_count BETWEEN ? AND ?',
@@ -287,7 +449,9 @@ export async function findComparableProperties(db, target, radius) {
                         'single_vs_multi_family = ?'
                 );
                 params.push(
+                        target.neighborhoodCode,
                         target.homeSize * 0.9,
+                        target.homeSize * 1.15,
                         target.certifiedLand * 0.8,
                         target.certifiedLand * 1.2,
                         target.bedroomCount,
@@ -298,21 +462,43 @@ export async function findComparableProperties(db, target, radius) {
                         target.pinProrationRate,
                         target.singleVsMultiFamily
                 );
-        } else if (!((target.classCode === '100' || target.classCode === '241') && target.homeSize !== null)) {
-                if (target.taxableValue === null || target.certifiedLand === null) {
-                        return [];
+                if (target.yearBuilt !== null && target.yearBuilt > 0) {
+                        clauses.push('year_built BETWEEN ? AND ?');
+                        params.push(target.yearBuilt - 15, target.yearBuilt + 15);
                 }
-
-                clauses.push(
-                        'taxable_value BETWEEN ? AND ?',
-                        'certified_land BETWEEN ? AND ?'
-                );
-                params.push(
-                        target.taxableValue * 0.9,
-                        target.taxableValue * 1.15,
-                        target.certifiedLand * 0.8,
-                        target.certifiedLand * 1.2
-                );
+                if (validText(target.repairCondition)) {
+                        clauses.push('repair_condition = ?');
+                        params.push(target.repairCondition);
+                }
+        } else if (target.classCode === '299') {
+                if (validText(target.pin10)) {
+                        clauses.push('pin10 = ?');
+                        params.push(target.pin10);
+                }
+                if (target.homeSize !== null && target.homeSize > 0) {
+                        clauses.push('home_size BETWEEN ? AND ?');
+                        params.push(target.homeSize * 0.85, target.homeSize * 1.15);
+                }
+                if (target.bedroomCount !== null && target.bedroomCount > 0) {
+                        clauses.push('bedroom_count BETWEEN ? AND ?');
+                        params.push(target.bedroomCount, target.bedroomCount);
+                }
+                if (target.bathroomCount !== null && target.bathroomCount > 0) {
+                        clauses.push('bathroom_count BETWEEN ? AND ?');
+                        params.push(target.bathroomCount - 1, target.bathroomCount + 1);
+                }
+                if (target.pinProrationRate !== null && target.pinProrationRate > 0) {
+                        clauses.push('pin_proration_rate BETWEEN ? AND ?');
+                        params.push(target.pinProrationRate * 0.9, target.pinProrationRate * 1.1);
+                }
+                if (validText(target.condoParkingSpace)) {
+                        clauses.push('condo_parking_space = ?');
+                        params.push(target.condoParkingSpace);
+                }
+                if (validText(target.condoCommonArea)) {
+                        clauses.push('condo_common_area = ?');
+                        params.push(target.condoCommonArea);
+                }
         }
 
         const { results } = await db.prepare(
@@ -340,6 +526,7 @@ export function buildAnalysis(target, comparables, radius) {
         const lowerValueCount = target
                 ? comparables.filter(item => item.taxableValue !== null && item.taxableValue < target.taxableValue).length
                 : 0;
+        const stats = target ? compUniformityStats(target, comparables) : null;
 
         return {
                 target,
@@ -349,6 +536,10 @@ export function buildAnalysis(target, comparables, radius) {
                         comparableCount: comparables.length,
                         averageComparableValue,
                         lowerValueCount,
+                        subjectValuePerSqft: stats?.subjectValuePerSqft ?? null,
+                        medianComparableValuePerSqft: stats?.medianValuePerSqft ?? null,
+                        lowerValuePerSqftCount: stats?.lowerValuePerSqftCount ?? 0,
+                        validValuePerSqftComparables: stats?.validValuePerSqftComparables ?? 0,
                         differenceFromAverage: averageComparableValue === null || !target
                                 ? null
                                 : target.taxableValue - averageComparableValue
