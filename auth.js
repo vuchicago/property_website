@@ -33,12 +33,23 @@ try {
 
 export { app, auth };
 
+function emailVerificationActionSettings() {
+        if (typeof window === 'undefined') {
+                return undefined;
+        }
+
+        return {
+                url: `${window.location.origin}/login.html?verified=1`,
+                handleCodeInApp: false
+        };
+}
+
 // Authentication Functions
 export const loginUser = async (email, password) => {
         try {
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
                 if (!userCredential.user.emailVerified) {
-                        await sendEmailVerification(userCredential.user).catch(() => { });
+                        await sendEmailVerification(userCredential.user, emailVerificationActionSettings()).catch(() => { });
                 }
                 return { success: true, user: userCredential.user };
         } catch (error) {
@@ -50,7 +61,7 @@ export const registerUser = async (email, password) => {
         try {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 try {
-                        await sendEmailVerification(userCredential.user);
+                        await sendEmailVerification(userCredential.user, emailVerificationActionSettings());
                         return {
                                 success: true,
                                 user: userCredential.user,
@@ -74,7 +85,7 @@ export const sendCurrentUserVerificationEmail = async () => {
                 if (!auth.currentUser) {
                         throw new Error('Please sign in before requesting a verification email.');
                 }
-                await sendEmailVerification(auth.currentUser);
+                await sendEmailVerification(auth.currentUser, emailVerificationActionSettings());
                 return { success: true };
         } catch (error) {
                 return { success: false, error: error.message };
@@ -198,7 +209,7 @@ const updateNavigation = (user) => {
                 if (user) {
                         dashboard.style.display = 'block';
                         // Load history
-                        import('./history.js?v=20260521-property-details').then(module => {
+                        import('./history.js?v=20260521-address-suggestions').then(module => {
                                 module.loadAppealHistory();
                         }).catch(err => console.error("Failed to load history module:", err));
                 } else {
@@ -212,7 +223,7 @@ const updateAuthButton = (container, user) => {
 
         if (user) {
                 // User is logged in
-                import('./appeal.js?v=20260506-address-suggestions').then(module => {
+                import('./appeal.js?v=20260521-address-suggestions').then(module => {
                         window.openAppealModal = module.openAppealModal;
                 });
 
@@ -288,7 +299,7 @@ const updateMobileMenu = (ulElement, user) => {
                 li.innerHTML = `<a href="#" onclick="window.handleLogout(event)">Logout (${user.email})</a>`;
                 // Add appeal link to mobile menu too if desired
                 const appealLi = document.createElement('li');
-                appealLi.innerHTML = `<a href="#" onclick="import('./appeal.js?v=20260506-address-suggestions').then(m=>m.openAppealModal())">Appeal Now</a>`;
+                appealLi.innerHTML = `<a href="#" onclick="import('./appeal.js?v=20260521-address-suggestions').then(m=>m.openAppealModal())">Appeal Now</a>`;
                 ulElement.insertBefore(appealLi, li);
         } else {
                 li.innerHTML = `<a href="login.html">Login</a>`;

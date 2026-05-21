@@ -384,7 +384,7 @@ function renderAppeals(appeals, address) {
         historyContainer.querySelectorAll('.appeal-again-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                         const addr = e.currentTarget.dataset.address;
-                        const { openAppealModal } = await import('./appeal.js?v=20260506-address-suggestions');
+                        const { openAppealModal } = await import('./appeal.js?v=20260521-address-suggestions');
                         openAppealModal(addr);
                 });
         });
@@ -474,9 +474,19 @@ async function updateAddressSuggestions(query, forceVisible = false) {
                 return;
         }
 
+        suggestionsPanel.innerHTML = '<div class="address-suggestion-helper">Searching Cook County addresses...</div>';
+        suggestionsPanel.classList.add('is-visible');
+
         try {
                 const response = await authFetch(`/api/address-lookup?q=${encodeURIComponent(query)}&limit=5`);
-                if (!response.ok) return;
+                if (!response.ok) {
+                        const error = await response.json().catch(() => ({}));
+                        renderAddressSuggestionMessage(
+                                'property-address-suggestions',
+                                error.error || 'Could not load address suggestions.'
+                        );
+                        return;
+                }
 
                 const data = await response.json();
                 currentSuggestions = data.suggestions || [];
@@ -490,6 +500,7 @@ async function updateAddressSuggestions(query, forceVisible = false) {
                 }, forceVisible ? 'Select the closest matching address before adding it.' : '');
         } catch (error) {
                 console.error('Address lookup failed:', error);
+                renderAddressSuggestionMessage('property-address-suggestions', 'Could not load address suggestions.');
         }
 }
 
@@ -498,7 +509,10 @@ function renderAddressSuggestions(containerId, suggestions, onSelect, helperText
         if (!panel) return;
 
         if (!suggestions.length) {
-                hideAddressSuggestions(containerId);
+                renderAddressSuggestionMessage(
+                        containerId,
+                        'No close matches yet. Try the full street number, street name, city, or ZIP.'
+                );
                 return;
         }
 
@@ -518,6 +532,13 @@ function renderAddressSuggestions(containerId, suggestions, onSelect, helperText
                         hideAddressSuggestions(containerId);
                 });
         });
+}
+
+function renderAddressSuggestionMessage(containerId, message) {
+        const panel = document.getElementById(containerId);
+        if (!panel) return;
+        panel.innerHTML = `<div class="address-suggestion-helper">${escapeHtml(message)}</div>`;
+        panel.classList.add('is-visible');
 }
 
 function hideAddressSuggestions(containerId) {

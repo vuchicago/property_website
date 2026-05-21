@@ -463,7 +463,7 @@
 
         <!-- Auth Logic Script -->
         <script type="module">
-                import { loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, sendCurrentUserVerificationEmail, refreshCurrentUser } from './auth.js?v=20260521-email-verify';
+                import { loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, sendCurrentUserVerificationEmail, refreshCurrentUser } from './auth.js?v=20260521-email-verify-return';
 
                 const form = document.getElementById('auth-form');
                 const emailInput = document.getElementById('email');
@@ -483,7 +483,9 @@
                 const authDivider = document.querySelector('.auth-divider');
                 const authToggle = document.querySelector('.auth-toggle');
 
-                const authMode = new URLSearchParams(window.location.search).get('mode');
+                const pageParams = new URLSearchParams(window.location.search);
+                const authMode = pageParams.get('mode');
+                const returnedFromVerification = pageParams.get('verified') === '1';
                 let isLogin = authMode !== 'signup' && authMode !== 'create-account';
                 updateUI();
 
@@ -567,6 +569,11 @@
 
                 onAuthUserChanged(async (user) => {
                         if (user) {
+                                if (returnedFromVerification) {
+                                        const handled = await handleVerificationReturn();
+                                        if (handled) return;
+                                }
+
                                 if (!user.emailVerified) {
                                         showVerificationPanel(user.email, false);
                                         return;
@@ -576,11 +583,15 @@
                                 authContainer.style.display = 'flex';
                                 dashboard.style.display = 'none';
                                 hideVerificationPanel();
+                                if (returnedFromVerification) {
+                                        errorAlert.textContent = 'Email verified. Please sign in to continue on this device.';
+                                        errorAlert.style.display = 'block';
+                                }
                         }
                 });
 
                 addAppealBtn.addEventListener('click', async () => {
-                        const { openAppealModal } = await import('./appeal.js?v=20260506-address-suggestions');
+                        const { openAppealModal } = await import('./appeal.js?v=20260521-address-suggestions');
                         openAppealModal();
                 });
 
@@ -595,8 +606,23 @@
                         authContainer.style.display = 'none';
                         dashboard.style.display = 'block';
                         hideVerificationPanel();
-                        const { loadAppealHistory } = await import('./history.js?v=20260521-property-details');
+                        clearVerificationReturnFlag();
+                        const { loadAppealHistory } = await import('./history.js?v=20260521-address-suggestions');
                         await loadAppealHistory();
+                }
+
+                async function handleVerificationReturn() {
+                        errorAlert.style.display = 'none';
+                        pageTitle.textContent = 'Checking Verification';
+                        pageSubtitle.textContent = 'One moment while we open your dashboard';
+
+                        const result = await refreshCurrentUser();
+                        if (result.success && result.user.emailVerified) {
+                                await showDashboard();
+                                return true;
+                        }
+
+                        return false;
                 }
 
                 function showVerificationPanel(email, emailSent) {
@@ -611,7 +637,7 @@
                         pageSubtitle.textContent = 'Check your inbox before continuing';
                         verificationPanel.innerHTML = `
                                 <h2>Email verification required</h2>
-                                <p>${emailSent ? 'We sent' : 'Use the button below to send'} a verification link to <strong>${escapeHtml(email || 'your email address')}</strong>. Open that link, then come back here and check verification.</p>
+                                <p>${emailSent ? 'We sent' : 'Use the button below to send'} a verification link to <strong>${escapeHtml(email || 'your email address')}</strong>. Open that link to continue. Please check your spam folder if you have not received it.</p>
                                 <div class="verification-actions">
                                         <button type="button" class="btn btn-primary" id="check-verification-btn">I Verified My Email</button>
                                         <button type="button" class="btn btn-secondary" id="resend-verification-btn">Resend Email</button>
@@ -636,6 +662,12 @@
                         googleAuthBtn.style.display = '';
                         if (authDivider) authDivider.style.display = '';
                         if (authToggle) authToggle.style.display = '';
+                }
+
+                function clearVerificationReturnFlag() {
+                        if (!returnedFromVerification) return;
+                        const cleanUrl = `${window.location.pathname}${window.location.hash || ''}`;
+                        window.history.replaceState({}, document.title, cleanUrl);
                 }
 
                 async function checkVerification() {

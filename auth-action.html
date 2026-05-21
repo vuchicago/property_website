@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Email Verification - Cook County Tax Compare</title>
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+        <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+        <main class="auth-container">
+                <section class="auth-card" style="text-align: center;">
+                        <h1 id="action-title">Verifying your email</h1>
+                        <p id="action-message" class="text-muted">One moment while we confirm your email address.</p>
+                        <div id="action-controls" style="margin-top: 1.5rem;"></div>
+                </section>
+        </main>
+
+        <script type="module">
+                import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+                import { getAuth, applyActionCode } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+                const firebaseConfig = {
+                        apiKey: "AIzaSyC_dBdm2F3zkzlP_540C4QgLAZhnb9a9Sc",
+                        authDomain: "cookcounty-tax-compare.firebaseapp.com",
+                        projectId: "cookcounty-tax-compare",
+                        storageBucket: "cookcounty-tax-compare.firebasestorage.app",
+                        messagingSenderId: "1078351634043",
+                        appId: "1:1078351634043:web:4b8dabd97ad2c072e8ccde",
+                        measurementId: "G-M88E80MJGJ"
+                };
+
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                const params = new URLSearchParams(window.location.search);
+                const mode = params.get('mode');
+                const actionCode = params.get('oobCode');
+                const continueUrl = params.get('continueUrl') || '/login.html?verified=1';
+                const title = document.getElementById('action-title');
+                const message = document.getElementById('action-message');
+                const controls = document.getElementById('action-controls');
+
+                function showResult(heading, body, href = '/login.html?verified=1', label = 'Continue') {
+                        title.textContent = heading;
+                        message.textContent = body;
+                        controls.innerHTML = `<a class="btn btn-primary" href="${escapeHtml(href)}">${escapeHtml(label)}</a>`;
+                }
+
+                function escapeHtml(value) {
+                        return String(value ?? '')
+                                .replace(/&/g, '&amp;')
+                                .replace(/</g, '&lt;')
+                                .replace(/>/g, '&gt;')
+                                .replace(/"/g, '&quot;')
+                                .replace(/'/g, '&#039;');
+                }
+
+                if (mode !== 'verifyEmail' || !actionCode) {
+                        showResult('Invalid verification link', 'This email verification link is missing required information.', '/login.html', 'Back to Login');
+                } else {
+                        applyActionCode(auth, actionCode)
+                                .then(() => {
+                                        showResult('Email verified', 'Thanks. Your email address has been verified.', continueUrl, 'Open Dashboard');
+                                        window.setTimeout(() => {
+                                                window.location.href = continueUrl;
+                                        }, 1200);
+                                })
+                                .catch(() => {
+                                        showResult('Verification link expired', 'This link is invalid or has already been used. Please sign in and request a new verification email.', '/login.html', 'Back to Login');
+                                });
+                }
+        </script>
+</body>
+
+</html>
