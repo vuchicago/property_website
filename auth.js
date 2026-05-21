@@ -69,6 +69,30 @@ export const registerUser = async (email, password) => {
         }
 };
 
+export const sendCurrentUserVerificationEmail = async () => {
+        try {
+                if (!auth.currentUser) {
+                        throw new Error('Please sign in before requesting a verification email.');
+                }
+                await sendEmailVerification(auth.currentUser);
+                return { success: true };
+        } catch (error) {
+                return { success: false, error: error.message };
+        }
+};
+
+export const refreshCurrentUser = async () => {
+        try {
+                if (!auth.currentUser) {
+                        return { success: false, error: 'No signed-in user.' };
+                }
+                await auth.currentUser.reload();
+                return { success: true, user: auth.currentUser };
+        } catch (error) {
+                return { success: false, error: error.message };
+        }
+};
+
 export const signInWithGoogle = async () => {
         try {
                 const provider = new GoogleAuthProvider();
