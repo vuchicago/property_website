@@ -43,6 +43,10 @@ df_parcel[df_parcel.pin==10271090440000]
 # %%
 df_output_all2025[df_output_all2025.pin=='10271090440000']
 # %%
-df_output_all=pd.merge(df_parcel,df_assessed,how='inner',on='pin')
-df_output_all[df_output_all.pin==10271090440000]
+df_duplicated=df_output_all2025[(df_output_all2025['Nearby Address'].duplicated()) & (df_output_all2025['PIN Proration Rate']==1)].copy()
+# %%
+df_duplicated[df_duplicated.pin=='27162050090000']
+# %%
+df_duplicated[df_duplicated['Nearby Address']=='9845 El Cameno Ln, Orland Park, IL 60462']
+
 # %%

@@ -1,6 +1,12 @@
 import { requireFirebaseUser, jsonResponse } from './_auth.js';
 import { findBestPropertyAddress, getPropertyAddressCount } from './_property_addresses.js';
 
+const PROPERTY_GROUP_KEY = `CASE
+        WHEN pin_proration_rate IS NOT NULL AND pin_proration_rate < 1
+        THEN normalized_address || '|fractional'
+        ELSE normalized_address || '|pin:' || COALESCE(pin, id)
+END`;
+
 export const onRequestGet = async (context) => {
         const { user, response } = await requireFirebaseUser(context.request);
 
@@ -16,23 +22,23 @@ export const onRequestGet = async (context) => {
                 const { results } = await context.env.DB.prepare(
                         `SELECT user_addresses.*,
                                 (
-                                  SELECT pin
+                                  SELECT group_concat(pin, ', ')
                                   FROM property_addresses
-                                  WHERE property_addresses.address = user_addresses.address
-                                  LIMIT 1
+                                  WHERE ${PROPERTY_GROUP_KEY} = user_addresses.property_key
                                 ) AS pin,
                                 (
                                   SELECT json_object(
-                                    'pin', pin,
-                                    'city', city,
-                                    'zipCode', zip_code,
-                                    'taxableValue', taxable_value,
+                                    'pin', group_concat(pin, ', '),
+                                    'pinCount', COUNT(pin),
+                                    'city', MAX(city),
+                                    'zipCode', MAX(zip_code),
+                                    'taxableValue', SUM(taxable_value),
                                     'homeSize', home_size,
                                     'yearBuilt', year_built,
                                     'lastAppealYear', last_appeal_year,
                                     'lastAppealStatus', last_appeal_status,
-                                    'certifiedLand', certified_land,
-                                    'certifiedBuilding', certified_building,
+                                    'certifiedLand', SUM(certified_land),
+                                    'certifiedBuilding', SUM(certified_building),
                                     'masonryType', masonry_type,
                                     'repairCondition', repair_condition,
                                     'classCode', class_code,
@@ -40,7 +46,7 @@ export const onRequestGet = async (context) => {
                                     'bedroomCount', bedroom_count,
                                     'bathroomCount', bathroom_count,
                                     'singleVsMultiFamily', single_vs_multi_family,
-                                    'pinProrationRate', pin_proration_rate,
+                                    'pinProrationRate', SUM(pin_proration_rate),
                                     'mailingName', mailing_name,
                                     'mailingAddress', mailing_address,
                                     'propertyClass', property_class,
@@ -58,8 +64,7 @@ export const onRequestGet = async (context) => {
                                     'condoCommonArea', condo_common_area
                                   )
                                   FROM property_addresses
-                                  WHERE property_addresses.address = user_addresses.address
-                                  LIMIT 1
+                                  WHERE ${PROPERTY_GROUP_KEY} = user_addresses.property_key
                                 ) AS property_details
                          FROM user_addresses
                          WHERE user_addresses.customer_id = ?
@@ -88,13 +93,27 @@ export const onRequestPost = async (context) => {
         }
 
         try {
-                const { address } = await context.request.json();
+                const { address, propertyKey } = await context.request.json();
 
                 if (!address) {
                         return jsonResponse({ error: 'Missing address' }, 400);
                 }
 
-                const propertyAddress = await findBestPropertyAddress(context.env.DB, address);
+                const propertyAddress = propertyKey
+                        ? await context.env.DB.prepare(
+                                `SELECT MIN(id) AS id,
+                                        group_concat(pin, ', ') AS pin,
+                                        address,
+                                        normalized_address,
+                                        ${PROPERTY_GROUP_KEY} AS property_key,
+                                        MAX(mailing_name) AS mailing_name,
+                                        SUM(pin_proration_rate) AS pin_proration_rate
+                                 FROM property_addresses
+                                 WHERE ${PROPERTY_GROUP_KEY} = ?
+                                 GROUP BY property_key
+                                 LIMIT 1`
+                        ).bind(propertyKey).first()
+                        : await findBestPropertyAddress(context.env.DB, address);
 
                 if (!propertyAddress) {
                         const propertyAddressCount = await getPropertyAddressCount(context.env.DB);
@@ -109,11 +128,9 @@ export const onRequestPost = async (context) => {
                         }, 400);
                 }
 
-                // Insert new address. We use INSERT OR IGNORE to handle the UNIQUE constraint
-                // quietly if the user tries to add the same address again.
                 const result = await context.env.DB.prepare(
-                        "INSERT OR IGNORE INTO user_addresses (customer_id, address, email) VALUES (?, ?, ?)"
-                ).bind(user.uid, propertyAddress.address, user.email || '').run();
+                        "INSERT OR IGNORE INTO user_addresses (customer_id, address, property_key, email) VALUES (?, ?, ?, ?)"
+                ).bind(user.uid, propertyAddress.address, propertyAddress.property_key, user.email || '').run();
 
                 // If changes === 0, it means it was a duplicate (ignored due to UNIQUE constraint)
                 if (result.meta && result.meta.changes === 0) {
@@ -121,6 +138,7 @@ export const onRequestPost = async (context) => {
                                 success: true,
                                 message: 'Address already exists',
                                 address: propertyAddress.address,
+                                propertyKey: propertyAddress.property_key,
                                 property: propertyAddress
                         });
                 }
@@ -128,6 +146,7 @@ export const onRequestPost = async (context) => {
                 return jsonResponse({
                         success: true,
                         address: propertyAddress.address,
+                        propertyKey: propertyAddress.property_key,
                         property: propertyAddress
                 });
         } catch (err) {
@@ -147,10 +166,10 @@ export const onRequestDelete = async (context) => {
         }
 
         try {
-                const { address } = await context.request.json();
+                const { address, propertyKey } = await context.request.json();
 
-                if (!address) {
-                        return jsonResponse({ error: 'Missing address' }, 400);
+                if (!address && !propertyKey) {
+                        return jsonResponse({ error: 'Missing address or property key' }, 400);
                 }
 
                 const appeal = await context.env.DB.prepare(
@@ -167,8 +186,10 @@ export const onRequestDelete = async (context) => {
                 }
 
                 const result = await context.env.DB.prepare(
-                        "DELETE FROM user_addresses WHERE customer_id = ? AND address = ?"
-                ).bind(user.uid, address).run();
+                        propertyKey
+                                ? "DELETE FROM user_addresses WHERE customer_id = ? AND property_key = ?"
+                                : "DELETE FROM user_addresses WHERE customer_id = ? AND address = ?"
+                ).bind(user.uid, propertyKey || address).run();
 
                 return jsonResponse({
                         success: true,

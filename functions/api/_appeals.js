@@ -14,10 +14,19 @@ export async function recordPaidAppeal(env, payment) {
         if (payment.customerId && payment.propertyAddress) {
                 try {
                         await env.DB.prepare(
-                                `INSERT OR IGNORE INTO user_addresses (customer_id, address, email)
-                                 VALUES (?, ?, ?)`
+                                `INSERT OR IGNORE INTO user_addresses (customer_id, address, property_key, email)
+                                 SELECT ?, address,
+                                        CASE
+                                          WHEN pin_proration_rate IS NOT NULL AND pin_proration_rate < 1
+                                          THEN normalized_address || '|fractional'
+                                          ELSE normalized_address || '|pin:' || COALESCE(pin, id)
+                                        END,
+                                        ?
+                                 FROM property_addresses
+                                 WHERE address = ?
+                                 LIMIT 1`
                         )
-                                .bind(payment.customerId, payment.propertyAddress, payment.customerEmail || '')
+                                .bind(payment.customerId, payment.customerEmail || '', payment.propertyAddress)
                                 .run();
                 } catch (error) {
                         console.error('Could not add paid property to user_addresses:', error);

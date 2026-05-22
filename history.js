@@ -4,6 +4,7 @@ let userAddresses = [];
 let allAppeals = [];
 let lookupTimer = null;
 let selectedAddressSuggestion = '';
+let selectedPropertyKeySuggestion = '';
 let currentSuggestions = [];
 let selectedAddressForImage = '';
 let selectedPinForImage = '';
@@ -81,16 +82,18 @@ function renderAddressList() {
                 const canDelete = appealCount === 0;
 
                 const safeAddress = escapeHtml(addrObj.address);
+                const safePropertyKey = escapeHtml(addrObj.property_key || addrObj.propertyKey || addrObj.address);
 
                 html += `
-            <li class="address-item" style="padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s;" data-address="${safeAddress}">
+            <li class="address-item" style="padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s;" data-address="${safeAddress}" data-property-key="${safePropertyKey}">
                 <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
                         <div>
                                 <div style="font-weight: 500; margin-bottom: 0.25rem;">${safeAddress}</div>
-                                ${addrObj.pin ? `<div class="text-xs text-muted">PIN ${escapeHtml(addrObj.pin)}</div>` : ''}
+                                ${addrObj.pin ? `<div class="text-xs text-muted">${String(addrObj.pin).includes(',') ? 'PINs' : 'PIN'} ${escapeHtml(addrObj.pin)}</div>` : ''}
+                                ${addrObj.propertyDetails?.mailingName ? `<div class="text-xs text-muted">${escapeHtml(addrObj.propertyDetails.mailingName)}</div>` : ''}
                                 <div class="text-xs text-muted">${appealCount} appeal(s)</div>
                         </div>
-                        ${canDelete ? `<button type="button" class="btn btn-secondary btn-sm delete-address-btn" data-address="${safeAddress}" aria-label="Delete ${safeAddress}">Delete</button>` : ''}
+                        ${canDelete ? `<button type="button" class="btn btn-secondary btn-sm delete-address-btn" data-address="${safeAddress}" data-property-key="${safePropertyKey}" aria-label="Delete ${safeAddress}">Delete</button>` : ''}
                 </div>
             </li>
         `;
@@ -113,8 +116,8 @@ function renderAddressList() {
                         e.currentTarget.style.borderColor = 'var(--primary)';
                         e.currentTarget.style.background = 'var(--bg-secondary)';
 
-                        const address = e.currentTarget.dataset.address;
-                        selectAddress(address);
+                        const propertyKey = e.currentTarget.dataset.propertyKey;
+                        selectAddress(propertyKey);
                 });
         });
 
@@ -122,14 +125,15 @@ function renderAddressList() {
                 button.addEventListener('click', async (event) => {
                         event.stopPropagation();
                         const address = event.currentTarget.dataset.address;
-                        if (!address) return;
+                        const propertyKey = event.currentTarget.dataset.propertyKey;
+                        if (!address && !propertyKey) return;
 
-                        await deleteAddress(address);
+                        await deleteAddress(address, propertyKey);
                 });
         });
 }
 
-async function deleteAddress(address) {
+async function deleteAddress(address, propertyKey) {
         const confirmed = window.confirm(`Delete ${address} from My Properties?`);
         if (!confirmed) return;
 
@@ -137,7 +141,7 @@ async function deleteAddress(address) {
                 const response = await authFetch('/api/addresses', {
                         method: 'DELETE',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ address })
+                        body: JSON.stringify({ address, propertyKey })
                 });
 
                 if (!response.ok) {
@@ -166,7 +170,9 @@ function showEmptyDetailsPanel() {
         }
 }
 
-function selectAddress(address) {
+function selectAddress(propertyKey) {
+        const selectedAddress = userAddresses.find(item => (item.property_key || item.propertyKey || item.address) === propertyKey);
+        const address = selectedAddress?.address || '';
         selectedAddressForImage = address;
         selectedPinForImage = '';
         document.getElementById('no-address-selected-msg').style.display = 'none';
@@ -174,13 +180,12 @@ function selectAddress(address) {
         detailsPanel.style.display = 'block';
 
         document.getElementById('selected-address-title').textContent = address;
-        const selectedAddress = userAddresses.find(item => item.address === address);
         const details = selectedAddress?.propertyDetails;
         const pinEl = document.getElementById('selected-address-pin');
 
         if (pinEl) {
                 const meta = [
-                        selectedAddress?.pin ? ['PIN', selectedAddress.pin] : null,
+                        selectedAddress?.pin ? [String(selectedAddress.pin).includes(',') ? 'PINs' : 'PIN', selectedAddress.pin] : null,
                         details?.pinProrationRate ? ['PIN Proration Code', formatPercent(details.pinProrationRate)] : null,
                         details?.lastAppealYear ? ['Last Appeal', details.lastAppealYear] : null,
                         details?.mailingName ? ['Mailing Name', details.mailingName] : null,
@@ -188,7 +193,7 @@ function selectAddress(address) {
                 ].filter(Boolean);
 
                 if (meta.length) {
-                        selectedPinForImage = selectedAddress?.pin || '';
+                        selectedPinForImage = String(selectedAddress?.pin || '').split(',')[0].trim();
                         pinEl.innerHTML = meta.map(([label, value]) => `
                                 <div class="selected-address-meta-row">
                                         <span>${escapeHtml(label)}</span>
@@ -474,6 +479,7 @@ function setupAddAddressForm() {
                 e.preventDefault();
                 const input = document.getElementById('new-property-address');
                 const address = selectedAddressSuggestion;
+                const propertyKey = selectedPropertyKeySuggestion;
                 const typedAddress = input.value.trim();
                 if (!address && typedAddress) {
                         await updateAddressSuggestions(typedAddress, true);
@@ -481,7 +487,7 @@ function setupAddAddressForm() {
                         return;
                 }
 
-                if (!address) return;
+                if (!address || !propertyKey) return;
 
                 const btn = document.getElementById('add-address-btn');
                 const originalText = btn.textContent;
@@ -492,12 +498,13 @@ function setupAddAddressForm() {
                         const response = await authFetch('/api/addresses', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ address })
+                                body: JSON.stringify({ address, propertyKey })
                         });
 
                         if (response.ok) {
                                 input.value = '';
                                 selectedAddressSuggestion = '';
+                                selectedPropertyKeySuggestion = '';
                                 hideAddressSuggestions('property-address-suggestions');
                                 // Refresh data
                                 await fetchAddresses();
@@ -519,6 +526,7 @@ function setupAddAddressForm() {
         const input = document.getElementById('new-property-address');
         input?.addEventListener('input', () => {
                 selectedAddressSuggestion = '';
+                selectedPropertyKeySuggestion = '';
                 currentSuggestions = [];
                 window.clearTimeout(lookupTimer);
                 lookupTimer = window.setTimeout(() => {
@@ -564,13 +572,14 @@ async function updateAddressSuggestions(query, forceVisible = false) {
 
                 const data = await response.json();
                 currentSuggestions = data.suggestions || [];
-                renderAddressSuggestions('property-address-suggestions', currentSuggestions, (address) => {
+                renderAddressSuggestions('property-address-suggestions', currentSuggestions, (item) => {
                         const input = document.getElementById('new-property-address');
                         if (input) {
-                                input.value = address;
+                                input.value = item.address;
                                 input.focus();
                         }
-                        selectedAddressSuggestion = address;
+                        selectedAddressSuggestion = item.address;
+                        selectedPropertyKeySuggestion = item.propertyKey || '';
                 }, forceVisible ? 'Select the closest matching address before adding it.' : '');
         } catch (error) {
                 console.error('Address lookup failed:', error);
@@ -592,17 +601,21 @@ function renderAddressSuggestions(containerId, suggestions, onSelect, helperText
 
         panel.innerHTML = `
                 ${helperText ? `<div class="address-suggestion-helper">${escapeHtml(helperText)}</div>` : ''}
-                ${suggestions.slice(0, 5).map(item => `
-                <button type="button" class="address-suggestion" role="option" data-address="${escapeHtml(item.address)}">
+                ${suggestions.slice(0, 5).map((item, index) => `
+                <button type="button" class="address-suggestion" role="option" data-index="${index}">
                         ${escapeHtml(item.address)}
-                        <span>PIN ${escapeHtml(item.pin || 'not available')}</span>
+                        <span>${escapeHtml([
+                                item.pin ? `PIN ${item.pin}` : 'Cook County property record',
+                                item.mailingName ? item.mailingName : '',
+                                item.pinProrationRate ? `Proration ${formatPercent(item.pinProrationRate)}` : ''
+                        ].filter(Boolean).join(' | '))}</span>
                 </button>
         `).join('')}`;
         panel.classList.add('is-visible');
 
         panel.querySelectorAll('.address-suggestion').forEach(button => {
                 button.addEventListener('click', () => {
-                        onSelect(button.dataset.address);
+                        onSelect(suggestions[Number(button.dataset.index)]);
                         hideAddressSuggestions(containerId);
                 });
         });

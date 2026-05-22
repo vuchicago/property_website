@@ -187,11 +187,24 @@ function buildCandidateQuery(query, limit) {
         }
 
         params.push(Math.max(limit * 8, 40));
+        const propertyKey = `CASE
+                        WHEN pin_proration_rate IS NOT NULL AND pin_proration_rate < 1
+                        THEN normalized_address || '|fractional'
+                        ELSE normalized_address || '|pin:' || COALESCE(pin, id)
+                      END`;
 
         return {
-                sql: `SELECT id, pin, address, normalized_address
+                sql: `SELECT
+                        MIN(id) AS id,
+                        group_concat(pin, ', ') AS pin,
+                        address,
+                        normalized_address,
+                        ${propertyKey} AS property_key,
+                        MAX(mailing_name) AS mailing_name,
+                        SUM(pin_proration_rate) AS pin_proration_rate
                       FROM property_addresses
                       WHERE ${clauses.join(' OR ')}
+                      GROUP BY property_key
                       LIMIT ?`,
                 params
         };

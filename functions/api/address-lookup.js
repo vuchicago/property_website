@@ -22,6 +22,9 @@ export const onRequestGet = async (context) => {
                         suggestions: suggestions.map(item => ({
                                 id: item.id,
                                 pin: item.pin,
+                                propertyKey: item.property_key,
+                                mailingName: item.mailing_name,
+                                pinProrationRate: item.pin_proration_rate,
                                 address: item.address,
                                 score: item.score
                         }))

@@ -216,7 +216,11 @@ function renderSuggestions(items) {
         <button type="button" class="address-suggestion" data-property-id="${escapeHtml(item.id)}"
             data-address="${escapeHtml(item.address)}" data-pin="${escapeHtml(item.pin || '')}">
             ${escapeHtml(item.address)}
-            <span>${item.pin ? `PIN ${escapeHtml(item.pin)}` : 'Cook County property record'}</span>
+            <span>${escapeHtml([
+                item.pin ? `PIN ${item.pin}` : 'Cook County property record',
+                item.mailingName || '',
+                item.pinProrationRate ? `Proration ${formatNumber(item.pinProrationRate)}` : ''
+            ].filter(Boolean).join(' | '))}</span>
         </button>
     `).join('');
     suggestions.classList.add('is-visible');

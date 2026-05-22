@@ -75,6 +75,7 @@ function rowToProperty(row) {
                 id: row.id,
                 pin: row.pin,
                 address: row.address,
+                normalizedAddress: row.normalized_address,
                 city: row.city,
                 zipCode: toInt(row.zip_code),
                 taxableValue: toNumber(row.taxable_value),
@@ -114,6 +115,104 @@ function rowToProperty(row) {
                 condoParkingSpace: row.condo_parking_space,
                 condoCommonArea: row.condo_common_area
         };
+}
+
+function firstValid(values) {
+        return values.find(value => value !== null && value !== undefined && String(value).trim() !== '');
+}
+
+function sumValues(values) {
+        const numbers = values
+                .map(toNumber)
+                .filter(value => value !== null);
+        return numbers.length ? numbers.reduce((sum, value) => sum + value, 0) : null;
+}
+
+function propertyGroupKey(property) {
+        if (property.pinProrationRate !== null && property.pinProrationRate < 1) {
+                return `${property.normalizedAddress || property.address}|fractional`;
+        }
+        return `${property.normalizedAddress || property.address}|pin:${property.pin || property.id}`;
+}
+
+function aggregatePropertiesByAddress(properties, preferredClassCode = null) {
+        const groups = new Map();
+
+        properties.forEach(property => {
+                const key = propertyGroupKey(property);
+                if (!key) return;
+                if (!groups.has(key)) {
+                        groups.set(key, []);
+                }
+                groups.get(key).push(property);
+        });
+
+        return Array.from(groups.values()).map(group => {
+                const preferred = preferredClassCode
+                        ? group.find(item => normalizeClassCode(item.classCode) === preferredClassCode)
+                        : null;
+                const orderedGroup = preferred ? [preferred, ...group.filter(item => item !== preferred)] : group;
+                const base = orderedGroup[0];
+                const pins = Array.from(new Set(group.map(item => item.pin).filter(Boolean)));
+                return {
+                        ...base,
+                        pin: pins.join(', '),
+                        pinList: pins,
+                        pinCount: pins.length,
+                        taxableValue: sumValues(group.map(item => item.taxableValue)),
+                        certifiedLand: sumValues(group.map(item => item.certifiedLand)),
+                        certifiedBuilding: sumValues(group.map(item => item.certifiedBuilding)),
+                        pinProrationRate: sumValues(group.map(item => item.pinProrationRate)),
+                        latitude: toNumber(firstValid(group.map(item => item.latitude))),
+                        longitude: toNumber(firstValid(group.map(item => item.longitude))),
+                        lastAppealYear: firstValid(orderedGroup.map(item => item.lastAppealYear)),
+                        lastAppealStatus: firstValid(orderedGroup.map(item => item.lastAppealStatus)),
+                        propertyClass: firstValid(orderedGroup.map(item => item.propertyClass)),
+                        classCode: normalizeClassCode(firstValid(orderedGroup.map(item => item.classCode))),
+                        neighborhoodCode: firstValid(orderedGroup.map(item => item.neighborhoodCode)),
+                        masonryType: firstValid(orderedGroup.map(item => item.masonryType)),
+                        finishedBasement: firstValid(orderedGroup.map(item => item.finishedBasement)),
+                        repairCondition: firstValid(orderedGroup.map(item => item.repairCondition)),
+                        singleVsMultiFamily: firstValid(orderedGroup.map(item => item.singleVsMultiFamily)),
+                        garageSize: firstValid(orderedGroup.map(item => item.garageSize)),
+                        pin10: firstValid(orderedGroup.map(item => item.pin10)),
+                        taxDistrictCode: toNumber(firstValid(orderedGroup.map(item => item.taxDistrictCode))),
+                        municipalityNumber: toNumber(firstValid(orderedGroup.map(item => item.municipalityNumber))),
+                        municipalityName: firstValid(orderedGroup.map(item => item.municipalityName)),
+                        taxMunicipalityName: firstValid(orderedGroup.map(item => item.taxMunicipalityName)),
+                        cmapWalkabilityTotalScore: toNumber(firstValid(orderedGroup.map(item => item.cmapWalkabilityTotalScore))),
+                        cmapWalkabilityNoTransitScore: toNumber(firstValid(orderedGroup.map(item => item.cmapWalkabilityNoTransitScore))),
+                        floodFsFactor: toNumber(firstValid(orderedGroup.map(item => item.floodFsFactor))),
+                        chicagoCommunityArea: firstValid(orderedGroup.map(item => item.chicagoCommunityArea)),
+                        sourcePins: group
+                };
+        });
+}
+
+async function getAddressGroupByNormalizedAddress(db, normalizedAddress) {
+        if (!normalizedAddress) return [];
+        const { results } = await db.prepare(
+                `SELECT ${PROPERTY_SELECT}
+                 FROM property_addresses
+                 WHERE normalized_address = ?`
+        ).bind(normalizedAddress).all();
+        return aggregatePropertiesByAddress((results || []).map(rowToProperty));
+}
+
+async function getPropertyGroup(db, row) {
+        if (!row) return [];
+        const property = rowToProperty(row);
+        if (property.pinProrationRate !== null && property.pinProrationRate < 1) {
+                const { results } = await db.prepare(
+                        `SELECT ${PROPERTY_SELECT}
+                         FROM property_addresses
+                         WHERE normalized_address = ?
+                           AND pin_proration_rate IS NOT NULL
+                           AND pin_proration_rate < 1`
+                ).bind(row.normalized_address).all();
+                return aggregatePropertiesByAddress((results || []).map(rowToProperty));
+        }
+        return [property];
 }
 
 function milesBetween(a, b) {
@@ -375,14 +474,18 @@ export async function findTargetProperty(db, { id, pin, address }) {
                 const row = await db.prepare(
                         `SELECT ${PROPERTY_SELECT} FROM property_addresses WHERE id = ? LIMIT 1`
                 ).bind(id).first();
-                if (row) return rowToProperty(row);
+                if (row) {
+                        return (await getPropertyGroup(db, row))[0] || rowToProperty(row);
+                }
         }
 
         if (pin) {
                 const row = await db.prepare(
                         `SELECT ${PROPERTY_SELECT} FROM property_addresses WHERE pin = ? LIMIT 1`
                 ).bind(pin).first();
-                if (row) return rowToProperty(row);
+                if (row) {
+                        return (await getPropertyGroup(db, row))[0] || rowToProperty(row);
+                }
         }
 
         const suggestions = await getAddressSuggestions(db, address || '', 1);
@@ -394,7 +497,7 @@ export async function findTargetProperty(db, { id, pin, address }) {
         const row = await db.prepare(
                 `SELECT ${PROPERTY_SELECT} FROM property_addresses WHERE id = ? LIMIT 1`
         ).bind(best.id).first();
-        return row ? rowToProperty(row) : null;
+        return row ? ((await getPropertyGroup(db, row))[0] || rowToProperty(row)) : null;
 }
 
 export async function findComparableProperties(db, target, radius) {
@@ -445,25 +548,20 @@ export async function findComparableProperties(db, target, radius) {
                         'neighborhood_code = ?',
                         'home_size >= ?',
                         'home_size <= ?',
-                        'certified_land BETWEEN ? AND ?',
                         'bedroom_count BETWEEN ? AND ?',
                         'bathroom_count BETWEEN ? AND ?',
                         'masonry_type = ?',
-                        'pin_proration_rate = ?',
                         'single_vs_multi_family = ?'
                 );
                 params.push(
                         target.neighborhoodCode,
                         target.homeSize * 0.9,
                         target.homeSize * 1.15,
-                        target.certifiedLand * 0.8,
-                        target.certifiedLand * 1.2,
                         target.bedroomCount,
                         target.bedroomCount + 1,
                         target.bathroomCount,
                         target.bathroomCount + 1,
                         target.masonryType,
-                        target.pinProrationRate,
                         target.singleVsMultiFamily
                 );
                 if (target.yearBuilt !== null && target.yearBuilt > 0) {
@@ -491,10 +589,6 @@ export async function findComparableProperties(db, target, radius) {
                         clauses.push('bathroom_count BETWEEN ? AND ?');
                         params.push(target.bathroomCount - 1, target.bathroomCount + 1);
                 }
-                if (target.pinProrationRate !== null && target.pinProrationRate > 0) {
-                        clauses.push('pin_proration_rate BETWEEN ? AND ?');
-                        params.push(target.pinProrationRate * 0.9, target.pinProrationRate * 1.1);
-                }
                 if (validText(target.condoParkingSpace)) {
                         clauses.push('condo_parking_space = ?');
                         params.push(target.condoParkingSpace);
@@ -508,17 +602,21 @@ export async function findComparableProperties(db, target, radius) {
         const { results } = await db.prepare(
                 `SELECT ${PROPERTY_SELECT}
                  FROM property_addresses
-                 WHERE ${clauses.join(' AND ')}
-                 LIMIT 10000`
+                 WHERE normalized_address IN (
+                         SELECT DISTINCT normalized_address
+                         FROM property_addresses
+                         WHERE ${clauses.join(' AND ')}
+                         LIMIT 10000
+                 )`
         ).bind(...params).all();
 
-        return (results || [])
-                .map(rowToProperty)
+        return aggregatePropertiesByAddress((results || []).map(rowToProperty), target.classCode)
                 .map(property => ({
                         ...property,
                         distanceMiles: milesBetween(target, property)
                 }))
                 .filter(property => property.distanceMiles <= radius)
+                .filter(property => propertyGroupKey(property) !== propertyGroupKey(target))
                 .filter(property => matchesComparableRules(property, target))
                 .sort((a, b) => a.distanceMiles - b.distanceMiles || (a.taxableValue || 0) - (b.taxableValue || 0));
 }
