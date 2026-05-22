@@ -232,6 +232,10 @@ function selectAddress(propertyKey) {
                         details?.pinProrationRate ? ['PIN Proration Code', formatPercent(details.pinProrationRate)] : null,
                         details?.lastAppealYear ? ['Last Appeal', details.lastAppealYear] : null,
                         details?.municipalityName ? ['Municipality', details.municipalityName] : null,
+                        details?.townshipName ? ['Township', details.townshipName] : null,
+                        details?.appealCalendar?.areaName ? ['Appeal Area', details.appealCalendar.areaName] : null,
+                        details?.appealCalendar?.lastFileDate ? ['Assessor Deadline', details.appealCalendar.lastFileDate] : null,
+                        details?.appealCalendar?.boardOfReviewAppealDates ? ['Board Review', details.appealCalendar.boardOfReviewAppealDates] : null,
                         details?.mailingName ? ['Mailing Name', details.mailingName] : null,
                         details?.mailingAddress ? ['Mailing Address', details.mailingAddress] : null
                 ].filter(Boolean);
@@ -437,6 +441,7 @@ function renderPropertyDetails(details) {
                 ['Year Built', formatWholeNumber(details?.yearBuilt)],
                 ['Property Class', details?.propertyClass],
                 ['Single vs Multi-Family', details?.singleVsMultiFamily],
+                ['Township', details?.townshipName],
                 ['Walkability Score', formatNumber(details?.cmapWalkabilityTotalScore)],
                 ['Masonry Type', details?.masonryType],
                 ['Repair', details?.repairCondition],

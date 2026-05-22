@@ -23,4 +23,4 @@ for file in import/"$IMPORT_STEM"_part_*.sql; do
 done
 
 echo "Column update import complete. Verify with:"
-echo "$WRANGLER d1 execute $DB_NAME --remote --command=\"SELECT COUNT(*) AS rows, COUNT(mailing_name) AS mailing_names, COUNT(city) AS cities FROM property_addresses;\""
+echo "$WRANGLER d1 execute $DB_NAME --remote --command=\"SELECT COUNT(*) AS rows, COUNT(mailing_name) AS mailing_names, COUNT(city) AS cities, COUNT(township_name) AS townships FROM property_addresses;\""

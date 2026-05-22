@@ -65,6 +65,8 @@ CREATE TABLE IF NOT EXISTS property_addresses (
   municipality_number INTEGER,
   municipality_name TEXT,
   tax_municipality_name TEXT,
+  township_name TEXT,
+  township_code TEXT,
   cmap_walkability_total_score REAL,
   cmap_walkability_no_transit_score REAL,
   flood_fs_factor REAL,

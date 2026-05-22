@@ -415,6 +415,10 @@ function updatePropertyResults(data) {
     setText('snapshot-half-baths', formatHalfBaths(target.bathroomCount));
     setText('snapshot-year-built', target.yearBuilt ? formatYear(target.yearBuilt) : 'N/A');
     setText('snapshot-municipality', target.municipalityName || 'N/A');
+    setText('snapshot-township', target.townshipName || 'N/A');
+    setText('snapshot-appeal-area', target.appealCalendar?.areaName || 'Not matched');
+    setText('snapshot-appeal-deadline', target.appealCalendar?.lastFileDate || 'N/A');
+    setText('snapshot-board-review', target.appealCalendar?.boardOfReviewAppealDates || 'N/A');
     setText('snapshot-single-multi', target.singleVsMultiFamily || 'N/A');
     setText('snapshot-basement', target.finishedBasement || 'N/A');
     setText('snapshot-garage', target.garageSize || 'N/A');

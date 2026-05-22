@@ -1,4 +1,5 @@
 import { getAddressSuggestions } from '../_property_addresses.js';
+import { getAppealCalendarForProperty } from '../_appeal_calendar.js';
 
 const EARTH_RADIUS_MILES = 3958.8;
 const RESIDENTIAL_CLASS_CODES = new Set([
@@ -41,6 +42,8 @@ const PROPERTY_SELECT = `
         municipality_number,
         municipality_name,
         tax_municipality_name,
+        township_name,
+        township_code,
         cmap_walkability_total_score,
         cmap_walkability_no_transit_score,
         flood_fs_factor,
@@ -105,6 +108,8 @@ function rowToProperty(row) {
                 municipalityNumber: toNumber(row.municipality_number),
                 municipalityName: row.municipality_name,
                 taxMunicipalityName: row.tax_municipality_name,
+                townshipName: row.township_name,
+                townshipCode: row.township_code,
                 cmapWalkabilityTotalScore: toNumber(row.cmap_walkability_total_score),
                 cmapWalkabilityNoTransitScore: toNumber(row.cmap_walkability_no_transit_score),
                 floodFsFactor: toNumber(row.flood_fs_factor),
@@ -182,6 +187,8 @@ function aggregatePropertiesByAddress(properties, preferredClassCode = null) {
                         municipalityNumber: toNumber(firstValid(orderedGroup.map(item => item.municipalityNumber))),
                         municipalityName: firstValid(orderedGroup.map(item => item.municipalityName)),
                         taxMunicipalityName: firstValid(orderedGroup.map(item => item.taxMunicipalityName)),
+                        townshipName: firstValid(orderedGroup.map(item => item.townshipName)),
+                        townshipCode: firstValid(orderedGroup.map(item => item.townshipCode)),
                         cmapWalkabilityTotalScore: toNumber(firstValid(orderedGroup.map(item => item.cmapWalkabilityTotalScore))),
                         cmapWalkabilityNoTransitScore: toNumber(firstValid(orderedGroup.map(item => item.cmapWalkabilityNoTransitScore))),
                         floodFsFactor: toNumber(firstValid(orderedGroup.map(item => item.floodFsFactor))),
@@ -650,16 +657,20 @@ export async function findComparableProperties(db, target, radius) {
 }
 
 export function buildAnalysis(target, comparables, radius, env) {
+        const targetWithCalendar = target ? {
+                ...target,
+                appealCalendar: getAppealCalendarForProperty(target)
+        } : target;
         const averageComparableValue = comparables.length
                 ? comparables.reduce((sum, item) => sum + (item.taxableValue || 0), 0) / comparables.length
                 : null;
-        const lowerValueCount = target
-                ? comparables.filter(item => item.taxableValue !== null && item.taxableValue < target.taxableValue).length
+        const lowerValueCount = targetWithCalendar
+                ? comparables.filter(item => item.taxableValue !== null && item.taxableValue < targetWithCalendar.taxableValue).length
                 : 0;
-        const stats = target ? compUniformityStats(target, comparables) : null;
+        const stats = targetWithCalendar ? compUniformityStats(targetWithCalendar, comparables) : null;
 
         return {
-                target,
+                target: targetWithCalendar,
                 comparables,
                 radius,
                 summary: {
@@ -670,10 +681,10 @@ export function buildAnalysis(target, comparables, radius, env) {
                         medianComparableValuePerSqft: stats?.medianValuePerSqft ?? null,
                         lowerValuePerSqftCount: stats?.lowerValuePerSqftCount ?? 0,
                         validValuePerSqftComparables: stats?.validValuePerSqftComparables ?? 0,
-                        differenceFromAverage: averageComparableValue === null || !target
+                        differenceFromAverage: averageComparableValue === null || !targetWithCalendar
                                 ? null
-                                : target.taxableValue - averageComparableValue
+                                : targetWithCalendar.taxableValue - averageComparableValue
                 },
-                appeal: decisionFor(target, comparables, radius, env)
+                appeal: decisionFor(targetWithCalendar, comparables, radius, env)
         };
 }

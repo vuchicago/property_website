@@ -52,3 +52,7 @@ df_duplicated[df_duplicated.pin=='27162050090000']
 df_duplicated[df_duplicated['Nearby Address']=='9845 El Cameno Ln, Orland Park, IL 60462']
 
 # %%
+df_output_all2025['Chicago Community Area'].value_counts()
+# %%
+df_output_all2025['Township Name'].value_counts()
+# %%

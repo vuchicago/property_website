@@ -15,6 +15,8 @@ UPDATE_COLUMNS = {
     "zip_code": "Zip Code",
     "mailing_name": "Mailing Name",
     "mailing_address": "Mailing Address",
+    "township_name": "Township Name",
+    "township_code": "Township Code",
 }
 
 
@@ -77,6 +79,8 @@ def row_to_update(row: dict) -> str | None:
         "zip_code": clean_number(row.get("Zip Code"), integer=True),
         "mailing_name": clean_string(row.get("Mailing Name")),
         "mailing_address": clean_string(row.get("Mailing Address")),
+        "township_name": clean_string(row.get("Township Name")),
+        "township_code": clean_string(row.get("Township Code")),
     }
 
     assignments = ", ".join(f"{column} = {sql_literal(value)}" for column, value in values.items())

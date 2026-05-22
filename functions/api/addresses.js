@@ -1,4 +1,5 @@
 import { requireFirebaseUser, jsonResponse } from './_auth.js';
+import { getAppealCalendarForProperty } from './_appeal_calendar.js';
 import { findBestPropertyAddress, getPropertyAddressCount } from './_property_addresses.js';
 
 const PROPERTY_GROUP_KEY = `CASE
@@ -55,6 +56,8 @@ export const onRequestGet = async (context) => {
                                     'municipalityNumber', municipality_number,
                                     'municipalityName', municipality_name,
                                     'taxMunicipalityName', tax_municipality_name,
+                                    'townshipName', township_name,
+                                    'townshipCode', township_code,
                                     'cmapWalkabilityTotalScore', cmap_walkability_total_score,
                                     'cmapWalkabilityNoTransitScore', cmap_walkability_no_transit_score,
                                     'floodFsFactor', flood_fs_factor,
@@ -71,11 +74,18 @@ export const onRequestGet = async (context) => {
                          ORDER BY user_addresses.created_at DESC`
                 ).bind(user.uid).all();
 
-                return jsonResponse(results.map(row => ({
-                        ...row,
-                        propertyDetails: row.property_details ? JSON.parse(row.property_details) : null,
-                        property_details: undefined
-                })));
+                return jsonResponse(results.map(row => {
+                        const propertyDetails = row.property_details ? JSON.parse(row.property_details) : null;
+                        if (propertyDetails) {
+                                propertyDetails.appealCalendar = getAppealCalendarForProperty(propertyDetails);
+                        }
+
+                        return {
+                                ...row,
+                                propertyDetails,
+                                property_details: undefined
+                        };
+                }));
         } catch (err) {
                 return jsonResponse({ error: err.message }, 500);
         }
