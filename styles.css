@@ -2765,6 +2765,12 @@ ol {
     min-height: 220px;
 }
 
+.chart-subheading {
+    border-top: 1px solid var(--dark-100);
+    margin-top: var(--space-6);
+    padding-top: var(--space-6);
+}
+
 .property-tax-chart-row {
     display: grid;
     gap: var(--space-2);

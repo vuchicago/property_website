@@ -419,7 +419,26 @@ function updatePropertyResults(data) {
     }
 
     renderComparableRows(target, data.comparables);
-    updateComparisonChart(target.taxableValue, summary.averageComparableValue);
+    updateComparisonChart(
+        'comparison-chart',
+        target.taxableValue,
+        summary.averageComparableValue,
+        {
+            yourLabel: 'Your Taxable Value',
+            compLabel: 'Average Comp Taxable Value',
+            formatter: formatCurrency
+        }
+    );
+    updateComparisonChart(
+        'comparison-chart-per-sqft',
+        summary.subjectValuePerSqft,
+        averageComparableValuePerSqft(data.comparables),
+        {
+            yourLabel: 'Your Taxable Value / Sqft',
+            compLabel: 'Average Comp Taxable Value / Sqft',
+            formatter: formatCurrencyPerSqft
+        }
+    );
     document.getElementById('export-csv').disabled = data.comparables.length === 0;
 }
 
@@ -583,8 +602,8 @@ function renderComparableHeader() {
         .join('');
 }
 
-function updateComparisonChart(yourValue, avgValue) {
-    const container = document.getElementById('comparison-chart');
+function updateComparisonChart(containerId, yourValue, avgValue, options = {}) {
+    const container = document.getElementById(containerId);
     if (!container) return;
 
     if (!avgValue) {
@@ -592,24 +611,40 @@ function updateComparisonChart(yourValue, avgValue) {
         return;
     }
 
+    const formatter = options.formatter || formatCurrency;
     const maxValue = Math.max(yourValue || 0, avgValue || 0);
     const yourWidth = Math.max(4, (yourValue / maxValue) * 100);
     const avgWidth = Math.max(4, (avgValue / maxValue) * 100);
 
     container.innerHTML = `
         <div class="property-tax-chart-row">
-            <span>Your Taxable Value</span>
+            <span>${escapeHtml(options.yourLabel || 'Your Value')}</span>
             <div class="property-tax-chart-track">
-                <div class="property-tax-chart-fill your-property" style="width:${yourWidth}%">${formatCurrency(yourValue)}</div>
+                <div class="property-tax-chart-fill your-property" style="width:${yourWidth}%">${formatter(yourValue)}</div>
             </div>
         </div>
         <div class="property-tax-chart-row">
-            <span>Average Comp Taxable Value</span>
+            <span>${escapeHtml(options.compLabel || 'Average Comp Value')}</span>
             <div class="property-tax-chart-track">
-                <div class="property-tax-chart-fill avg-comps" style="width:${avgWidth}%">${formatCurrency(avgValue)}</div>
+                <div class="property-tax-chart-fill avg-comps" style="width:${avgWidth}%">${formatter(avgValue)}</div>
             </div>
         </div>
     `;
+}
+
+function averageComparableValuePerSqft(comparables) {
+    const values = (comparables || [])
+        .map(item => {
+            const taxableValue = Number(item.taxableValue);
+            const homeSize = Number(item.homeSize);
+            return Number.isFinite(taxableValue) && Number.isFinite(homeSize) && homeSize > 0
+                ? taxableValue / homeSize
+                : null;
+        })
+        .filter(value => value !== null);
+
+    if (!values.length) return null;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
 function initializeMap(data) {
@@ -819,6 +854,16 @@ function formatCurrency(value) {
         currency: 'USD',
         maximumFractionDigits: 0
     }).format(number);
+}
+
+function formatCurrencyPerSqft(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 'N/A';
+    return `${new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 2
+    }).format(number)}/sqft`;
 }
 
 function formatNumber(value) {
