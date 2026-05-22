@@ -267,6 +267,47 @@ function buildCandidateQuery(query, limit, { broad = false } = {}) {
         };
 }
 
+function buildStreetTokenQuery(query, limit) {
+        const canonicalQuery = canonicalAddress(query);
+        const tokens = addressTokens(canonicalQuery);
+        const firstNumber = tokens.find(token => /^\d+$/.test(token));
+        const streetToken = tokens.find(token => !/^\d+$/.test(token) && token.length >= 3);
+
+        if (!firstNumber || !streetToken) {
+                return null;
+        }
+
+        const propertyKey = `CASE
+                        WHEN pin_proration_rate IS NOT NULL AND pin_proration_rate < 1
+                        THEN normalized_address || '|fractional'
+                        ELSE normalized_address || '|pin:' || COALESCE(pin, id)
+                      END`;
+
+        return {
+                sql: `SELECT
+                        MIN(id) AS id,
+                        group_concat(pin, ', ') AS pin,
+                        address,
+                        normalized_address,
+                        ${propertyKey} AS property_key,
+                        MAX(mailing_name) AS mailing_name,
+                        SUM(pin_proration_rate) AS pin_proration_rate
+                      FROM property_addresses
+                      WHERE normalized_address >= ?
+                        AND normalized_address < ?
+                        AND normalized_address LIKE ?
+                      GROUP BY property_key
+                      ORDER BY normalized_address
+                      LIMIT ?`,
+                params: [
+                        firstNumber,
+                        prefixUpperBound(firstNumber),
+                        `%${streetToken}%`,
+                        Math.max(limit * 12, 60)
+                ]
+        };
+}
+
 export async function getAddressSuggestions(db, query, limit = 5) {
         const normalizedQuery = normalizeAddress(query);
 
@@ -305,11 +346,18 @@ export async function getAddressSuggestions(db, query, limit = 5) {
                 return fastSuggestions;
         }
 
+        const streetTokenQuery = buildStreetTokenQuery(normalizedQuery, limit);
+        let streetTokenSuggestions = [];
+        if (streetTokenQuery) {
+                const streetTokenResults = await db.prepare(streetTokenQuery.sql).bind(...streetTokenQuery.params).all();
+                streetTokenSuggestions = rankCandidates(streetTokenResults.results);
+        }
+
         const broadQuery = buildCandidateQuery(normalizedQuery, limit, { broad: true });
         const broadResults = await db.prepare(broadQuery.sql).bind(...broadQuery.params).all();
         const byPropertyKey = new Map();
 
-        [...fastSuggestions, ...rankCandidates(broadResults.results)].forEach(candidate => {
+        [...fastSuggestions, ...streetTokenSuggestions, ...rankCandidates(broadResults.results)].forEach(candidate => {
                 const key = candidate.property_key || candidate.id;
                 const existing = byPropertyKey.get(key);
                 if (!existing || candidate.score > existing.score) {

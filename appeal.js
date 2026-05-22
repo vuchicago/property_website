@@ -174,7 +174,7 @@ async function handleAppealPayment() {
         }
 
         // Get current user
-        const { auth, authFetch } = await import('./auth.js');
+        const { auth, authFetch } = await import('./auth-client.js');
         const user = auth.currentUser;
 
         if (!user) {
@@ -252,7 +252,7 @@ async function updateAppealAddressSuggestions(query, forceVisible = false) {
         suggestionsPanel.classList.add('is-visible');
 
         try {
-                const { authFetch } = await import('./auth.js');
+                const { authFetch } = await import('./auth-client.js');
                 const response = await authFetch(`/api/address-lookup?q=${encodeURIComponent(query)}&limit=5`);
                 if (!response.ok) {
                         const error = await response.json().catch(() => ({}));

@@ -1,4 +1,4 @@
-import { auth, authFetch } from './auth.js';
+import { auth, authFetch } from './auth-client.js';
 
 let currentUserEmail = null;
 let currentRole = null;

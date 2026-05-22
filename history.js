@@ -1,4 +1,4 @@
-import { auth, authFetch } from './auth.js';
+import { auth, authFetch } from './auth-client.js';
 
 let userAddresses = [];
 let allAppeals = [];
@@ -233,9 +233,7 @@ function selectAddress(propertyKey) {
                         details?.lastAppealYear ? ['Last Appeal', details.lastAppealYear] : null,
                         details?.municipalityName ? ['Municipality', details.municipalityName] : null,
                         details?.townshipName ? ['Township', details.townshipName] : null,
-                        details?.appealCalendar?.areaName ? ['Appeal Area', details.appealCalendar.areaName] : null,
                         details?.appealCalendar?.nextAppealWindow ? ['Next Appeal Window', details.appealCalendar.nextAppealWindow] : null,
-                        details?.appealCalendar?.lastFileDate ? ['Assessor Deadline', details.appealCalendar.lastFileDate] : null,
                         details?.appealCalendar?.boardOfReviewAppealDates ? ['Board Review', details.appealCalendar.boardOfReviewAppealDates] : null,
                         details?.mailingName ? ['Mailing Name', details.mailingName] : null,
                         details?.mailingAddress ? ['Mailing Address', details.mailingAddress] : null
