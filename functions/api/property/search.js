@@ -2,10 +2,6 @@ import { jsonResponse } from '../_auth.js';
 import { buildAnalysis, findComparableProperties, findTargetProperty } from './_compare.js';
 
 const NUMERIC_SIMULATION_FIELDS = new Set([
-        'taxableValue',
-        'certifiedLand',
-        'certifiedBuilding',
-        'homeSize',
         'yearBuilt',
         'bedroomCount',
         'bathroomCount'

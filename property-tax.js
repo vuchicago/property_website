@@ -2,28 +2,29 @@ let propertyMap = null;
 let selectedProperty = null;
 let searchResults = null;
 let suggestionAbort = null;
+let comparableSort = { index: null, direction: 'asc' };
 const COMPARABLE_COLUMNS = [
-    { label: 'Address', value: c => escapeHtml(c.address) },
-    { label: 'Taxable Value', value: c => formatCurrency(c.taxableValue) },
-    { label: 'Last Appeal', value: c => escapeHtml(formatLastAppeal(c.lastAppealYear)) },
-    { label: 'Home Size', value: c => c.homeSize ? `${formatNumber(c.homeSize)} sqft` : 'N/A' },
-    { label: 'Year Built', value: c => c.yearBuilt ? formatYear(c.yearBuilt) : 'N/A' },
-    { label: 'Beds', value: c => c.bedroomCount === null ? 'N/A' : formatNumber(c.bedroomCount) },
-    { label: 'Baths', value: c => c.bathroomCount === null ? 'N/A' : formatNumber(c.bathroomCount) },
-    { label: 'Distance', value: c => c.isSubjectProperty ? 'Searched Address' : (c.distanceMiles === null || c.distanceMiles === undefined ? 'N/A' : `${c.distanceMiles.toFixed(2)} mi`) },
-    { label: 'Certified Land', value: c => c.certifiedLand === null ? 'N/A' : formatCurrency(c.certifiedLand) },
-    { label: 'Certified Building', value: c => c.certifiedBuilding === null ? 'N/A' : formatCurrency(c.certifiedBuilding) },
-    { label: 'Masonry', value: c => escapeHtml(c.masonryType || 'N/A') },
-    { label: 'Repair', value: c => escapeHtml(c.repairCondition || 'N/A') },
-    { label: 'Basement', value: c => escapeHtml(c.finishedBasement || 'N/A') },
-    { label: 'Single/Multi', value: c => escapeHtml(c.singleVsMultiFamily || 'N/A') },
-    { label: 'Neighborhood', value: c => escapeHtml(c.neighborhoodCode || 'N/A') },
-    { label: 'Garage', value: c => escapeHtml(c.garageSize || 'N/A') },
-    { label: 'Class', value: c => escapeHtml(c.propertyClass || c.classCode || 'N/A') },
-    { label: 'PIN Proration Code', value: c => c.pinProrationRate === null || c.pinProrationRate === undefined ? 'N/A' : escapeHtml(formatNumber(c.pinProrationRate)) },
-    { label: 'Walkability Score', value: c => c.cmapWalkabilityTotalScore === null || c.cmapWalkabilityTotalScore === undefined ? 'N/A' : formatNumber(c.cmapWalkabilityTotalScore) },
-    { label: 'Municipality', value: c => escapeHtml(c.municipalityName || 'N/A') },
-    { label: 'PIN', value: c => escapeHtml(c.pin || 'N/A') }
+    { label: 'Address', value: c => escapeHtml(c.address), sortValue: c => c.address },
+    { label: 'Taxable Value', value: c => formatCurrency(c.taxableValue), sortValue: c => c.taxableValue },
+    { label: 'Last Appeal', value: c => escapeHtml(formatLastAppeal(c.lastAppealYear)), sortValue: c => Number(c.lastAppealYear) || c.lastAppealYear },
+    { label: 'Home Size', value: c => c.homeSize ? `${formatNumber(c.homeSize)} sqft` : 'N/A', sortValue: c => c.homeSize },
+    { label: 'Year Built', value: c => c.yearBuilt ? formatYear(c.yearBuilt) : 'N/A', sortValue: c => c.yearBuilt },
+    { label: 'Beds', value: c => c.bedroomCount === null ? 'N/A' : formatNumber(c.bedroomCount), sortValue: c => c.bedroomCount },
+    { label: 'Baths', value: c => c.bathroomCount === null ? 'N/A' : formatNumber(c.bathroomCount), sortValue: c => c.bathroomCount },
+    { label: 'Distance', value: c => c.isSubjectProperty ? 'Searched Address' : (c.distanceMiles === null || c.distanceMiles === undefined ? 'N/A' : `${c.distanceMiles.toFixed(2)} mi`), sortValue: c => c.distanceMiles },
+    { label: 'Certified Land', value: c => c.certifiedLand === null ? 'N/A' : formatCurrency(c.certifiedLand), sortValue: c => c.certifiedLand },
+    { label: 'Certified Building', value: c => c.certifiedBuilding === null ? 'N/A' : formatCurrency(c.certifiedBuilding), sortValue: c => c.certifiedBuilding },
+    { label: 'Masonry', value: c => escapeHtml(c.masonryType || 'N/A'), sortValue: c => c.masonryType },
+    { label: 'Repair', value: c => escapeHtml(c.repairCondition || 'N/A'), sortValue: c => c.repairCondition },
+    { label: 'Basement', value: c => escapeHtml(c.finishedBasement || 'N/A'), sortValue: c => c.finishedBasement },
+    { label: 'Single/Multi', value: c => escapeHtml(c.singleVsMultiFamily || 'N/A'), sortValue: c => c.singleVsMultiFamily },
+    { label: 'Neighborhood', value: c => escapeHtml(c.neighborhoodCode || 'N/A'), sortValue: c => c.neighborhoodCode },
+    { label: 'Garage', value: c => escapeHtml(c.garageSize || 'N/A'), sortValue: c => c.garageSize },
+    { label: 'Class', value: c => escapeHtml(c.propertyClass || c.classCode || 'N/A'), sortValue: c => c.propertyClass || c.classCode },
+    { label: 'PIN Proration Code', value: c => c.pinProrationRate === null || c.pinProrationRate === undefined ? 'N/A' : escapeHtml(formatNumber(c.pinProrationRate)), sortValue: c => c.pinProrationRate },
+    { label: 'Walkability Score', value: c => c.cmapWalkabilityTotalScore === null || c.cmapWalkabilityTotalScore === undefined ? 'N/A' : formatNumber(c.cmapWalkabilityTotalScore), sortValue: c => c.cmapWalkabilityTotalScore },
+    { label: 'Municipality', value: c => escapeHtml(c.municipalityName || 'N/A'), sortValue: c => c.municipalityName },
+    { label: 'PIN', value: c => escapeHtml(c.pin || 'N/A'), sortValue: c => c.pin }
 ];
 
 document.addEventListener('DOMContentLoaded', initPropertyTaxTool);
@@ -37,12 +38,14 @@ function initPropertyTaxTool() {
     const searchBtn = document.getElementById('search-property');
     const resetBtn = document.getElementById('reset-search');
     const simulateBtn = document.getElementById('simulate-search');
+    const resultSimulateBtn = document.getElementById('result-simulate-search');
     const simulationForm = document.getElementById('simulation-panel');
     const resetSimulationBtn = document.getElementById('reset-simulation');
     const addressInput = document.getElementById('property-address');
     const suggestions = document.getElementById('property-address-suggestions');
     const exportCsvBtn = document.getElementById('export-csv');
     const increaseRadiusBtn = document.getElementById('increase-radius-search');
+    const compsHeader = document.getElementById('comps-table-header');
 
     renderComparableHeader();
 
@@ -85,6 +88,20 @@ function initPropertyTaxTool() {
         selectSuggestion(button);
     });
 
+    compsHeader?.addEventListener('click', event => {
+        const button = event.target.closest('[data-sort-index]');
+        if (!button || !searchResults?.target) return;
+
+        const index = Number(button.dataset.sortIndex);
+        if (comparableSort.index === index) {
+            comparableSort.direction = comparableSort.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+            comparableSort = { index, direction: 'asc' };
+        }
+
+        renderComparableRows(searchResults.target, searchResults.comparables || []);
+    });
+
     searchBtn?.addEventListener('click', () => {
         if (!selectedProperty) {
             showNotification('Please choose a property from the suggestions', 'error');
@@ -95,15 +112,18 @@ function initPropertyTaxTool() {
     });
 
     resetBtn?.addEventListener('click', resetPropertyResults);
-    simulateBtn?.addEventListener('click', () => {
+    const openSimulationPanel = () => {
         if (!searchResults?.target) {
             showNotification('Run an analysis before simulating changes.', 'error');
             return;
         }
 
         populateSimulationForm(searchResults.target);
-        simulationForm.hidden = !simulationForm.hidden;
-    });
+        simulationForm.hidden = false;
+        simulationForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+    simulateBtn?.addEventListener('click', openSimulationPanel);
+    resultSimulateBtn?.addEventListener('click', openSimulationPanel);
     resetSimulationBtn?.addEventListener('click', () => {
         if (searchResults?.target) {
             populateSimulationForm(searchResults.target);
@@ -270,6 +290,10 @@ async function searchProperty(radius, options = {}) {
     searchBtn.innerHTML = '<svg class="spinner" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" opacity="0.3" fill="none"/><path d="M12 2C6.477 2 2 6.477 2 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg> Analyzing';
 
     try {
+        if (!options.preserveSort) {
+            comparableSort = { index: null, direction: 'asc' };
+        }
+
         const response = await fetch('/api/property/search', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -348,10 +372,6 @@ function updatePropertyResults(data) {
 
 function simulationFieldMap() {
     return {
-        taxableValue: 'simulate-taxable-value',
-        certifiedLand: 'simulate-certified-land',
-        certifiedBuilding: 'simulate-certified-building',
-        homeSize: 'simulate-home-size',
         yearBuilt: 'simulate-year-built',
         bedroomCount: 'simulate-bedroom-count',
         bathroomCount: 'simulate-bathroom-count',
@@ -371,10 +391,6 @@ function populateSimulationForm(target) {
 
 function readSimulationForm() {
     const numericFields = new Set([
-        'taxableValue',
-        'certifiedLand',
-        'certifiedBuilding',
-        'homeSize',
         'yearBuilt',
         'bedroomCount',
         'bathroomCount'
@@ -442,12 +458,45 @@ function renderComparableRows(target, comparables) {
     const rows = target
         ? [{ ...target, distanceMiles: null, isSubjectProperty: true }, ...comparables]
         : comparables;
+    const sortedRows = sortComparableRows(rows);
 
-    body.innerHTML = rows.map(c => `
+    body.innerHTML = sortedRows.map(c => `
         <tr${c.isSubjectProperty ? ' class="subject-property-row"' : ''}>
             ${COMPARABLE_COLUMNS.map(column => `<td>${column.value(c)}</td>`).join('')}
         </tr>
     `).join('');
+}
+
+function sortComparableRows(rows) {
+    if (comparableSort.index === null) {
+        return rows;
+    }
+
+    const column = COMPARABLE_COLUMNS[comparableSort.index];
+    if (!column?.sortValue) {
+        return rows;
+    }
+
+    const direction = comparableSort.direction === 'desc' ? -1 : 1;
+    return [...rows].sort((left, right) => {
+        const leftValue = column.sortValue(left);
+        const rightValue = column.sortValue(right);
+        const leftMissing = leftValue === null || leftValue === undefined || leftValue === '';
+        const rightMissing = rightValue === null || rightValue === undefined || rightValue === '';
+
+        if (leftMissing && rightMissing) return 0;
+        if (leftMissing) return 1;
+        if (rightMissing) return -1;
+
+        if (typeof leftValue === 'number' && typeof rightValue === 'number') {
+            return (leftValue - rightValue) * direction;
+        }
+
+        return String(leftValue).localeCompare(String(rightValue), undefined, {
+            numeric: true,
+            sensitivity: 'base'
+        }) * direction;
+    });
 }
 
 function renderComparableHeader() {
@@ -455,7 +504,11 @@ function renderComparableHeader() {
     if (!headerRow) return;
 
     headerRow.innerHTML = COMPARABLE_COLUMNS
-        .map(column => `<th>${escapeHtml(column.label)}</th>`)
+        .map((column, index) => {
+            const isSorted = comparableSort.index === index;
+            const indicator = isSorted ? (comparableSort.direction === 'asc' ? ' ↑' : ' ↓') : '';
+            return `<th><button type="button" class="table-sort-btn${isSorted ? ' is-active' : ''}" data-sort-index="${index}">${escapeHtml(column.label)}${indicator}</button></th>`;
+        })
         .join('');
 }
 
@@ -568,6 +621,7 @@ function activateTab(tabName) {
 function resetPropertyResults() {
     selectedProperty = null;
     searchResults = null;
+    comparableSort = { index: null, direction: 'asc' };
     document.getElementById('property-address').value = '';
     document.getElementById('search-radius').value = '0.5';
     document.getElementById('radius-value').textContent = '0.5';

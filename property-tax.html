@@ -226,7 +226,10 @@
                                 </button>
                                 <button type="button" class="btn btn-secondary" id="reset-search">Clear</button>
                                 <button type="button" class="btn btn-secondary" id="simulate-search" disabled
-                                    title="Use Simulate if you believe the county data shown here is incorrect.">Simulate</button>
+                                    title="Use Simulate if you believe the county data shown here is incorrect.">
+                                    <span>Simulate</span>
+                                    <small>Simulate with corrected data</small>
+                                </button>
                             </div>
                         </div>
                         <p class="property-tax-picked" id="selected-property">Enter an address and choose the closest
@@ -237,18 +240,6 @@
                                 <button type="button" class="btn btn-secondary btn-sm" id="reset-simulation">Reset</button>
                             </div>
                             <div class="simulation-grid">
-                                <label>Taxable Value
-                                    <input type="number" id="simulate-taxable-value" min="0" step="1">
-                                </label>
-                                <label>Home Size
-                                    <input type="number" id="simulate-home-size" min="0" step="1">
-                                </label>
-                                <label>Certified Land
-                                    <input type="number" id="simulate-certified-land" min="0" step="1">
-                                </label>
-                                <label>Certified Building
-                                    <input type="number" id="simulate-certified-building" min="0" step="1">
-                                </label>
                                 <label>Bedrooms
                                     <input type="number" id="simulate-bedroom-count" min="0" step="0.5">
                                 </label>
@@ -259,13 +250,30 @@
                                     <input type="number" id="simulate-year-built" min="1800" max="2100" step="1">
                                 </label>
                                 <label>Masonry Type
-                                    <input type="text" id="simulate-masonry-type">
+                                    <select id="simulate-masonry-type">
+                                        <option value="">Not specified</option>
+                                        <option value="Frame">Frame</option>
+                                        <option value="Frame + Masonry">Frame + Masonry</option>
+                                        <option value="Masonry">Masonry</option>
+                                        <option value="None">None</option>
+                                        <option value="Stucco">Stucco</option>
+                                    </select>
                                 </label>
                                 <label>Repair
-                                    <input type="text" id="simulate-repair-condition">
+                                    <select id="simulate-repair-condition">
+                                        <option value="">Not specified</option>
+                                        <option value="Above Average">Above Average</option>
+                                        <option value="Average">Average</option>
+                                        <option value="Below Average">Below Average</option>
+                                    </select>
                                 </label>
                                 <label>Single/Multi
-                                    <input type="text" id="simulate-single-vs-multi-family">
+                                    <select id="simulate-single-vs-multi-family">
+                                        <option value="">Not specified</option>
+                                        <option value="Single-Family">Single-Family</option>
+                                        <option value="Multi-Family">Multi-Family</option>
+                                        <option value="None">None</option>
+                                    </select>
                                 </label>
                             </div>
                             <button type="submit" class="btn btn-primary">Run Simulation</button>
@@ -283,10 +291,15 @@
                                 <span class="result-eyebrow">Result</span>
                                 <h2 id="decision-label">Analysis pending</h2>
                                 <p id="decision-reason">Run an analysis to see whether the comps suggest an appeal.</p>
-                                <p class="result-simulation-note">If any property information looks incorrect, use
-                                    Simulate to update the inputs and rerun a more accurate analysis.</p>
                                 <button type="button" class="btn btn-secondary result-action-btn"
                                     id="increase-radius-search" hidden>Try a wider radius</button>
+                                <p class="result-simulation-note">If any property information looks incorrect, use
+                                    Simulate to update the inputs and rerun a more accurate analysis.</p>
+                                <button type="button" class="btn btn-secondary btn-sm result-simulate-btn"
+                                    id="result-simulate-search">
+                                    <span>Simulate</span>
+                                    <small>Simulate with corrected data</small>
+                                </button>
                             </section>
                             <section class="dashboard-card">
                                 <div class="property-tax-card-header">
