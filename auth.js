@@ -209,7 +209,7 @@ const updateNavigation = (user) => {
                 if (user) {
                         dashboard.style.display = 'block';
                         // Load history
-                        import('./history.js?v=20260522-dashboard-cache').then(module => {
+                        import('./history.js?v=20260522-split-baths').then(module => {
                                 module.loadAppealHistory();
                         }).catch(err => console.error("Failed to load history module:", err));
                 } else {

@@ -431,7 +431,8 @@ function renderPropertyDetails(details) {
         const fields = [
                 ['Taxable Value', formatCurrency(details?.taxableValue)],
                 ['Bedrooms', formatNumber(details?.bedroomCount)],
-                ['Bathrooms', formatNumber(details?.bathroomCount)],
+                ['Full Baths', formatFullBaths(details?.bathroomCount)],
+                ['Half Baths', formatHalfBaths(details?.bathroomCount)],
                 ['Year Built', formatWholeNumber(details?.yearBuilt)],
                 ['Property Class', details?.propertyClass],
                 ['Single vs Multi-Family', details?.singleVsMultiFamily],
@@ -708,6 +709,30 @@ function formatCurrency(value) {
 function formatNumber(value, suffix = '') {
         if (value === null || value === undefined || value === '') return '';
         return `${Number(value).toLocaleString('en-US', { maximumFractionDigits: 1 })}${suffix}`;
+}
+
+function bathParts(value) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) {
+                return { fullBaths: null, halfBaths: null };
+        }
+
+        const fullBaths = Math.trunc(number);
+        const halfBaths = Math.round((number - fullBaths) * 2);
+        return {
+                fullBaths: fullBaths + Math.trunc(halfBaths / 2),
+                halfBaths: halfBaths % 2
+        };
+}
+
+function formatFullBaths(value) {
+        const { fullBaths } = bathParts(value);
+        return fullBaths === null ? '' : formatNumber(fullBaths);
+}
+
+function formatHalfBaths(value) {
+        const { halfBaths } = bathParts(value);
+        return halfBaths === null ? '' : formatNumber(halfBaths);
 }
 
 function formatWholeNumber(value) {

@@ -241,8 +241,11 @@
                                 <label>Bedrooms
                                     <input type="number" id="simulate-bedroom-count" min="0" step="0.5">
                                 </label>
-                                <label>Bathrooms
-                                    <input type="number" id="simulate-bathroom-count" min="0" step="0.5">
+                                <label>Full Baths
+                                    <input type="number" id="simulate-full-bath-count" min="0" step="1">
+                                </label>
+                                <label>Half Baths
+                                    <input type="number" id="simulate-half-bath-count" min="0" step="1">
                                 </label>
                                 <label>Year Built
                                     <input type="number" id="simulate-year-built" min="1800" max="2100" step="1">
@@ -303,7 +306,7 @@
                                     <div><span>Taxable Value</span><strong id="your-value">$0</strong></div>
                                     <div><span>Last Appeal</span><strong id="last-appeal">N/A</strong></div>
                                     <div><span>Size</span><strong id="home-size">N/A</strong></div>
-                                    <div><span>Beds / Baths</span><strong id="beds-baths">N/A</strong></div>
+                                    <div><span>Beds / Full / Half</span><strong id="beds-baths">N/A</strong></div>
                                     <div><span>Year Built</span><strong id="snapshot-year-built">N/A</strong></div>
                                     <div><span>Municipality</span><strong id="snapshot-municipality">N/A</strong></div>
                                 </div>
@@ -357,7 +360,8 @@
                                             <th>Home Size</th>
                                             <th>Year Built</th>
                                             <th>Beds</th>
-                                            <th>Baths</th>
+                                            <th>Full Baths</th>
+                                            <th>Half Baths</th>
                                             <th>Distance</th>
                                             <th>Certified Land</th>
                                             <th>Certified Building</th>
@@ -373,7 +377,7 @@
                                     </thead>
                                     <tbody id="comps-table-body">
                                         <tr class="placeholder-row">
-                                            <td colspan="18">Search for a property to see comparables</td>
+                                            <td colspan="22">Search for a property to see comparables</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -469,7 +473,7 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="components.js"></script>
     <script src="app.js"></script>
-    <script src="property-tax.js?v=20260522-simulation"></script>
+    <script src="property-tax.js?v=20260522-split-baths"></script>
     <script type="module">
         import { initAuthUI } from './auth.js';
         initAuthUI();

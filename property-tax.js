@@ -10,7 +10,8 @@ const COMPARABLE_COLUMNS = [
     { label: 'Home Size', value: c => c.homeSize ? `${formatNumber(c.homeSize)} sqft` : 'N/A', sortValue: c => c.homeSize },
     { label: 'Year Built', value: c => c.yearBuilt ? formatYear(c.yearBuilt) : 'N/A', sortValue: c => c.yearBuilt },
     { label: 'Beds', value: c => c.bedroomCount === null ? 'N/A' : formatNumber(c.bedroomCount), sortValue: c => c.bedroomCount },
-    { label: 'Baths', value: c => c.bathroomCount === null ? 'N/A' : formatNumber(c.bathroomCount), sortValue: c => c.bathroomCount },
+    { label: 'Full Baths', value: c => formatFullBaths(c.bathroomCount), sortValue: c => bathParts(c.bathroomCount).fullBaths },
+    { label: 'Half Baths', value: c => formatHalfBaths(c.bathroomCount), sortValue: c => bathParts(c.bathroomCount).halfBaths },
     { label: 'Distance', value: c => c.isSubjectProperty ? 'Searched Address' : (c.distanceMiles === null || c.distanceMiles === undefined ? 'N/A' : `${c.distanceMiles.toFixed(2)} mi`), sortValue: c => c.distanceMiles },
     { label: 'Certified Land', value: c => c.certifiedLand === null ? 'N/A' : formatCurrency(c.certifiedLand), sortValue: c => c.certifiedLand },
     { label: 'Certified Building', value: c => c.certifiedBuilding === null ? 'N/A' : formatCurrency(c.certifiedBuilding), sortValue: c => c.certifiedBuilding },
@@ -409,7 +410,7 @@ function updatePropertyResults(data) {
     setText('lower-value-count', summary.lowerValueCount.toLocaleString());
     setText('last-appeal', formatLastAppeal(target.lastAppealYear));
     setText('home-size', target.homeSize ? `${formatNumber(target.homeSize)} sqft` : 'N/A');
-    setText('beds-baths', target.bedroomCount !== null && target.bathroomCount !== null ? `${formatNumber(target.bedroomCount)} / ${formatNumber(target.bathroomCount)}` : 'N/A');
+    setText('beds-baths', target.bedroomCount !== null && target.bathroomCount !== null ? `${formatNumber(target.bedroomCount)} / ${formatFullBaths(target.bathroomCount)} full, ${formatHalfBaths(target.bathroomCount)} half` : 'N/A');
     setText('snapshot-year-built', target.yearBuilt ? formatYear(target.yearBuilt) : 'N/A');
     setText('snapshot-municipality', target.municipalityName || 'N/A');
     setText('snapshot-type', target.propertyClass || target.classCode || 'N/A');
@@ -426,7 +427,8 @@ function simulationFieldMap() {
     return {
         yearBuilt: 'simulate-year-built',
         bedroomCount: 'simulate-bedroom-count',
-        bathroomCount: 'simulate-bathroom-count',
+        fullBathCount: 'simulate-full-bath-count',
+        halfBathCount: 'simulate-half-bath-count',
         masonryType: 'simulate-masonry-type',
         repairCondition: 'simulate-repair-condition',
         singleVsMultiFamily: 'simulate-single-vs-multi-family'
@@ -437,6 +439,14 @@ function populateSimulationForm(target) {
     Object.entries(simulationFieldMap()).forEach(([field, id]) => {
         const input = document.getElementById(id);
         if (!input) return;
+        if (field === 'fullBathCount') {
+            input.value = bathParts(target?.bathroomCount).fullBaths ?? '';
+            return;
+        }
+        if (field === 'halfBathCount') {
+            input.value = bathParts(target?.bathroomCount).halfBaths ?? '';
+            return;
+        }
         input.value = target?.[field] === null || target?.[field] === undefined ? '' : target[field];
     });
 }
@@ -445,16 +455,26 @@ function readSimulationForm() {
     const numericFields = new Set([
         'yearBuilt',
         'bedroomCount',
-        'bathroomCount'
+        'fullBathCount',
+        'halfBathCount'
     ]);
 
-    return Object.entries(simulationFieldMap()).reduce((simulation, [field, id]) => {
+    const simulation = Object.entries(simulationFieldMap()).reduce((draft, [field, id]) => {
         const input = document.getElementById(id);
-        if (!input) return simulation;
+        if (!input) return draft;
         const value = input.value.trim();
-        simulation[field] = numericFields.has(field) ? (value === '' ? null : Number(value)) : value;
-        return simulation;
+        draft[field] = numericFields.has(field) ? (value === '' ? null : Number(value)) : value;
+        return draft;
     }, {});
+
+    const fullBaths = simulation.fullBathCount;
+    const halfBaths = simulation.halfBathCount;
+    simulation.bathroomCount = fullBaths === null && halfBaths === null
+        ? null
+        : (Number(fullBaths || 0) + Number(halfBaths || 0) * 0.5);
+    delete simulation.fullBathCount;
+    delete simulation.halfBathCount;
+    return simulation;
 }
 
 function updateWiderRadiusButton(data) {
@@ -704,7 +724,7 @@ function exportToCSV() {
     if (!searchResults) return;
 
     const rows = [
-        ['Address', 'Taxable Value', 'Last Appeal Year', 'Certified Land', 'Certified Building', 'Home Size', 'Year Built', 'Last Appeal Status', 'Beds', 'Baths', 'Masonry Type', 'Repair Condition', 'Finished Basement', 'Single vs Multi Family', 'Neighborhood Code', 'Garage Size', 'Class Description', 'PIN Proration Rate', 'PIN', 'PIN10', 'Latitude', 'Longitude', 'Class Code', 'Condo Unit Sqft', 'Condo Parking Space', 'Condo Common Area', 'Distance Miles'],
+        ['Address', 'Taxable Value', 'Last Appeal Year', 'Certified Land', 'Certified Building', 'Home Size', 'Year Built', 'Last Appeal Status', 'Beds', 'Full Baths', 'Half Baths', 'Masonry Type', 'Repair Condition', 'Finished Basement', 'Single vs Multi Family', 'Neighborhood Code', 'Garage Size', 'Class Description', 'PIN Proration Rate', 'PIN', 'PIN10', 'Latitude', 'Longitude', 'Class Code', 'Condo Unit Sqft', 'Condo Parking Space', 'Condo Common Area', 'Distance Miles'],
         [
             searchResults.target.address,
             searchResults.target.taxableValue,
@@ -715,7 +735,8 @@ function exportToCSV() {
             searchResults.target.yearBuilt || '',
             searchResults.target.lastAppealStatus || '',
             searchResults.target.bedroomCount || '',
-            searchResults.target.bathroomCount || '',
+            formatFullBaths(searchResults.target.bathroomCount),
+            formatHalfBaths(searchResults.target.bathroomCount),
             searchResults.target.masonryType || '',
             searchResults.target.repairCondition || '',
             searchResults.target.finishedBasement || '',
@@ -744,7 +765,8 @@ function exportToCSV() {
             c.yearBuilt || '',
             c.lastAppealStatus || '',
             c.bedroomCount || '',
-            c.bathroomCount || '',
+            formatFullBaths(c.bathroomCount),
+            formatHalfBaths(c.bathroomCount),
             c.masonryType || '',
             c.repairCondition || '',
             c.finishedBasement || '',
@@ -803,6 +825,30 @@ function formatNumber(value) {
     const number = Number(value);
     if (!Number.isFinite(number)) return 'N/A';
     return new Intl.NumberFormat('en-US', { maximumFractionDigits: number % 1 ? 1 : 0 }).format(number);
+}
+
+function bathParts(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+        return { fullBaths: null, halfBaths: null };
+    }
+
+    const fullBaths = Math.trunc(number);
+    const halfBaths = Math.round((number - fullBaths) * 2);
+    return {
+        fullBaths: fullBaths + Math.trunc(halfBaths / 2),
+        halfBaths: halfBaths % 2
+    };
+}
+
+function formatFullBaths(value) {
+    const { fullBaths } = bathParts(value);
+    return fullBaths === null ? 'N/A' : formatNumber(fullBaths);
+}
+
+function formatHalfBaths(value) {
+    const { halfBaths } = bathParts(value);
+    return halfBaths === null ? 'N/A' : formatNumber(halfBaths);
 }
 
 function formatYear(value) {
