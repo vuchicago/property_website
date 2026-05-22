@@ -360,7 +360,6 @@ function matchesComparableRules(candidate, target) {
                         within(candidate.bedroomCount, target.bedroomCount, target.bedroomCount + 1) &&
                         within(candidate.bathroomCount, target.bathroomCount, target.bathroomCount + 1) &&
                         sameValue(candidate.masonryType, target.masonryType) &&
-                        sameValue(candidate.pinProrationRate, target.pinProrationRate) &&
                         sameValue(candidate.singleVsMultiFamily, target.singleVsMultiFamily) &&
                         optionalNumericRange(candidate.yearBuilt, target.yearBuilt, null, null, 15) &&
                         optionalSameValue(candidate.repairCondition, target.repairCondition)
@@ -372,7 +371,6 @@ function matchesComparableRules(candidate, target) {
                         optionalNumericRange(candidate.homeSize, target.homeSize, 0.85, 1.15) &&
                         optionalNumericRange(candidate.bedroomCount, target.bedroomCount, null, null, 0) &&
                         optionalNumericRange(candidate.bathroomCount, target.bathroomCount, null, null, 1) &&
-                        optionalNumericRange(candidate.pinProrationRate, target.pinProrationRate, 0.9, 1.1) &&
                         optionalSameValue(candidate.condoParkingSpace, target.condoParkingSpace) &&
                         optionalSameValue(candidate.condoCommonArea, target.condoCommonArea);
         }

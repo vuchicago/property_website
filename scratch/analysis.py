@@ -3,9 +3,11 @@ import pandas as pd
 import os
 
 #%%
-os.chdir('/Users/vuchicago/Python/property_tax_data_big')
+data_big='/Users/vuchicago/Python/property_tax_data_big'
+data_current='/Users/vuchicago/Python/property_tax'
+os.chdir(data_current)
 df_output_all2025=pd.read_parquet('output_all_2025.parquet')
-df_output_all2025.head(100)
+print(df_output_all2025.shape)
 # %%
 appeals= 'Assessor_-_Appeals_20260306.csv'
 characteristics='Assessor_-_Single_and_Multi-Family_Improvement_Characteristics_20260314.csv'
@@ -22,7 +24,7 @@ def read_csv_for_tax_year(file_name, tax_year, chunksize=50_000, **read_csv_kwar
             chunks.append(chunk)
 
     return pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
-
+os.chdir(data_big)
 #%%
 df_parcel_universe=read_csv_for_tax_year(parcel_universe,tax_year=2026)
 #%%
