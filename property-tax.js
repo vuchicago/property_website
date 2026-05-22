@@ -10,7 +10,7 @@ const COMPARABLE_COLUMNS = [
     { label: 'Year Built', value: c => c.yearBuilt ? formatYear(c.yearBuilt) : 'N/A' },
     { label: 'Beds', value: c => c.bedroomCount === null ? 'N/A' : formatNumber(c.bedroomCount) },
     { label: 'Baths', value: c => c.bathroomCount === null ? 'N/A' : formatNumber(c.bathroomCount) },
-    { label: 'Distance', value: c => c.distanceMiles === null || c.distanceMiles === undefined ? 'N/A' : `${c.distanceMiles.toFixed(2)} mi` },
+    { label: 'Distance', value: c => c.isSubjectProperty ? 'Searched Address' : (c.distanceMiles === null || c.distanceMiles === undefined ? 'N/A' : `${c.distanceMiles.toFixed(2)} mi`) },
     { label: 'Certified Land', value: c => c.certifiedLand === null ? 'N/A' : formatCurrency(c.certifiedLand) },
     { label: 'Certified Building', value: c => c.certifiedBuilding === null ? 'N/A' : formatCurrency(c.certifiedBuilding) },
     { label: 'Masonry', value: c => escapeHtml(c.masonryType || 'N/A') },
@@ -20,6 +20,7 @@ const COMPARABLE_COLUMNS = [
     { label: 'Neighborhood', value: c => escapeHtml(c.neighborhoodCode || 'N/A') },
     { label: 'Garage', value: c => escapeHtml(c.garageSize || 'N/A') },
     { label: 'Class', value: c => escapeHtml(c.propertyClass || c.classCode || 'N/A') },
+    { label: 'PIN Proration Code', value: c => c.pinProrationRate === null || c.pinProrationRate === undefined ? 'N/A' : escapeHtml(formatNumber(c.pinProrationRate)) },
     { label: 'Walkability Score', value: c => c.cmapWalkabilityTotalScore === null || c.cmapWalkabilityTotalScore === undefined ? 'N/A' : formatNumber(c.cmapWalkabilityTotalScore) },
     { label: 'Municipality', value: c => escapeHtml(c.municipalityName || 'N/A') },
     { label: 'PIN', value: c => escapeHtml(c.pin || 'N/A') }
@@ -300,7 +301,7 @@ function updatePropertyResults(data) {
     setText('snapshot-municipality', target.municipalityName || 'N/A');
     setText('snapshot-type', target.propertyClass || target.classCode || 'N/A');
 
-    renderComparableRows(data.comparables);
+    renderComparableRows(target, data.comparables);
     updateComparisonChart(target.taxableValue, summary.averageComparableValue);
     document.getElementById('export-csv').disabled = data.comparables.length === 0;
 }
@@ -346,17 +347,21 @@ function updateDecision(appeal) {
     setText('decision-reason', appeal.reason || '');
 }
 
-function renderComparableRows(comparables) {
+function renderComparableRows(target, comparables) {
     const body = document.getElementById('comps-table-body');
     renderComparableHeader();
 
-    if (!comparables.length) {
+    if (!target && !comparables.length) {
         body.innerHTML = `<tr class="placeholder-row"><td colspan="${COMPARABLE_COLUMNS.length}">No comparable properties matched the current filters.</td></tr>`;
         return;
     }
 
-    body.innerHTML = comparables.map(c => `
-        <tr>
+    const rows = target
+        ? [{ ...target, distanceMiles: null, isSubjectProperty: true }, ...comparables]
+        : comparables;
+
+    body.innerHTML = rows.map(c => `
+        <tr${c.isSubjectProperty ? ' class="subject-property-row"' : ''}>
             ${COMPARABLE_COLUMNS.map(column => `<td>${column.value(c)}</td>`).join('')}
         </tr>
     `).join('');

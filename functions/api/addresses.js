@@ -46,7 +46,7 @@ export const onRequestGet = async (context) => {
                                     'bedroomCount', bedroom_count,
                                     'bathroomCount', bathroom_count,
                                     'singleVsMultiFamily', single_vs_multi_family,
-                                    'pinProrationRate', SUM(pin_proration_rate),
+                                    'pinProrationRate', MAX(pin_proration_rate),
                                     'mailingName', mailing_name,
                                     'mailingAddress', mailing_address,
                                     'propertyClass', property_class,

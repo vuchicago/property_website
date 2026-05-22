@@ -2696,6 +2696,11 @@ ol {
     margin-bottom: var(--space-5);
 }
 
+.subject-property-row {
+    background: var(--primary-light);
+    font-weight: 700;
+}
+
 .property-tax-bar-chart {
     display: grid;
     gap: var(--space-5);

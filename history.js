@@ -8,16 +8,23 @@ let selectedPropertyKeySuggestion = '';
 let currentSuggestions = [];
 let selectedAddressForImage = '';
 let selectedPinForImage = '';
+const DASHBOARD_CACHE_VERSION = '20260522-property-key';
 
 export async function loadAppealHistory() {
         const user = auth.currentUser;
         if (!user) return;
 
-        // Load both addresses and appeals
+        const hadCache = loadDashboardCache(user.uid);
+        if (hadCache) {
+                renderAccountSummary(user);
+                renderAddressList();
+        }
+
         await Promise.all([
                 fetchAddresses(),
                 fetchAppeals()
         ]);
+        saveDashboardCache(user.uid);
 
         renderAccountSummary(user);
         renderAddressList();
@@ -33,6 +40,41 @@ async function fetchAddresses() {
                 userAddresses = await response.json();
         } catch (error) {
                 console.error("Error fetching addresses:", error);
+        }
+}
+
+function dashboardCacheKey(uid) {
+        return `ctc-dashboard:${DASHBOARD_CACHE_VERSION}:${uid}`;
+}
+
+function loadDashboardCache(uid) {
+        try {
+                const raw = window.localStorage.getItem(dashboardCacheKey(uid));
+                if (!raw) return false;
+
+                const cached = JSON.parse(raw);
+                if (!Array.isArray(cached.userAddresses) || !Array.isArray(cached.allAppeals)) {
+                        return false;
+                }
+
+                userAddresses = cached.userAddresses;
+                allAppeals = cached.allAppeals;
+                return true;
+        } catch (error) {
+                console.warn('Could not load dashboard cache:', error);
+                return false;
+        }
+}
+
+function saveDashboardCache(uid) {
+        try {
+                window.localStorage.setItem(dashboardCacheKey(uid), JSON.stringify({
+                        cachedAt: Date.now(),
+                        userAddresses,
+                        allAppeals
+                }));
+        } catch (error) {
+                console.warn('Could not save dashboard cache:', error);
         }
 }
 
@@ -151,6 +193,7 @@ async function deleteAddress(address, propertyKey) {
                 }
 
                 await fetchAddresses();
+                if (auth.currentUser) saveDashboardCache(auth.currentUser.uid);
                 renderAccountSummary(auth.currentUser);
                 renderAddressList();
         } catch (error) {
@@ -508,6 +551,7 @@ function setupAddAddressForm() {
                                 hideAddressSuggestions('property-address-suggestions');
                                 // Refresh data
                                 await fetchAddresses();
+                                if (auth.currentUser) saveDashboardCache(auth.currentUser.uid);
                                 renderAccountSummary(auth.currentUser);
                                 renderAddressList();
                         } else {

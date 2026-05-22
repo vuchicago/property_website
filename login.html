@@ -503,7 +503,7 @@
 
         <!-- Auth Logic Script -->
         <script type="module">
-                import { loginUser, registerUser, signInWithGoogle, signInWithApple, logoutUser, onAuthUserChanged, sendCurrentUserVerificationEmail, refreshCurrentUser } from './auth.js?v=20260521-property-key';
+                import { loginUser, registerUser, signInWithGoogle, signInWithApple, logoutUser, onAuthUserChanged, sendCurrentUserVerificationEmail, refreshCurrentUser } from './auth.js?v=20260522-dashboard-cache';
 
                 const form = document.getElementById('auth-form');
                 const emailInput = document.getElementById('email');
@@ -681,7 +681,7 @@
                         dashboard.style.display = 'block';
                         hideVerificationPanel();
                         clearVerificationReturnFlag();
-                        const { loadAppealHistory } = await import('./history.js?v=20260521-property-key');
+                        const { loadAppealHistory } = await import('./history.js?v=20260522-dashboard-cache');
                         await loadAppealHistory();
                 }
 
