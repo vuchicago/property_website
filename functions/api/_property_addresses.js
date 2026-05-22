@@ -310,6 +310,7 @@ function buildStreetTokenQuery(query, limit) {
 
 export async function getAddressSuggestions(db, query, limit = 5) {
         const normalizedQuery = normalizeAddress(query);
+        const confidentSearchTableScore = 2200;
 
         if (normalizedQuery.length < 3) {
                 return [];
@@ -329,7 +330,10 @@ export async function getAddressSuggestions(db, query, limit = 5) {
                 const searchTableResults = await db.prepare(searchTableQuery.sql).bind(...searchTableQuery.params).all();
                 const searchTableSuggestions = rankCandidates(searchTableResults.results);
 
-                if (searchTableSuggestions.length || normalizedQuery.length < 6) {
+                if (
+                        normalizedQuery.length < 6 ||
+                        searchTableSuggestions.some(candidate => candidate.score >= confidentSearchTableScore)
+                ) {
                         return searchTableSuggestions;
                 }
         } catch (error) {
