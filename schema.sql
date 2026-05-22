@@ -78,6 +78,9 @@ CREATE TABLE IF NOT EXISTS property_addresses (
   condo_common_area INTEGER
 );
 
+CREATE INDEX IF NOT EXISTS idx_property_addresses_suggest_normalized
+ON property_addresses(normalized_address, pin);
+
 CREATE TABLE IF NOT EXISTS property_images (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   customer_id TEXT NOT NULL,

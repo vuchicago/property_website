@@ -142,7 +142,7 @@ function scoreAddressMatch(query, candidate) {
         return score;
 }
 
-function buildCandidateQuery(query, limit) {
+function buildCandidateQuery(query, limit, { broad = false } = {}) {
         const normalizedQuery = normalizeAddress(query);
         const canonicalQuery = canonicalAddress(query);
         const tokens = addressTokens(canonicalQuery);
@@ -171,12 +171,12 @@ function buildCandidateQuery(query, limit) {
         } else if (firstNumber) {
                 clauses.push('normalized_address LIKE ?');
                 params.push(`${firstNumber}%`);
-        } else if (streetToken) {
+        } else if (broad && streetToken) {
                 clauses.push('normalized_address LIKE ?');
                 params.push(`%${streetToken}%`);
         }
 
-        if (normalizedQuery.length >= 10) {
+        if (broad && normalizedQuery.length >= 10) {
                 clauses.push('normalized_address LIKE ?');
                 params.push(`%${normalizedQuery}%`);
         }
@@ -217,15 +217,36 @@ export async function getAddressSuggestions(db, query, limit = 5) {
                 return [];
         }
 
-        const { sql, params } = buildCandidateQuery(normalizedQuery, limit);
-        const { results } = await db.prepare(sql).bind(...params).all();
-
-        return (results || [])
+        const rankCandidates = results => (results || [])
                 .map(candidate => ({
                         ...candidate,
                         score: scoreAddressMatch(normalizedQuery, candidate)
                 }))
                 .filter(candidate => candidate.score > 0)
+                .sort((a, b) => b.score - a.score || a.address.length - b.address.length)
+                .slice(0, limit);
+
+        const fastQuery = buildCandidateQuery(normalizedQuery, limit);
+        const fastResults = await db.prepare(fastQuery.sql).bind(...fastQuery.params).all();
+        const fastSuggestions = rankCandidates(fastResults.results);
+
+        if (fastSuggestions.length >= limit || normalizedQuery.length < 6) {
+                return fastSuggestions;
+        }
+
+        const broadQuery = buildCandidateQuery(normalizedQuery, limit, { broad: true });
+        const broadResults = await db.prepare(broadQuery.sql).bind(...broadQuery.params).all();
+        const byPropertyKey = new Map();
+
+        [...fastSuggestions, ...rankCandidates(broadResults.results)].forEach(candidate => {
+                const key = candidate.property_key || candidate.id;
+                const existing = byPropertyKey.get(key);
+                if (!existing || candidate.score > existing.score) {
+                        byPropertyKey.set(key, candidate);
+                }
+        });
+
+        return Array.from(byPropertyKey.values())
                 .sort((a, b) => b.score - a.score || a.address.length - b.address.length)
                 .slice(0, limit);
 }
