@@ -377,7 +377,7 @@ async function searchLongerRadius(options = {}) {
     } finally {
         if (button) {
             button.disabled = false;
-            button.textContent = originalText || 'Try longer radius';
+            button.textContent = originalText || 'Try Wider Radius';
         }
     }
 }
@@ -476,9 +476,9 @@ function updateWiderRadiusButton(data) {
     button.classList.remove('btn-primary', 'appeal-cta-btn');
     button.classList.add('btn-secondary');
     if (canWiden) {
-        button.textContent = 'Try longer radius';
+        button.textContent = 'Try Wider Radius';
     } else {
-        button.textContent = 'Try longer radius';
+        button.textContent = 'Try Wider Radius';
     }
 }
 
@@ -697,7 +697,7 @@ function resetResultActionButton() {
     button.dataset.action = 'widen';
     button.classList.remove('btn-primary', 'appeal-cta-btn');
     button.classList.add('btn-secondary');
-    button.textContent = 'Try longer radius';
+    button.textContent = 'Try Wider Radius';
 }
 
 function exportToCSV() {
