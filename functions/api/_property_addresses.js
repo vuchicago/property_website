@@ -120,6 +120,8 @@ function scoreAddressMatch(query, candidate) {
         const queryTokens = addressTokens(canonicalQuery);
         const candidateTokens = addressTokens(canonicalCandidate);
         const candidateTokenSet = new Set(candidateTokens);
+        const queryNumber = queryTokens.find(token => /^\d+$/.test(token));
+        const queryStreetTokens = queryTokens.filter(token => !/^\d+$/.test(token) && token.length >= 3);
         let matchedTokens = 0;
 
         queryTokens.forEach((token, index) => {
@@ -131,6 +133,21 @@ function scoreAddressMatch(query, candidate) {
                         score += 55;
                 }
         });
+
+        if (queryNumber && candidateTokenSet.has(queryNumber)) {
+                score += 1200;
+                if (candidateTokens[0] === queryNumber) {
+                        score += 400;
+                }
+        }
+
+        const matchedStreetTokens = queryStreetTokens.filter(token => candidateTokenSet.has(token)).length;
+        if (queryStreetTokens.length) {
+                score += matchedStreetTokens * 900;
+                if (matchedStreetTokens === queryStreetTokens.length) {
+                        score += 1600;
+                }
+        }
 
         if (queryTokens.length) {
                 score += Math.round((matchedTokens / queryTokens.length) * 500);
@@ -308,9 +325,18 @@ function buildStreetTokenQuery(query, limit) {
         };
 }
 
+async function getStreetTokenSuggestions(db, normalizedQuery, limit, rankCandidates) {
+        const streetTokenQuery = buildStreetTokenQuery(normalizedQuery, limit);
+        if (!streetTokenQuery) {
+                return [];
+        }
+
+        const streetTokenResults = await db.prepare(streetTokenQuery.sql).bind(...streetTokenQuery.params).all();
+        return rankCandidates(streetTokenResults.results);
+}
+
 export async function getAddressSuggestions(db, query, limit = 5) {
         const normalizedQuery = normalizeAddress(query);
-        const confidentSearchTableScore = 2200;
 
         if (normalizedQuery.length < 3) {
                 return [];
@@ -330,11 +356,31 @@ export async function getAddressSuggestions(db, query, limit = 5) {
                 const searchTableResults = await db.prepare(searchTableQuery.sql).bind(...searchTableQuery.params).all();
                 const searchTableSuggestions = rankCandidates(searchTableResults.results);
 
-                if (
-                        normalizedQuery.length < 6 ||
-                        searchTableSuggestions.some(candidate => candidate.score >= confidentSearchTableScore)
-                ) {
+                if (normalizedQuery.length < 6) {
                         return searchTableSuggestions;
+                }
+
+                const streetTokenSuggestions = await getStreetTokenSuggestions(db, normalizedQuery, limit, rankCandidates);
+                const byPropertyKey = new Map();
+
+                [...searchTableSuggestions, ...streetTokenSuggestions].forEach(candidate => {
+                        const key = candidate.property_key || candidate.id;
+                        const existing = byPropertyKey.get(key);
+                        if (!existing || candidate.score > existing.score) {
+                                byPropertyKey.set(key, candidate);
+                        }
+                });
+
+                const blendedSuggestions = Array.from(byPropertyKey.values())
+                        .sort((a, b) => b.score - a.score || a.address.length - b.address.length)
+                        .slice(0, limit);
+
+                if (
+                        blendedSuggestions.length >= limit ||
+                        streetTokenSuggestions.length ||
+                        searchTableSuggestions.some(candidate => candidate.score >= 4500)
+                ) {
+                        return blendedSuggestions;
                 }
         } catch (error) {
                 if (!String(error?.message || '').toLowerCase().includes('property_address_search')) {
@@ -350,12 +396,7 @@ export async function getAddressSuggestions(db, query, limit = 5) {
                 return fastSuggestions;
         }
 
-        const streetTokenQuery = buildStreetTokenQuery(normalizedQuery, limit);
-        let streetTokenSuggestions = [];
-        if (streetTokenQuery) {
-                const streetTokenResults = await db.prepare(streetTokenQuery.sql).bind(...streetTokenQuery.params).all();
-                streetTokenSuggestions = rankCandidates(streetTokenResults.results);
-        }
+        const streetTokenSuggestions = await getStreetTokenSuggestions(db, normalizedQuery, limit, rankCandidates);
 
         const broadQuery = buildCandidateQuery(normalizedQuery, limit, { broad: true });
         const broadResults = await db.prepare(broadQuery.sql).bind(...broadQuery.params).all();

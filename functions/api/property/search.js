@@ -1,6 +1,13 @@
 import { jsonResponse } from '../_auth.js';
 import { buildAnalysis, findComparableProperties, findTargetProperty } from './_compare.js';
 
+const PROPERTY_SEARCH_LOG_EXCLUSIONS = new Set([
+        '8141 TRIPP AVE SKOKIE IL 60076',
+        '8501 CHRISTIANA AVE SKOKIE IL 60076',
+        '5705 W OHIO CHICAGO IL 60644',
+        '1049 N LARAMIE CHICAGO IL 60651'
+]);
+
 const NUMERIC_SIMULATION_FIELDS = new Set([
         'yearBuilt',
         'bedroomCount',
@@ -37,6 +44,20 @@ function numberOrNull(value) {
 
         const number = Number(value);
         return Number.isFinite(number) ? number : null;
+}
+
+function normalizeAddressForExclusion(value) {
+        return String(value || '')
+                .toUpperCase()
+                .replace(/[^A-Z0-9]+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+}
+
+function isExcludedPropertySearch(payload, target) {
+        return [payload?.address, target?.address].some(value =>
+                PROPERTY_SEARCH_LOG_EXCLUSIONS.has(normalizeAddressForExclusion(value))
+        );
 }
 
 function applySimulationOverrides(target, simulation) {
@@ -146,7 +167,7 @@ export const onRequestPost = async (context) => {
                 const target = applySimulationOverrides(originalTarget, payload.simulation);
                 const comparables = await findComparableProperties(context.env.DB, target, radius);
                 const analysis = buildAnalysis(target, comparables, radius, context.env);
-                const savePromise = target.isSimulated
+                const savePromise = target.isSimulated || isExcludedPropertySearch(payload, target)
                         ? Promise.resolve()
                         : savePropertySearch(context.env.DB, context.request, payload, analysis)
                                 .catch(error => console.warn('Could not save property search:', error.message));
