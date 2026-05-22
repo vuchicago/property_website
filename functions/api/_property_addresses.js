@@ -142,6 +142,70 @@ function scoreAddressMatch(query, candidate) {
         return score;
 }
 
+function prefixUpperBound(prefix) {
+        if (!prefix) {
+                return null;
+        }
+
+        return `${prefix}\uffff`;
+}
+
+function addPrefixClause(clauses, params, column, prefix) {
+        const normalizedPrefix = normalizeAddress(prefix);
+        const upperBound = prefixUpperBound(normalizedPrefix);
+        if (!normalizedPrefix || !upperBound) {
+                return;
+        }
+
+        clauses.push(`(${column} >= ? AND ${column} < ?)`);
+        params.push(normalizedPrefix, upperBound);
+}
+
+function buildSearchTableCandidateQuery(query, limit) {
+        const normalizedQuery = normalizeAddress(query);
+        const canonicalQuery = canonicalAddress(query);
+        const tokens = addressTokens(canonicalQuery);
+        const firstNumber = tokens.find(token => /^\d+$/.test(token));
+        const params = [];
+        const clauses = [];
+
+        clauses.push('normalized_address = ?');
+        params.push(normalizedQuery);
+
+        if (canonicalQuery !== normalizedQuery) {
+                clauses.push('normalized_address = ?');
+                params.push(canonicalQuery);
+        }
+
+        addPrefixClause(clauses, params, 'normalized_address', normalizedQuery);
+        addPrefixClause(clauses, params, 'normalized_address', canonicalQuery);
+
+        if (firstNumber) {
+                addPrefixClause(clauses, params, 'normalized_address', firstNumber);
+        }
+        if (/^\d{10,14}$/.test(normalizedQuery)) {
+                addPrefixClause(clauses, params, 'pin', normalizedQuery);
+        }
+
+        params.push(Math.max(limit * 8, 40));
+
+        return {
+                sql: `SELECT
+                        id,
+                        pin,
+                        address,
+                        normalized_address,
+                        property_key,
+                        mailing_name,
+                        pin_proration_rate
+                      FROM property_address_search
+                      WHERE ${clauses.join(' OR ')}
+                      ORDER BY normalized_address
+                      LIMIT ?`,
+                params
+        };
+}
+
 function buildCandidateQuery(query, limit, { broad = false } = {}) {
         const normalizedQuery = normalizeAddress(query);
         const canonicalQuery = canonicalAddress(query);
@@ -159,18 +223,11 @@ function buildCandidateQuery(query, limit, { broad = false } = {}) {
                 params.push(canonicalQuery);
         }
 
-        clauses.push('normalized_address LIKE ?');
-        params.push(`${normalizedQuery}%`);
+        addPrefixClause(clauses, params, 'normalized_address', normalizedQuery);
+        addPrefixClause(clauses, params, 'normalized_address', canonicalQuery);
 
-        clauses.push('normalized_address LIKE ?');
-        params.push(`${canonicalQuery}%`);
-
-        if (firstNumber && streetToken) {
-                clauses.push('normalized_address LIKE ?');
-                params.push(`${firstNumber}%${streetToken}%`);
-        } else if (firstNumber) {
-                clauses.push('normalized_address LIKE ?');
-                params.push(`${firstNumber}%`);
+        if (firstNumber) {
+                addPrefixClause(clauses, params, 'normalized_address', firstNumber);
         } else if (broad && streetToken) {
                 clauses.push('normalized_address LIKE ?');
                 params.push(`%${streetToken}%`);
@@ -182,8 +239,7 @@ function buildCandidateQuery(query, limit, { broad = false } = {}) {
         }
 
         if (/^\d{10,14}$/.test(normalizedQuery)) {
-                clauses.push('pin LIKE ?');
-                params.push(`${normalizedQuery}%`);
+                addPrefixClause(clauses, params, 'pin', normalizedQuery);
         }
 
         params.push(Math.max(limit * 8, 40));
@@ -205,6 +261,7 @@ function buildCandidateQuery(query, limit, { broad = false } = {}) {
                       FROM property_addresses
                       WHERE ${clauses.join(' OR ')}
                       GROUP BY property_key
+                      ORDER BY normalized_address
                       LIMIT ?`,
                 params
         };
@@ -225,6 +282,20 @@ export async function getAddressSuggestions(db, query, limit = 5) {
                 .filter(candidate => candidate.score > 0)
                 .sort((a, b) => b.score - a.score || a.address.length - b.address.length)
                 .slice(0, limit);
+
+        try {
+                const searchTableQuery = buildSearchTableCandidateQuery(normalizedQuery, limit);
+                const searchTableResults = await db.prepare(searchTableQuery.sql).bind(...searchTableQuery.params).all();
+                const searchTableSuggestions = rankCandidates(searchTableResults.results);
+
+                if (searchTableSuggestions.length || normalizedQuery.length < 6) {
+                        return searchTableSuggestions;
+                }
+        } catch (error) {
+                if (!String(error?.message || '').toLowerCase().includes('property_address_search')) {
+                        throw error;
+                }
+        }
 
         const fastQuery = buildCandidateQuery(normalizedQuery, limit);
         const fastResults = await db.prepare(fastQuery.sql).bind(...fastQuery.params).all();

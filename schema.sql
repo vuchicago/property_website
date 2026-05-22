@@ -81,6 +81,22 @@ CREATE TABLE IF NOT EXISTS property_addresses (
 CREATE INDEX IF NOT EXISTS idx_property_addresses_suggest_normalized
 ON property_addresses(normalized_address, pin);
 
+CREATE TABLE IF NOT EXISTS property_address_search (
+  property_key TEXT PRIMARY KEY,
+  id INTEGER,
+  pin TEXT,
+  address TEXT NOT NULL,
+  normalized_address TEXT NOT NULL,
+  mailing_name TEXT,
+  pin_proration_rate REAL
+);
+
+CREATE INDEX IF NOT EXISTS idx_property_address_search_normalized
+ON property_address_search(normalized_address);
+
+CREATE INDEX IF NOT EXISTS idx_property_address_search_pin
+ON property_address_search(pin);
+
 CREATE TABLE IF NOT EXISTS property_images (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   customer_id TEXT NOT NULL,
