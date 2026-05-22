@@ -180,14 +180,21 @@ function selectAddress(address) {
 
         if (pinEl) {
                 const meta = [
-                        selectedAddress?.pin ? `PIN ${selectedAddress.pin}` : '',
-                        details?.pinProrationRate ? `PIN Proration Code ${formatPercent(details.pinProrationRate)}` : '',
-                        details?.lastAppealYear ? `Last Appeal ${details.lastAppealYear}` : ''
+                        selectedAddress?.pin ? ['PIN', selectedAddress.pin] : null,
+                        details?.pinProrationRate ? ['PIN Proration Code', formatPercent(details.pinProrationRate)] : null,
+                        details?.lastAppealYear ? ['Last Appeal', details.lastAppealYear] : null,
+                        details?.mailingName ? ['Mailing Name', details.mailingName] : null,
+                        details?.mailingAddress ? ['Mailing Address', details.mailingAddress] : null
                 ].filter(Boolean);
 
                 if (meta.length) {
                         selectedPinForImage = selectedAddress?.pin || '';
-                        pinEl.innerHTML = meta.map(item => `<span>${escapeHtml(item)}</span>`).join('');
+                        pinEl.innerHTML = meta.map(([label, value]) => `
+                                <div class="selected-address-meta-row">
+                                        <span>${escapeHtml(label)}</span>
+                                        <strong>${escapeHtml(value)}</strong>
+                                </div>
+                        `).join('');
                         pinEl.style.display = 'block';
                 } else {
                         pinEl.innerHTML = '';

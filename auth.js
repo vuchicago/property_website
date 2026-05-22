@@ -1,6 +1,6 @@
 // Firebase Authentication Logic
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, OAuthProvider, signInWithPopup, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
 
 // Firebase Configuration
@@ -115,6 +115,18 @@ export const signInWithGoogle = async () => {
         }
 };
 
+export const signInWithApple = async () => {
+        try {
+                const provider = new OAuthProvider('apple.com');
+                provider.addScope('email');
+                provider.addScope('name');
+                const userCredential = await signInWithPopup(auth, provider);
+                return { success: true, user: userCredential.user };
+        } catch (error) {
+                return { success: false, error: error.message };
+        }
+};
+
 export const logoutUser = async () => {
         try {
                 await signOut(auth);
@@ -209,7 +221,7 @@ const updateNavigation = (user) => {
                 if (user) {
                         dashboard.style.display = 'block';
                         // Load history
-                        import('./history.js?v=20260521-dashboard-docs').then(module => {
+                        import('./history.js?v=20260521-mailing-meta').then(module => {
                                 module.loadAppealHistory();
                         }).catch(err => console.error("Failed to load history module:", err));
                 } else {

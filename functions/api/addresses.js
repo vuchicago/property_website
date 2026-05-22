@@ -24,6 +24,8 @@ export const onRequestGet = async (context) => {
                                 (
                                   SELECT json_object(
                                     'pin', pin,
+                                    'city', city,
+                                    'zipCode', zip_code,
                                     'taxableValue', taxable_value,
                                     'homeSize', home_size,
                                     'yearBuilt', year_built,
@@ -39,6 +41,8 @@ export const onRequestGet = async (context) => {
                                     'bathroomCount', bathroom_count,
                                     'singleVsMultiFamily', single_vs_multi_family,
                                     'pinProrationRate', pin_proration_rate,
+                                    'mailingName', mailing_name,
+                                    'mailingAddress', mailing_address,
                                     'propertyClass', property_class,
                                     'pin10', pin10,
                                     'taxDistrictCode', tax_district_code,

@@ -116,6 +116,10 @@
                         width: 100%;
                 }
 
+                .google-auth-btn+.google-auth-btn {
+                        margin-top: var(--space-3);
+                }
+
                 .google-auth-btn:hover {
                         border-color: var(--primary);
                         box-shadow: var(--shadow-md);
@@ -383,6 +387,13 @@
                                 </svg>
                                 <span>Continue with Google</span>
                         </button>
+                        <button type="button" class="google-auth-btn" id="apple-auth-btn">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path fill="currentColor"
+                                                d="M16.36 1.43c0 1.12-.46 2.18-1.2 2.98-.8.86-2.07 1.52-3.14 1.44-.13-1.07.39-2.22 1.12-3.01.8-.86 2.18-1.5 3.22-1.41zM20.14 17.2c-.55 1.25-.82 1.8-1.53 2.9-.99 1.52-2.38 3.42-4.1 3.44-1.53.02-1.93-.99-4.01-.98-2.08.01-2.52 1-4.05.98-1.72-.02-3.03-1.73-4.02-3.25-2.75-4.22-3.04-9.18-1.34-11.82 1.21-1.87 3.12-2.97 4.92-2.97 1.83 0 2.98 1 4.49 1 1.47 0 2.36-1 4.48-1 1.6 0 3.29.87 4.49 2.37-3.94 2.16-3.3 7.78.67 9.33z" />
+                                </svg>
+                                <span>Continue with Apple</span>
+                        </button>
 
                         <div class="auth-toggle">
                                 <span id="toggle-text">Don't have an account?</span>
@@ -492,7 +503,7 @@
 
         <!-- Auth Logic Script -->
         <script type="module">
-                import { loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, sendCurrentUserVerificationEmail, refreshCurrentUser } from './auth.js?v=20260521-dashboard-docs';
+                import { loginUser, registerUser, signInWithGoogle, signInWithApple, logoutUser, onAuthUserChanged, sendCurrentUserVerificationEmail, refreshCurrentUser } from './auth.js?v=20260521-mailing-apple';
 
                 const form = document.getElementById('auth-form');
                 const emailInput = document.getElementById('email');
@@ -506,6 +517,7 @@
                 const browserWarning = document.getElementById('browser-warning');
                 const verificationPanel = document.getElementById('verification-panel');
                 const googleAuthBtn = document.getElementById('google-auth-btn');
+                const appleAuthBtn = document.getElementById('apple-auth-btn');
                 const authContainer = document.getElementById('auth-container');
                 const dashboard = document.getElementById('user-dashboard');
                 const addAppealBtn = document.getElementById('account-add-appeal-btn');
@@ -605,6 +617,30 @@
                         }
                 });
 
+                appleAuthBtn.addEventListener('click', async () => {
+                        errorAlert.style.display = 'none';
+
+                        if (inBlockedOAuthBrowser) {
+                                showBrowserWarning(true);
+                                return;
+                        }
+
+                        appleAuthBtn.disabled = true;
+                        appleAuthBtn.querySelector('span').textContent = 'Opening Apple...';
+
+                        const result = await signInWithApple();
+
+                        appleAuthBtn.disabled = false;
+                        appleAuthBtn.querySelector('span').textContent = 'Continue with Apple';
+
+                        if (result.success) {
+                                await showDashboard();
+                        } else {
+                                errorAlert.textContent = result.error;
+                                errorAlert.style.display = 'block';
+                        }
+                });
+
                 onAuthUserChanged(async (user) => {
                         if (user) {
                                 if (returnedFromVerification) {
@@ -645,7 +681,7 @@
                         dashboard.style.display = 'block';
                         hideVerificationPanel();
                         clearVerificationReturnFlag();
-                        const { loadAppealHistory } = await import('./history.js?v=20260521-dashboard-docs');
+                        const { loadAppealHistory } = await import('./history.js?v=20260521-mailing-meta');
                         await loadAppealHistory();
                 }
 
@@ -668,6 +704,7 @@
                         dashboard.style.display = 'none';
                         form.style.display = 'none';
                         googleAuthBtn.style.display = 'none';
+                        appleAuthBtn.style.display = 'none';
                         if (authDivider) authDivider.style.display = 'none';
                         if (authToggle) authToggle.style.display = 'none';
                         errorAlert.style.display = 'none';
@@ -699,7 +736,9 @@
                         }
 
                         googleAuthBtn.disabled = true;
+                        appleAuthBtn.disabled = true;
                         googleAuthBtn.querySelector('span').textContent = 'Open in Safari or Chrome for Google sign-in';
+                        appleAuthBtn.querySelector('span').textContent = 'Open in Safari or Chrome for Apple sign-in';
                         showBrowserWarning(true);
                 }
 
@@ -713,7 +752,7 @@
 
                         browserWarning.innerHTML = `
                                 <strong>Open this page in Safari or Chrome for Google sign-in.</strong>
-                                Facebook, Messenger, and Instagram open links in an embedded browser that Google blocks. Tap the share/menu button, choose “Open in Browser” or “Open in Safari,” then sign in again. Email and password sign-up can still be used here.
+                                Facebook, Messenger, and Instagram open links in an embedded browser that OAuth providers often block. Tap the share/menu button, choose “Open in Browser” or “Open in Safari,” then sign in again. Email and password sign-up can still be used here.
                         `;
                         browserWarning.style.display = 'block';
                 }
@@ -729,6 +768,7 @@
                         verificationPanel.innerHTML = '';
                         form.style.display = '';
                         googleAuthBtn.style.display = '';
+                        appleAuthBtn.style.display = '';
                         if (authDivider) authDivider.style.display = '';
                         if (authToggle) authToggle.style.display = '';
                 }

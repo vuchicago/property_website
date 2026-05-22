@@ -15,6 +15,8 @@ PROPERTY_COLUMNS = [
     "pin",
     "address",
     "normalized_address",
+    "city",
+    "zip_code",
     "taxable_value",
     "last_appeal_year",
     "certified_land",
@@ -32,6 +34,8 @@ PROPERTY_COLUMNS = [
     "garage_size",
     "property_class",
     "pin_proration_rate",
+    "mailing_name",
+    "mailing_address",
     "pin10",
     "latitude",
     "longitude",
@@ -90,7 +94,10 @@ def clean_number(value, integer: bool = False):
         return None
     if clean_string(value) is None:
         return None
-    return int(value) if integer else float(value)
+    number = float(value)
+    if math.isnan(number):
+        return None
+    return int(number) if integer else number
 
 
 def clean_bool(value):
@@ -130,6 +137,8 @@ def row_to_values(row: dict) -> list:
         clean_pin(row.get("pin")),
         address,
         normalize_address(address),
+        clean_string(row.get("City")),
+        clean_number(row.get("Zip Code"), integer=True),
         clean_number(row.get("Taxable Value"), integer=True),
         clean_string(row.get("Last Appeal Year")),
         clean_number(row.get("Certified Land"), integer=True),
@@ -147,10 +156,12 @@ def row_to_values(row: dict) -> list:
         clean_string(row.get("Garage Size")),
         clean_string(row.get("Class Description")),
         clean_number(row.get("PIN Proration Rate")),
+        clean_string(row.get("Mailing Name")),
+        clean_string(row.get("Mailing Address")),
         clean_pin(row.get("pin10")),
         clean_number(row.get("lat")),
         clean_number(row.get("lon")),
-        clean_string(row.get("class")),
+        clean_string(row.get("Class Code") or row.get("class")),
         clean_number(row.get("Tax District Code"), integer=True),
         clean_number(row.get("Municipality Number"), integer=True),
         clean_string(row.get("Municipality Name")),

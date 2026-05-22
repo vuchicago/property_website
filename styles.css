@@ -528,10 +528,28 @@ ol {
 }
 
 .selected-address-meta {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
+    display: grid;
+    gap: var(--space-1);
     margin-top: var(--space-1);
+}
+
+.selected-address-meta-row {
+    align-items: baseline;
+    display: grid;
+    gap: 0.15rem;
+}
+
+.selected-address-meta-row span {
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    line-height: 1.2;
+}
+
+.selected-address-meta-row strong {
+    color: var(--dark-900);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    line-height: 1.3;
 }
 
 .property-image-panel {
