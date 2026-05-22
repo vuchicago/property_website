@@ -8,7 +8,7 @@ let selectedPropertyKeySuggestion = '';
 let currentSuggestions = [];
 let selectedAddressForImage = '';
 let selectedPinForImage = '';
-const DASHBOARD_CACHE_VERSION = '20260522-property-key';
+const DASHBOARD_CACHE_VERSION = '20260522-appeal-window';
 
 export async function loadAppealHistory() {
         const user = auth.currentUser;
@@ -234,6 +234,7 @@ function selectAddress(propertyKey) {
                         details?.municipalityName ? ['Municipality', details.municipalityName] : null,
                         details?.townshipName ? ['Township', details.townshipName] : null,
                         details?.appealCalendar?.areaName ? ['Appeal Area', details.appealCalendar.areaName] : null,
+                        details?.appealCalendar?.nextAppealWindow ? ['Next Appeal Window', details.appealCalendar.nextAppealWindow] : null,
                         details?.appealCalendar?.lastFileDate ? ['Assessor Deadline', details.appealCalendar.lastFileDate] : null,
                         details?.appealCalendar?.boardOfReviewAppealDates ? ['Board Review', details.appealCalendar.boardOfReviewAppealDates] : null,
                         details?.mailingName ? ['Mailing Name', details.mailingName] : null,
@@ -442,6 +443,7 @@ function renderPropertyDetails(details) {
                 ['Property Class', details?.propertyClass],
                 ['Single vs Multi-Family', details?.singleVsMultiFamily],
                 ['Township', details?.townshipName],
+                ['Next Appeal Window', details?.appealCalendar?.nextAppealWindow],
                 ['Walkability Score', formatNumber(details?.cmapWalkabilityTotalScore)],
                 ['Masonry Type', details?.masonryType],
                 ['Repair', details?.repairCondition],

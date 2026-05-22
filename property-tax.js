@@ -24,6 +24,7 @@ const COMPARABLE_COLUMNS = [
     { label: 'Class', value: c => escapeHtml(c.propertyClass || c.classCode || 'N/A'), sortValue: c => c.propertyClass || c.classCode },
     { label: 'PIN Proration Code', value: c => c.pinProrationRate === null || c.pinProrationRate === undefined ? 'N/A' : escapeHtml(formatNumber(c.pinProrationRate)), sortValue: c => c.pinProrationRate },
     { label: 'Walkability Score', value: c => c.cmapWalkabilityTotalScore === null || c.cmapWalkabilityTotalScore === undefined ? 'N/A' : formatNumber(c.cmapWalkabilityTotalScore), sortValue: c => c.cmapWalkabilityTotalScore },
+    { label: 'Township', value: c => escapeHtml(c.townshipName || 'N/A'), sortValue: c => c.townshipName },
     { label: 'Municipality', value: c => escapeHtml(c.municipalityName || 'N/A'), sortValue: c => c.municipalityName },
     { label: 'PIN', value: c => escapeHtml(c.pin || 'N/A'), sortValue: c => c.pin }
 ];
@@ -416,9 +417,7 @@ function updatePropertyResults(data) {
     setText('snapshot-year-built', target.yearBuilt ? formatYear(target.yearBuilt) : 'N/A');
     setText('snapshot-municipality', target.municipalityName || 'N/A');
     setText('snapshot-township', target.townshipName || 'N/A');
-    setText('snapshot-appeal-area', target.appealCalendar?.areaName || 'Not matched');
-    setText('snapshot-appeal-deadline', target.appealCalendar?.lastFileDate || 'N/A');
-    setText('snapshot-board-review', target.appealCalendar?.boardOfReviewAppealDates || 'N/A');
+    setText('snapshot-next-appeal-window', target.appealCalendar?.nextAppealWindow || 'N/A');
     setText('snapshot-single-multi', target.singleVsMultiFamily || 'N/A');
     setText('snapshot-basement', target.finishedBasement || 'N/A');
     setText('snapshot-garage', target.garageSize || 'N/A');

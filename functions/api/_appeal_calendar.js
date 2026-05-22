@@ -198,11 +198,18 @@ function matchCalendarName(value) {
 }
 
 function calendarPayload(entry, matchedBy, confidence, lookupName) {
+        const assessorAppealWindow = entry.reassessmentNoticeDate && entry.lastFileDate
+                ? `${entry.reassessmentNoticeDate} - ${entry.lastFileDate}`
+                : entry.lastFileDate || null;
+        const nextAppealWindow = entry.boardOfReviewAppealDates || assessorAppealWindow;
+
         return {
                 areaName: entry.name,
                 lookupName,
                 reassessmentNoticeDate: entry.reassessmentNoticeDate || null,
                 lastFileDate: entry.lastFileDate || null,
+                assessorAppealWindow,
+                nextAppealWindow,
                 aRollCertifiedDate: entry.aRollCertifiedDate || null,
                 aRollPublishedDate: entry.aRollPublishedDate || null,
                 boardOfReviewAppealDates: entry.boardOfReviewAppealDates || null,
@@ -246,6 +253,8 @@ export function getAppealCalendarForProperty(property) {
                 lookupName: isChicago ? property?.chicagoCommunityArea || '' : municipalityName,
                 sourceUrl: OFFICIAL_CALENDAR_URL,
                 sourceLastUpdated: '1/27/2026',
+                nextAppealWindow: null,
+                assessorAppealWindow: null,
                 matchedBy: 'none',
                 confidence: 0,
                 note: 'Calendar area could not be matched confidently. Check the official Cook County Assessor calendar.'
