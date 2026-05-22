@@ -38,7 +38,6 @@ function initPropertyTaxTool() {
     const searchBtn = document.getElementById('search-property');
     const resetBtn = document.getElementById('reset-search');
     const simulateBtn = document.getElementById('simulate-search');
-    const resultSimulateBtn = document.getElementById('result-simulate-search');
     const simulationForm = document.getElementById('simulation-panel');
     const resetSimulationBtn = document.getElementById('reset-simulation');
     const addressInput = document.getElementById('property-address');
@@ -119,11 +118,12 @@ function initPropertyTaxTool() {
         }
 
         populateSimulationForm(searchResults.target);
-        simulationForm.hidden = false;
-        simulationForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        simulationForm.hidden = !simulationForm.hidden;
+        if (!simulationForm.hidden) {
+            simulationForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
     };
     simulateBtn?.addEventListener('click', openSimulationPanel);
-    resultSimulateBtn?.addEventListener('click', openSimulationPanel);
     resetSimulationBtn?.addEventListener('click', () => {
         if (searchResults?.target) {
             populateSimulationForm(searchResults.target);
@@ -142,17 +142,16 @@ function initPropertyTaxTool() {
         });
     });
     exportCsvBtn?.addEventListener('click', exportToCSV);
-    increaseRadiusBtn?.addEventListener('click', () => {
+    increaseRadiusBtn?.addEventListener('click', async () => {
         if (increaseRadiusBtn.dataset.action === 'appeal') {
             window.location.href = 'login.html?mode=signup&source=property-tax-appeal';
             return;
         }
 
         if (!selectedProperty) return;
-        const nextRadius = Math.min(5, Number((Number(radiusSlider.value) + 0.5).toFixed(1)));
-        radiusSlider.value = String(nextRadius);
-        radiusValue.textContent = nextRadius.toFixed(1);
-        searchProperty(nextRadius);
+        await searchLongerRadius({
+            simulation: searchResults?.target?.isSimulated ? readSimulationForm() : null
+        });
     });
 
     document.querySelectorAll('.property-tax-tab').forEach(tab => {
@@ -321,12 +320,65 @@ async function searchProperty(radius, options = {}) {
         } else {
             clearMap();
         }
-        showNotification(`Found ${data.comparables.length} comparable properties`, 'success');
+        if (!options.quiet) {
+            showNotification(`Found ${data.comparables.length} comparable properties`, 'success');
+        }
+        return data;
     } catch (error) {
         showNotification(error.message || 'Error searching property', 'error');
+        return null;
     } finally {
         searchBtn.disabled = !selectedProperty;
         searchBtn.innerHTML = originalHtml;
+    }
+}
+
+async function searchLongerRadius(options = {}) {
+    const radiusSlider = document.getElementById('search-radius');
+    const radiusValue = document.getElementById('radius-value');
+    const button = document.getElementById('increase-radius-search');
+    const originalText = button?.textContent || '';
+    let radius = Number(searchResults?.radius || radiusSlider?.value || 0.5);
+    let latestResult = searchResults;
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = 'Searching up to 5.0 mi';
+    }
+
+    try {
+        while (radius < 5 && (latestResult?.summary?.comparableCount || 0) < 5) {
+            radius = Math.min(5, Number((radius + 0.5).toFixed(1)));
+            if (radiusSlider && radiusValue) {
+                radiusSlider.value = String(radius);
+                radiusValue.textContent = radius.toFixed(1);
+            }
+
+            latestResult = await searchProperty(radius, {
+                simulation: options.simulation,
+                quiet: true,
+                preserveSort: true
+            });
+
+            if (!latestResult) {
+                break;
+            }
+        }
+
+        if (latestResult) {
+            const count = latestResult.summary?.comparableCount || 0;
+            showNotification(
+                count >= 5
+                    ? `Found ${count} comparable properties at ${latestResult.radius.toFixed(1)} miles`
+                    : `Reached 5.0 miles with ${count} comparable properties`,
+                count >= 5 ? 'success' : 'info'
+            );
+        }
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = originalText || 'Try longer radius';
+        }
     }
 }
 
@@ -424,10 +476,9 @@ function updateWiderRadiusButton(data) {
     button.classList.remove('btn-primary', 'appeal-cta-btn');
     button.classList.add('btn-secondary');
     if (canWiden) {
-        const nextRadius = Math.min(5, Number((data.radius + 0.5).toFixed(1)));
-        button.textContent = `Try ${nextRadius.toFixed(1)} mi radius`;
+        button.textContent = 'Try longer radius';
     } else {
-        button.textContent = 'Try a wider radius';
+        button.textContent = 'Try longer radius';
     }
 }
 
@@ -646,7 +697,7 @@ function resetResultActionButton() {
     button.dataset.action = 'widen';
     button.classList.remove('btn-primary', 'appeal-cta-btn');
     button.classList.add('btn-secondary');
-    button.textContent = 'Try a wider radius';
+    button.textContent = 'Try longer radius';
 }
 
 function exportToCSV() {

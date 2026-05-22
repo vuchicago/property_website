@@ -226,10 +226,8 @@
                                 </button>
                                 <button type="button" class="btn btn-secondary" id="reset-search">Clear</button>
                                 <button type="button" class="btn btn-secondary" id="simulate-search" disabled
-                                    title="Use Simulate if you believe the county data shown here is incorrect.">
-                                    <span>Simulate</span>
-                                    <small>Simulate with corrected data</small>
-                                </button>
+                                    title="Use Simulate if you believe the county data shown here is incorrect.">Simulate</button>
+                                <p class="simulate-action-helper">Simulate analysis with correct data</p>
                             </div>
                         </div>
                         <p class="property-tax-picked" id="selected-property">Enter an address and choose the closest
@@ -276,7 +274,7 @@
                                     </select>
                                 </label>
                             </div>
-                            <button type="submit" class="btn btn-primary">Run Simulation</button>
+                            <button type="submit" class="btn btn-primary">Analyze</button>
                         </form>
                     </div>
 
@@ -292,14 +290,9 @@
                                 <h2 id="decision-label">Analysis pending</h2>
                                 <p id="decision-reason">Run an analysis to see whether the comps suggest an appeal.</p>
                                 <button type="button" class="btn btn-secondary result-action-btn"
-                                    id="increase-radius-search" hidden>Try a wider radius</button>
+                                    id="increase-radius-search" hidden>Try longer radius</button>
                                 <p class="result-simulation-note">If any property information looks incorrect, use
                                     Simulate to update the inputs and rerun a more accurate analysis.</p>
-                                <button type="button" class="btn btn-secondary btn-sm result-simulate-btn"
-                                    id="result-simulate-search">
-                                    <span>Simulate</span>
-                                    <small>Simulate with corrected data</small>
-                                </button>
                             </section>
                             <section class="dashboard-card">
                                 <div class="property-tax-card-header">
