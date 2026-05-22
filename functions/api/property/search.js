@@ -89,7 +89,7 @@ export const onRequestPost = async (context) => {
                 }
 
                 const comparables = await findComparableProperties(context.env.DB, target, radius);
-                const analysis = buildAnalysis(target, comparables, radius);
+                const analysis = buildAnalysis(target, comparables, radius, context.env);
                 const savePromise = savePropertySearch(context.env.DB, context.request, payload, analysis)
                         .catch(error => console.warn('Could not save property search:', error.message));
 

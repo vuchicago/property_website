@@ -6,6 +6,8 @@ const RESIDENTIAL_CLASS_CODES = new Set([
         '211', '212', '218', '219', '234', '278', '295'
 ]);
 const APPEAL_MODEL_APPLICABLE_CLASS_CODES = new Set([...RESIDENTIAL_CLASS_CODES, '299']);
+const DEFAULT_VALUE_PER_SQFT_SIGNAL_PERCENT = 3;
+const DEFAULT_TAXABLE_VALUE_SIGNAL_PERCENT = 5;
 
 const PROPERTY_SELECT = `
         id,
@@ -273,6 +275,34 @@ function valuePerSqft(value, sqft) {
         return value / sqft;
 }
 
+function percentageThreshold(env, name, fallbackPercent) {
+        const rawValue = env?.[name];
+        const parsedValue = rawValue === undefined || rawValue === null || rawValue === ''
+                ? null
+                : Number(rawValue);
+
+        if (!Number.isFinite(parsedValue) || parsedValue < 0) {
+                return fallbackPercent / 100;
+        }
+
+        return parsedValue > 1 ? parsedValue / 100 : parsedValue;
+}
+
+function uniformityThresholds(env) {
+        return {
+                valuePerSqft: percentageThreshold(
+                        env,
+                        'UNIFORMITY_VALUE_PER_SQFT_SIGNAL_PERCENT',
+                        DEFAULT_VALUE_PER_SQFT_SIGNAL_PERCENT
+                ),
+                taxableValue: percentageThreshold(
+                        env,
+                        'UNIFORMITY_TAXABLE_VALUE_SIGNAL_PERCENT',
+                        DEFAULT_TAXABLE_VALUE_SIGNAL_PERCENT
+                )
+        };
+}
+
 function compUniformityStats(target, comparables) {
         const value = target?.taxableValue ?? null;
         const subjectValuePerSqft = valuePerSqft(value, target?.homeSize);
@@ -307,18 +337,18 @@ function compUniformityStats(target, comparables) {
         };
 }
 
-function hasUniformityAppealSignal(stats) {
+function hasUniformityAppealSignal(stats, thresholds = uniformityThresholds()) {
         if (
                 stats.validValuePerSqftComparables >= 5 &&
                 stats.subjectValuePerSqft !== null &&
                 stats.medianValuePerSqft !== null
         ) {
-                return stats.subjectValuePerSqft > stats.medianValuePerSqft * 1.03 &&
+                return stats.subjectValuePerSqft > stats.medianValuePerSqft * (1 + thresholds.valuePerSqft) &&
                         stats.lowerValuePerSqftCount >= 3;
         }
 
         if (stats.averageValue !== null && stats.averageValue > 0 && stats.value !== null) {
-                return stats.value > stats.averageValue * 1.05 &&
+                return stats.value > stats.averageValue * (1 + thresholds.taxableValue) &&
                         stats.lowerValueCount >= 3;
         }
 
@@ -378,7 +408,7 @@ function matchesComparableRules(candidate, target) {
         return false;
 }
 
-function decisionFor(target, comparables, radius, now = new Date()) {
+function decisionFor(target, comparables, radius, env, now = new Date()) {
         if (!target) {
                 return {
                         decision: 'Please Enter Valid Cook County Address',
@@ -425,7 +455,7 @@ function decisionFor(target, comparables, radius, now = new Date()) {
         const stats = compUniformityStats(target, comparables);
         const context = compContext(target);
 
-        if (hasUniformityAppealSignal(stats)) {
+        if (hasUniformityAppealSignal(stats, uniformityThresholds(env))) {
                 if (
                         stats.validValuePerSqftComparables >= 5 &&
                         stats.subjectValuePerSqft !== null &&
@@ -619,7 +649,7 @@ export async function findComparableProperties(db, target, radius) {
                 .sort((a, b) => a.distanceMiles - b.distanceMiles || (a.taxableValue || 0) - (b.taxableValue || 0));
 }
 
-export function buildAnalysis(target, comparables, radius) {
+export function buildAnalysis(target, comparables, radius, env) {
         const averageComparableValue = comparables.length
                 ? comparables.reduce((sum, item) => sum + (item.taxableValue || 0), 0) / comparables.length
                 : null;
@@ -644,6 +674,6 @@ export function buildAnalysis(target, comparables, radius) {
                                 ? null
                                 : target.taxableValue - averageComparableValue
                 },
-                appeal: decisionFor(target, comparables, radius)
+                appeal: decisionFor(target, comparables, radius, env)
         };
 }
