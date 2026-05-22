@@ -36,6 +36,9 @@ function initPropertyTaxTool() {
     const radiusValue = document.getElementById('radius-value');
     const searchBtn = document.getElementById('search-property');
     const resetBtn = document.getElementById('reset-search');
+    const simulateBtn = document.getElementById('simulate-search');
+    const simulationForm = document.getElementById('simulation-panel');
+    const resetSimulationBtn = document.getElementById('reset-simulation');
     const addressInput = document.getElementById('property-address');
     const suggestions = document.getElementById('property-address-suggestions');
     const exportCsvBtn = document.getElementById('export-csv');
@@ -49,7 +52,10 @@ function initPropertyTaxTool() {
 
     addressInput?.addEventListener('input', debounce(() => {
         selectedProperty = null;
+        searchResults = null;
         searchBtn.disabled = true;
+        simulateBtn.disabled = true;
+        simulationForm.hidden = true;
         setSelectedPropertyText('Choose a property from the suggestions.');
         fetchAddressSuggestions(addressInput.value.trim());
     }, 220));
@@ -89,6 +95,32 @@ function initPropertyTaxTool() {
     });
 
     resetBtn?.addEventListener('click', resetPropertyResults);
+    simulateBtn?.addEventListener('click', () => {
+        if (!searchResults?.target) {
+            showNotification('Run an analysis before simulating changes.', 'error');
+            return;
+        }
+
+        populateSimulationForm(searchResults.target);
+        simulationForm.hidden = !simulationForm.hidden;
+    });
+    resetSimulationBtn?.addEventListener('click', () => {
+        if (searchResults?.target) {
+            populateSimulationForm(searchResults.target);
+        }
+    });
+    simulationForm?.addEventListener('submit', event => {
+        event.preventDefault();
+        if (!selectedProperty) {
+            showNotification('Choose a property before running a simulation.', 'error');
+            return;
+        }
+
+        searchProperty(Number(radiusSlider.value), {
+            simulation: readSimulationForm(),
+            scrollToResults: true
+        });
+    });
     exportCsvBtn?.addEventListener('click', exportToCSV);
     increaseRadiusBtn?.addEventListener('click', () => {
         if (increaseRadiusBtn.dataset.action === 'appeal') {
@@ -245,7 +277,8 @@ async function searchProperty(radius, options = {}) {
                 id: selectedProperty.id,
                 pin: selectedProperty.pin,
                 address: selectedProperty.address,
-                radius
+                radius,
+                ...(options.simulation ? { simulation: options.simulation } : {})
             })
         });
         const data = await response.json();
@@ -253,6 +286,9 @@ async function searchProperty(radius, options = {}) {
 
         searchResults = data;
         updatePropertyResults(data);
+        if (!options.simulation) {
+            populateSimulationForm(data.target);
+        }
         if (options.scrollToResults) {
             scrollPropertyResultsIntoView();
         }
@@ -286,6 +322,7 @@ function updatePropertyResults(data) {
 
     document.getElementById('property-tax-empty').hidden = true;
     document.getElementById('property-tax-results').hidden = false;
+    document.getElementById('simulate-search').disabled = false;
 
     updateDecision(data.appeal);
     updateWiderRadiusButton(data);
@@ -300,10 +337,56 @@ function updatePropertyResults(data) {
     setText('snapshot-year-built', target.yearBuilt ? formatYear(target.yearBuilt) : 'N/A');
     setText('snapshot-municipality', target.municipalityName || 'N/A');
     setText('snapshot-type', target.propertyClass || target.classCode || 'N/A');
+    if (target.isSimulated) {
+        setSelectedPropertyText(`Simulating changes for ${target.address}`);
+    }
 
     renderComparableRows(target, data.comparables);
     updateComparisonChart(target.taxableValue, summary.averageComparableValue);
     document.getElementById('export-csv').disabled = data.comparables.length === 0;
+}
+
+function simulationFieldMap() {
+    return {
+        taxableValue: 'simulate-taxable-value',
+        certifiedLand: 'simulate-certified-land',
+        certifiedBuilding: 'simulate-certified-building',
+        homeSize: 'simulate-home-size',
+        yearBuilt: 'simulate-year-built',
+        bedroomCount: 'simulate-bedroom-count',
+        bathroomCount: 'simulate-bathroom-count',
+        masonryType: 'simulate-masonry-type',
+        repairCondition: 'simulate-repair-condition',
+        singleVsMultiFamily: 'simulate-single-vs-multi-family'
+    };
+}
+
+function populateSimulationForm(target) {
+    Object.entries(simulationFieldMap()).forEach(([field, id]) => {
+        const input = document.getElementById(id);
+        if (!input) return;
+        input.value = target?.[field] === null || target?.[field] === undefined ? '' : target[field];
+    });
+}
+
+function readSimulationForm() {
+    const numericFields = new Set([
+        'taxableValue',
+        'certifiedLand',
+        'certifiedBuilding',
+        'homeSize',
+        'yearBuilt',
+        'bedroomCount',
+        'bathroomCount'
+    ]);
+
+    return Object.entries(simulationFieldMap()).reduce((simulation, [field, id]) => {
+        const input = document.getElementById(id);
+        if (!input) return simulation;
+        const value = input.value.trim();
+        simulation[field] = numericFields.has(field) ? (value === '' ? null : Number(value)) : value;
+        return simulation;
+    }, {});
 }
 
 function updateWiderRadiusButton(data) {
@@ -489,6 +572,8 @@ function resetPropertyResults() {
     document.getElementById('search-radius').value = '0.5';
     document.getElementById('radius-value').textContent = '0.5';
     document.getElementById('search-property').disabled = true;
+    document.getElementById('simulate-search').disabled = true;
+    document.getElementById('simulation-panel').hidden = true;
     document.getElementById('property-tax-empty').hidden = false;
     document.getElementById('property-tax-results').hidden = true;
     document.getElementById('export-csv').disabled = true;

@@ -1,6 +1,21 @@
 import { jsonResponse } from '../_auth.js';
 import { buildAnalysis, findComparableProperties, findTargetProperty } from './_compare.js';
 
+const NUMERIC_SIMULATION_FIELDS = new Set([
+        'taxableValue',
+        'certifiedLand',
+        'certifiedBuilding',
+        'homeSize',
+        'yearBuilt',
+        'bedroomCount',
+        'bathroomCount'
+]);
+const TEXT_SIMULATION_FIELDS = new Set([
+        'masonryType',
+        'repairCondition',
+        'singleVsMultiFamily'
+]);
+
 function deviceFromUserAgent(userAgent) {
         const value = String(userAgent || '').toLowerCase();
 
@@ -17,6 +32,50 @@ function deviceFromUserAgent(userAgent) {
         }
 
         return 'Unknown';
+}
+
+function numberOrNull(value) {
+        if (value === null || value === undefined || value === '') {
+                return null;
+        }
+
+        const number = Number(value);
+        return Number.isFinite(number) ? number : null;
+}
+
+function applySimulationOverrides(target, simulation) {
+        if (!simulation || typeof simulation !== 'object') {
+                return target;
+        }
+
+        const simulatedTarget = { ...target };
+        const applied = {};
+
+        NUMERIC_SIMULATION_FIELDS.forEach(field => {
+                if (!Object.prototype.hasOwnProperty.call(simulation, field)) {
+                        return;
+                }
+
+                const value = numberOrNull(simulation[field]);
+                simulatedTarget[field] = value;
+                applied[field] = value;
+        });
+
+        TEXT_SIMULATION_FIELDS.forEach(field => {
+                if (!Object.prototype.hasOwnProperty.call(simulation, field)) {
+                        return;
+                }
+
+                const value = String(simulation[field] ?? '').trim();
+                simulatedTarget[field] = value || null;
+                applied[field] = simulatedTarget[field];
+        });
+
+        return {
+                ...simulatedTarget,
+                isSimulated: Object.keys(applied).length > 0,
+                simulationOverrides: applied
+        };
 }
 
 async function savePropertySearch(db, request, payload, analysis) {
@@ -80,18 +139,21 @@ export const onRequestPost = async (context) => {
         try {
                 const payload = await context.request.json();
                 const radius = Math.max(0.1, Math.min(5, Number(payload.radius || 0.5)));
-                const target = await findTargetProperty(context.env.DB, payload);
+                const originalTarget = await findTargetProperty(context.env.DB, payload);
 
-                if (!target) {
+                if (!originalTarget) {
                         return jsonResponse({
                                 error: 'Please enter a valid Cook County property address from the database.'
                         }, 404);
                 }
 
+                const target = applySimulationOverrides(originalTarget, payload.simulation);
                 const comparables = await findComparableProperties(context.env.DB, target, radius);
                 const analysis = buildAnalysis(target, comparables, radius, context.env);
-                const savePromise = savePropertySearch(context.env.DB, context.request, payload, analysis)
-                        .catch(error => console.warn('Could not save property search:', error.message));
+                const savePromise = target.isSimulated
+                        ? Promise.resolve()
+                        : savePropertySearch(context.env.DB, context.request, payload, analysis)
+                                .catch(error => console.warn('Could not save property search:', error.message));
 
                 if (context.waitUntil) {
                         context.waitUntil(savePromise);

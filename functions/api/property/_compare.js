@@ -358,7 +358,7 @@ function hasUniformityAppealSignal(stats, thresholds = uniformityThresholds()) {
 function compContext(target) {
         return target?.classCode === '299'
                 ? 'same condo building or closely similar condo units'
-                : 'similar nearby properties matched on class, neighborhood, size, bedrooms, baths, construction, proration, and available age/condition fields';
+                : 'similar nearby properties matched on class, neighborhood, size, bedrooms, baths, construction, and available age/condition fields';
 }
 
 function matchesComparableRules(candidate, target) {
