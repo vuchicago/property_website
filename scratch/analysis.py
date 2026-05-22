@@ -43,7 +43,7 @@ print(df_parcel.shape)
 #%%
 df_parcel[df_parcel.pin==10271090440000]
 # %%
-df_output_all2025[df_output_all2025.pin=='10271090440000']
+df_output_all2025[df_output_all2025.pin=='09211020010000']
 # %%
 df_duplicated=df_output_all2025[(df_output_all2025['Nearby Address'].duplicated()) & (df_output_all2025['PIN Proration Rate']==1)].copy()
 # %%

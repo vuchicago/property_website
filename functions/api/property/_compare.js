@@ -313,12 +313,12 @@ function hasUniformityAppealSignal(stats) {
                 stats.subjectValuePerSqft !== null &&
                 stats.medianValuePerSqft !== null
         ) {
-                return stats.subjectValuePerSqft > stats.medianValuePerSqft * 1.05 &&
+                return stats.subjectValuePerSqft > stats.medianValuePerSqft * 1.03 &&
                         stats.lowerValuePerSqftCount >= 3;
         }
 
         if (stats.averageValue !== null && stats.averageValue > 0 && stats.value !== null) {
-                return stats.value > stats.averageValue * 1.10 &&
+                return stats.value > stats.averageValue * 1.05 &&
                         stats.lowerValueCount >= 3;
         }
 
