@@ -535,13 +535,14 @@ ol {
 
 .selected-address-meta-row {
     align-items: baseline;
-    display: grid;
-    gap: 0.15rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
 }
 
 .selected-address-meta-row span {
     color: var(--text-muted);
-    font-size: var(--font-size-xs);
+    font-size: var(--font-size-sm);
     line-height: 1.2;
 }
 

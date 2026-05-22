@@ -495,7 +495,7 @@
 
         <!-- Auth Logic Script -->
         <script type="module">
-                import { loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, sendCurrentUserVerificationEmail, refreshCurrentUser } from './auth.js?v=20260522-google-only';
+                import { loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, refreshCurrentUser } from './auth.js?v=20260522-verified-token';
 
                 const form = document.getElementById('auth-form');
                 const emailInput = document.getElementById('email');
@@ -678,21 +678,9 @@
                         pageSubtitle.textContent = 'Check your inbox before continuing';
                         verificationPanel.innerHTML = `
                                 <h2>Email verification required</h2>
-                                <p>${emailSent ? 'We sent' : 'Use the button below to send'} a verification link to <strong>${escapeHtml(email || 'your email address')}</strong>. Open that link to continue. Please check your spam folder if you have not received it.</p>
-                                <div class="verification-actions">
-                                        <button type="button" class="btn btn-primary" id="check-verification-btn">I Verified My Email</button>
-                                        <button type="button" class="btn btn-secondary" id="resend-verification-btn">Resend Email</button>
-                                        <button type="button" class="btn btn-secondary" id="change-email-btn">Use Another Email</button>
-                                </div>
+                                <p>Please check email for verification link. <strong>(Check spam folder as well!)</strong></p>
                         `;
                         verificationPanel.style.display = 'block';
-
-                        document.getElementById('check-verification-btn')?.addEventListener('click', checkVerification);
-                        document.getElementById('resend-verification-btn')?.addEventListener('click', resendVerification);
-                        document.getElementById('change-email-btn')?.addEventListener('click', async () => {
-                                await logoutUser();
-                                hideVerificationPanel();
-                        });
                 }
 
                 function updateBrowserWarning() {
@@ -740,45 +728,6 @@
                         if (!returnedFromVerification) return;
                         const cleanUrl = `${window.location.pathname}${window.location.hash || ''}`;
                         window.history.replaceState({}, document.title, cleanUrl);
-                }
-
-                async function checkVerification() {
-                        const button = document.getElementById('check-verification-btn');
-                        if (!button) return;
-
-                        const originalText = button.textContent;
-                        button.disabled = true;
-                        button.textContent = 'Checking...';
-
-                        const result = await refreshCurrentUser();
-                        button.disabled = false;
-                        button.textContent = originalText;
-
-                        if (result.success && result.user.emailVerified) {
-                                await showDashboard();
-                                return;
-                        }
-
-                        errorAlert.textContent = 'That email is not verified yet. Open the verification link first, then try again.';
-                        errorAlert.style.display = 'block';
-                }
-
-                async function resendVerification() {
-                        const button = document.getElementById('resend-verification-btn');
-                        if (!button) return;
-
-                        const originalText = button.textContent;
-                        button.disabled = true;
-                        button.textContent = 'Sending...';
-
-                        const result = await sendCurrentUserVerificationEmail();
-                        button.disabled = false;
-                        button.textContent = originalText;
-
-                        errorAlert.textContent = result.success
-                                ? 'Verification email sent. Check your inbox and spam folder.'
-                                : result.error;
-                        errorAlert.style.display = 'block';
                 }
 
                 function escapeHtml(value) {

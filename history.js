@@ -231,6 +231,7 @@ function selectAddress(propertyKey) {
                         selectedAddress?.pin ? [String(selectedAddress.pin).includes(',') ? 'PINs' : 'PIN', selectedAddress.pin] : null,
                         details?.pinProrationRate ? ['PIN Proration Code', formatPercent(details.pinProrationRate)] : null,
                         details?.lastAppealYear ? ['Last Appeal', details.lastAppealYear] : null,
+                        details?.municipalityName ? ['Municipality', details.municipalityName] : null,
                         details?.mailingName ? ['Mailing Name', details.mailingName] : null,
                         details?.mailingAddress ? ['Mailing Address', details.mailingAddress] : null
                 ].filter(Boolean);
@@ -239,7 +240,7 @@ function selectAddress(propertyKey) {
                         selectedPinForImage = String(selectedAddress?.pin || '').split(',')[0].trim();
                         pinEl.innerHTML = meta.map(([label, value]) => `
                                 <div class="selected-address-meta-row">
-                                        <span>${escapeHtml(label)}</span>
+                                        <span>${escapeHtml(label)}:</span>
                                         <strong>${escapeHtml(value)}</strong>
                                 </div>
                         `).join('');
@@ -436,7 +437,6 @@ function renderPropertyDetails(details) {
                 ['Year Built', formatWholeNumber(details?.yearBuilt)],
                 ['Property Class', details?.propertyClass],
                 ['Single vs Multi-Family', details?.singleVsMultiFamily],
-                ['Municipality', details?.municipalityName],
                 ['Walkability Score', formatNumber(details?.cmapWalkabilityTotalScore)],
                 ['Masonry Type', details?.masonryType],
                 ['Repair', details?.repairCondition],

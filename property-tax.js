@@ -410,9 +410,14 @@ function updatePropertyResults(data) {
     setText('lower-value-count', summary.lowerValueCount.toLocaleString());
     setText('last-appeal', formatLastAppeal(target.lastAppealYear));
     setText('home-size', target.homeSize ? `${formatNumber(target.homeSize)} sqft` : 'N/A');
-    setText('beds-baths', target.bedroomCount !== null && target.bathroomCount !== null ? `${formatNumber(target.bedroomCount)} / ${formatFullBaths(target.bathroomCount)} full, ${formatHalfBaths(target.bathroomCount)} half` : 'N/A');
+    setText('snapshot-beds', target.bedroomCount === null ? 'N/A' : formatNumber(target.bedroomCount));
+    setText('snapshot-full-baths', formatFullBaths(target.bathroomCount));
+    setText('snapshot-half-baths', formatHalfBaths(target.bathroomCount));
     setText('snapshot-year-built', target.yearBuilt ? formatYear(target.yearBuilt) : 'N/A');
     setText('snapshot-municipality', target.municipalityName || 'N/A');
+    setText('snapshot-single-multi', target.singleVsMultiFamily || 'N/A');
+    setText('snapshot-basement', target.finishedBasement || 'N/A');
+    setText('snapshot-garage', target.garageSize || 'N/A');
     setText('snapshot-type', target.propertyClass || target.classCode || 'N/A');
     if (target.isSimulated) {
         setSelectedPropertyText(`Simulating changes for ${target.address}`);

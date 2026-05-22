@@ -159,7 +159,9 @@ export const waitForAuthUser = async () => {
 
 export const getCurrentUserToken = async () => {
         const user = await waitForAuthUser();
-        const token = await user.getIdToken();
+        await user.reload();
+        const refreshedUser = auth.currentUser || user;
+        const token = await refreshedUser.getIdToken(true);
 
         if (!token) {
                 throw new Error('Could not verify your login. Please log in again.');
