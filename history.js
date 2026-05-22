@@ -233,9 +233,9 @@ function selectAddress(propertyKey) {
                         details?.lastAppealYear ? ['Last Appeal', details.lastAppealYear] : null,
                         details?.municipalityName ? ['Municipality', details.municipalityName] : null,
                         details?.townshipName ? ['Township', details.townshipName] : null,
-                        details?.appealCalendar?.boardOfReviewAppealDates ? ['Board Review', details.appealCalendar.boardOfReviewAppealDates] : null,
                         details?.mailingName ? ['Mailing Name', details.mailingName] : null,
-                        details?.mailingAddress ? ['Mailing Address', details.mailingAddress] : null
+                        details?.mailingAddress ? ['Mailing Address', details.mailingAddress] : null,
+                        details?.appealCalendar?.boardOfReviewAppealDates ? ['Board Review', details.appealCalendar.boardOfReviewAppealDates] : null
                 ].filter(Boolean);
 
                 if (meta.length) {
