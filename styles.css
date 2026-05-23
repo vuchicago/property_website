@@ -4229,39 +4229,6 @@ textarea {
         white-space: nowrap;
     }
 
-    .hero {
-        flex-direction: column;
-        text-align: center;
-        padding-top: calc(80px + var(--space-12));
-    }
-
-    .hero .container {
-        flex-direction: column !important;
-        gap: var(--space-8) !important;
-    }
-
-    .hero-content {
-        padding: 0 var(--container-padding);
-        max-width: 100%;
-    }
-
-    .hero-cta {
-        justify-content: center;
-    }
-
-    .hero-stats {
-        justify-content: center;
-    }
-
-    .hero-visual {
-        padding: var(--space-8) var(--container-padding);
-    }
-
-    .hero-phone-preview {
-        max-width: min(1200px, 168vw);
-        width: 168%;
-    }
-
     .why-appeal .container,
     .deadlines-section .container,
     .contact-section .container {
@@ -4321,6 +4288,39 @@ textarea {
 
     .features-grid {
         grid-template-columns: 1fr;
+    }
+
+    .hero {
+        flex-direction: column;
+        text-align: center;
+        padding-top: calc(80px + var(--space-12));
+    }
+
+    .hero .container {
+        flex-direction: column !important;
+        gap: var(--space-8) !important;
+    }
+
+    .hero-content {
+        padding: 0 var(--container-padding);
+        max-width: 100%;
+    }
+
+    .hero-cta {
+        justify-content: center;
+    }
+
+    .hero-stats {
+        justify-content: center;
+    }
+
+    .hero-visual {
+        padding: var(--space-8) var(--container-padding);
+    }
+
+    .hero-phone-preview {
+        max-width: min(1200px, 168vw);
+        width: 168%;
     }
 
     .content-grid {
