@@ -6,16 +6,19 @@ export const onRequestPost = async (context) => {
         let savedMessageId = null;
 
         try {
-                const { name, email, phone, propertyAddress, message, inquiryType, insuranceTypes } = await context.request.json();
+                const { name, email, phone, propertyAddress, message, inquiryType, insuranceTypes, firmName } = await context.request.json();
 
                 const inquiryKind = String(inquiryType || '').toLowerCase();
                 const isInsuranceInquiry = inquiryKind === 'insurance';
                 const isWaitlistInquiry = inquiryKind === 'property-tax-waitlist' || inquiryKind === 'waitlist';
+                const isPartnershipInquiry = inquiryKind === 'partnership' || inquiryKind === 'partner';
                 const normalizedType = isInsuranceInquiry
                         ? 'Insurance Inquiry'
                         : isWaitlistInquiry
                                 ? 'Property Tax Appeal Waitlist'
-                                : 'Appeal Help Request';
+                                : isPartnershipInquiry
+                                        ? 'Attorney Partnership Inquiry'
+                                        : 'Appeal Help Request';
                 const selectedInsurance = Array.isArray(insuranceTypes) && insuranceTypes.length
                         ? insuranceTypes.join(', ')
                         : 'Not provided';
@@ -49,6 +52,9 @@ export const onRequestPost = async (context) => {
                         dateStyle: 'medium',
                         timeStyle: 'short'
                 });
+                const savedMessage = firmName
+                        ? `Firm Name: ${firmName}\n\n${message || ''}`.trim()
+                        : message;
 
                 savedMessageId = await saveContactMessage(context, {
                         inquiryType: normalizedType,
@@ -57,7 +63,7 @@ export const onRequestPost = async (context) => {
                         phone,
                         propertyAddress,
                         insuranceTypes: selectedInsurance,
-                        message
+                        message: savedMessage
                 });
 
                 const html = `
@@ -67,6 +73,7 @@ export const onRequestPost = async (context) => {
                                 <tr><td><strong>Name</strong></td><td>${escapeHtml(name)}</td></tr>
                                 <tr><td><strong>Email</strong></td><td>${escapeHtml(email)}</td></tr>
                                 <tr><td><strong>Phone</strong></td><td>${escapeHtml(phone || 'Not provided')}</td></tr>
+                                <tr><td><strong>Firm Name</strong></td><td>${escapeHtml(firmName || 'Not provided')}</td></tr>
                                 <tr><td><strong>Insurance Interest</strong></td><td>${escapeHtml(selectedInsurance)}</td></tr>
                                 <tr><td><strong>Property Address</strong></td><td>${escapeHtml(propertyAddress || 'Not provided')}</td></tr>
                                 <tr><td><strong>Submitted</strong></td><td>${escapeHtml(submittedAt)}</td></tr>
@@ -81,6 +88,7 @@ export const onRequestPost = async (context) => {
                         `Name: ${name}`,
                         `Email: ${email}`,
                         `Phone: ${phone || 'Not provided'}`,
+                        `Firm Name: ${firmName || 'Not provided'}`,
                         `Insurance Interest: ${selectedInsurance}`,
                         `Property Address: ${propertyAddress || 'Not provided'}`,
                         `Submitted: ${submittedAt}`,
@@ -89,7 +97,9 @@ export const onRequestPost = async (context) => {
                         message || 'No message provided'
                 ].join('\n');
 
-                const to = context.env.ADMIN_NOTIFICATION_EMAIL || ADMIN_EMAIL;
+                const to = isPartnershipInquiry
+                        ? (context.env.PARTNERSHIP_NOTIFICATION_EMAIL || ADMIN_EMAIL)
+                        : (context.env.ADMIN_NOTIFICATION_EMAIL || ADMIN_EMAIL);
                 const from = context.env.NOTIFICATION_FROM_EMAIL
                         || (context.env.RESEND_API_KEY
                                 ? 'Cook County Tax Compare <onboarding@resend.dev>'

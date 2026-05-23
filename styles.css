@@ -643,9 +643,89 @@ ol {
     margin-top: auto;
 }
 
+.partner-page {
+    background:
+        radial-gradient(circle at top left, rgba(14, 165, 233, 0.12), transparent 34rem),
+        linear-gradient(180deg, var(--white) 0%, var(--dark-50) 44%, var(--dark-50) 100%);
+}
+
+.partner-hero {
+    align-items: stretch;
+    display: grid;
+    gap: var(--space-8);
+    grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+}
+
+.partner-hero .section-header {
+    margin-bottom: 0;
+}
+
+.partner-hero-card {
+    align-self: center;
+    background: var(--dark-900);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-xl);
+    color: var(--white);
+    padding: var(--space-8);
+}
+
+.partner-hero-card strong {
+    display: block;
+    font-size: var(--font-size-2xl);
+    line-height: 1.2;
+    margin-bottom: var(--space-3);
+}
+
+.partner-hero-card p {
+    color: var(--dark-200);
+    line-height: 1.7;
+}
+
+.partner-section,
+.partner-contact-section {
+    margin-top: var(--space-12);
+}
+
+.partner-benefit-grid {
+    display: grid;
+    gap: var(--space-5);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.partner-benefit-grid h2,
+.partner-contact-copy h2 {
+    color: var(--dark-900);
+    line-height: 1.2;
+}
+
+.partner-benefit-grid p,
+.partner-contact-copy p {
+    color: var(--dark-600);
+    line-height: 1.7;
+}
+
+.partner-contact-section {
+    align-items: start;
+    display: grid;
+    gap: var(--space-8);
+    grid-template-columns: minmax(0, 0.8fr) minmax(320px, 1.2fr);
+}
+
+.partner-contact-copy {
+    position: sticky;
+    top: calc(80px + var(--space-6));
+}
+
+.partner-form-wrapper {
+    background: var(--white);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+}
+
 .tool-link-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--space-6);
     margin-bottom: var(--space-8);
 }
@@ -3626,6 +3706,372 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 /* ========================================
+   Tax Tutorial
+======================================== */
+.tax-tutorial-hero {
+    background:
+        radial-gradient(circle at 16% 24%, rgba(124, 58, 237, 0.12), transparent 30%),
+        linear-gradient(180deg, var(--primary-50) 0%, var(--white) 70%);
+}
+
+.tax-tutorial-section {
+    padding: var(--space-20) 0;
+    background: var(--white);
+}
+
+.tax-tutorial-section.alt-bg {
+    background: var(--dark-50);
+}
+
+.tax-flow {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--space-3);
+    margin-bottom: var(--space-10);
+}
+
+.tax-flow div {
+    background: var(--white);
+    border: 1px solid var(--dark-100);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    min-height: 150px;
+    padding: var(--space-4);
+}
+
+.tax-flow span {
+    align-items: center;
+    background: var(--primary);
+    border-radius: 999px;
+    color: var(--white);
+    display: inline-flex;
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    height: 28px;
+    justify-content: center;
+    margin-bottom: var(--space-3);
+    width: 28px;
+}
+
+.tax-flow strong,
+.tax-flow small {
+    display: block;
+}
+
+.tax-flow strong {
+    color: var(--dark-900);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--space-2);
+}
+
+.tax-flow small {
+    color: var(--dark-500);
+    line-height: 1.45;
+}
+
+.tax-tutorial-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-6);
+}
+
+.tax-step-card {
+    display: grid;
+    gap: var(--space-4);
+}
+
+.tax-step-card h2,
+.tax-takeaway-grid h2 {
+    color: var(--dark-900);
+    font-size: var(--font-size-2xl);
+}
+
+.tax-step-card p,
+.tax-takeaway-grid p {
+    color: var(--dark-500);
+    line-height: 1.7;
+}
+
+.tax-house-visual {
+    margin: var(--space-2) auto 0;
+    max-width: 300px;
+    width: 100%;
+}
+
+.tax-house-roof {
+    border-bottom: 70px solid var(--primary);
+    border-left: 120px solid transparent;
+    border-right: 120px solid transparent;
+    height: 0;
+    margin: 0 auto;
+    width: 0;
+}
+
+.tax-house-body {
+    background: var(--primary-50);
+    border: 2px solid rgba(124, 58, 237, 0.24);
+    border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-6);
+    text-align: center;
+}
+
+.tax-house-body span,
+.tax-slice-visual span,
+.tax-multiplier span {
+    color: var(--dark-500);
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+}
+
+.tax-house-body strong,
+.tax-slice-visual strong,
+.tax-multiplier strong {
+    color: var(--dark-900);
+    font-size: clamp(1.15rem, 2vw, var(--font-size-2xl));
+    overflow-wrap: anywhere;
+}
+
+.tax-slice-visual {
+    align-items: center;
+    display: grid;
+    gap: var(--space-5);
+    grid-template-columns: 120px 1fr;
+}
+
+.tax-slice-fill {
+    aspect-ratio: 1;
+    background: conic-gradient(var(--accent) 0 36deg, var(--dark-100) 36deg 360deg);
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 18px var(--white), 0 0 0 1px var(--dark-100);
+}
+
+.tax-multiplier {
+    align-items: center;
+    display: grid;
+    gap: var(--space-3);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tax-multiplier div {
+    background: var(--dark-50);
+    border: 1px solid var(--dark-100);
+    border-radius: var(--radius-lg);
+    min-width: 0;
+    padding: var(--space-3);
+    text-align: center;
+}
+
+.tax-multiplier small {
+    color: var(--primary);
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1.2;
+    margin-top: var(--space-1);
+    text-transform: uppercase;
+}
+
+.tax-rate-stack {
+    display: grid;
+    gap: var(--space-3);
+}
+
+.tax-rate-stack div {
+    align-items: center;
+    display: grid;
+    gap: var(--space-3);
+    grid-template-columns: 115px 1fr;
+}
+
+.tax-rate-stack span {
+    color: var(--dark-600);
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+}
+
+.tax-rate-stack b {
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    border-radius: 999px;
+    display: block;
+    height: 14px;
+}
+
+.tax-receipt {
+    background: var(--dark-50);
+    border: 1px dashed var(--dark-300);
+    border-radius: var(--radius-lg);
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-5);
+}
+
+.tax-receipt div {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-4);
+}
+
+.tax-receipt span {
+    color: var(--dark-600);
+}
+
+.tax-receipt strong {
+    color: var(--dark-900);
+}
+
+.tax-receipt-total {
+    border-top: 1px solid var(--dark-200);
+    padding-top: var(--space-3);
+}
+
+.tax-receipt-total strong {
+    color: var(--accent);
+    font-size: var(--font-size-xl);
+}
+
+.appeal-impact-path {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.appeal-impact-path span {
+    border: 1px solid var(--dark-200);
+    border-radius: 999px;
+    color: var(--dark-500);
+    font-size: var(--font-size-sm);
+    font-weight: 800;
+    padding: var(--space-2) var(--space-3);
+}
+
+.appeal-impact-path .is-active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--white);
+}
+
+.tax-calculator-layout {
+    display: grid;
+    grid-template-columns: 360px minmax(0, 1fr);
+    gap: var(--space-6);
+}
+
+.tax-tutorial-calculator {
+    display: grid;
+    gap: var(--space-4);
+}
+
+.tax-tutorial-calculator label {
+    color: var(--dark-700);
+    display: grid;
+    font-size: var(--font-size-sm);
+    font-weight: 800;
+    gap: var(--space-2);
+}
+
+.tax-tutorial-calculator small {
+    color: var(--dark-500);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.tax-tutorial-calculator input[readonly] {
+    background: var(--dark-50);
+    color: var(--dark-500);
+    cursor: not-allowed;
+}
+
+.tax-output-panel {
+    display: grid;
+    gap: var(--space-5);
+}
+
+.tax-output-formula {
+    background: var(--dark-50);
+    border: 1px solid var(--dark-100);
+    border-radius: var(--radius-lg);
+    color: var(--dark-600);
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    line-height: 1.5;
+    padding: var(--space-4);
+}
+
+.tax-output-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4);
+}
+
+.tax-output-grid div {
+    background: var(--dark-50);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+}
+
+.tax-output-grid span {
+    color: var(--dark-500);
+    display: block;
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    margin-bottom: var(--space-1);
+}
+
+.tax-output-grid strong {
+    color: var(--dark-900);
+    font-size: var(--font-size-2xl);
+}
+
+.tax-waterfall {
+    display: grid;
+    gap: var(--space-4);
+}
+
+.tax-waterfall div {
+    display: grid;
+    gap: var(--space-2);
+}
+
+.tax-waterfall span {
+    color: var(--dark-600);
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+}
+
+.tax-waterfall b {
+    background: var(--dark-100);
+    border-radius: 999px;
+    display: block;
+    height: 18px;
+    overflow: hidden;
+}
+
+.tax-waterfall i {
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    border-radius: inherit;
+    display: block;
+    height: 100%;
+    transition: width var(--transition-base);
+}
+
+.tax-takeaway-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-6);
+}
+
+.tax-tutorial-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    justify-content: center;
+    margin-top: var(--space-8);
+}
+
+/* ========================================
    Contact Section
 ======================================== */
 .footnotes-section {
@@ -4267,6 +4713,26 @@ textarea {
         grid-template-columns: 1fr;
     }
 
+    .tax-flow,
+    .tax-takeaway-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tax-tutorial-grid,
+    .tax-calculator-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .partner-hero,
+    .partner-benefit-grid,
+    .partner-contact-section {
+        grid-template-columns: 1fr;
+    }
+
+    .partner-contact-copy {
+        position: static;
+    }
+
     .property-tax-search-grid,
     .property-tax-result-grid {
         grid-template-columns: 1fr;
@@ -4345,6 +4811,14 @@ textarea {
     }
 
     .tool-description-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tax-multiplier {
+        grid-template-columns: 1fr;
+    }
+
+    .tax-output-grid {
         grid-template-columns: 1fr;
     }
 

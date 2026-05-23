@@ -435,6 +435,7 @@ function initContactForm() {
                     name: document.getElementById('name')?.value.trim(),
                     email: document.getElementById('email')?.value.trim(),
                     phone: document.getElementById('phone')?.value.trim(),
+                    firmName: document.getElementById('firm-name')?.value.trim(),
                     propertyAddress: document.getElementById('property-address-contact')?.value.trim(),
                     inquiryType: document.getElementById('inquiry-type')?.value.trim(),
                     message: document.getElementById('message')?.value.trim()

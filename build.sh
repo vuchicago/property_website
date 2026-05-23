@@ -32,6 +32,13 @@ NODE
 rm -rf dist/property-tax
 mkdir -p dist/property-tax
 cp property-tax.html dist/property-tax/index.html
+rm -rf dist/how-property-taxes-work
+mkdir -p dist/how-property-taxes-work
+cp how-property-taxes-work.html dist/how-property-taxes-work/index.html
+rm -rf dist/partners
+mkdir -p dist/partners
+cp partners.html dist/partners/index.html
+perl -0pi -e 's{<head>}{<head>\n    <base href="/">}i' dist/property-tax/index.html dist/how-property-taxes-work/index.html dist/partners/index.html
 
 # Copy crawl/indexing metadata and Pages routing rules when present
 cp robots.txt sitemap.xml llms.txt _redirects dist/ 2>/dev/null || true
