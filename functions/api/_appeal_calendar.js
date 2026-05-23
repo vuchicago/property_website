@@ -1,53 +1,12 @@
-const OFFICIAL_CALENDAR_URL = 'https://www.cookcountyassessoril.gov/assessment-calendar-and-deadlines';
+import {
+        APPEAL_CALENDAR_2026,
+        APPEAL_CALENDAR_SOURCE_LAST_UPDATED,
+        CURRENT_CALENDAR_URL,
+        OFFICIAL_CALENDAR_URL
+} from './_appeal_deadlines.js';
 
-const APPEAL_CALENDAR_2025 = [
-        ['Norwood Park', '3/24/2025', '5/5/2025', '6/5/2025', '6/19/2025', '7/7/2025 - 8/5/2025', 'north-suburbs'],
-        ['Evanston', '4/9/2025', '5/21/2025', '6/20/2025', '7/3/2025', '7/7/2025 - 8/5/2025', 'north-suburbs'],
-        ['New Trier', '4/23/2025', '6/5/2025', '7/21/2025', '7/31/2025', '8/18/2025 - 9/16/2025', 'north-suburbs'],
-        ['Elk Grove', '5/6/2025', '6/18/2025', '7/31/2025', '8/7/2025', '8/18/2025 - 9/16/2025', 'north-suburbs'],
-        ['Maine', '6/4/2025', '7/18/2025', '8/18/2025', '8/27/2025', '9/22/2025 - 10/21/2025', 'north-suburbs'],
-        ['Northfield', '6/17/2025', '7/31/2025', '9/12/2025', '9/25/2025', '9/22/2025 - 10/21/2025', 'north-suburbs'],
-        ['Barrington', '7/3/2025', '8/15/2025', '9/5/2025', '9/18/2025', '9/22/2025 - 10/21/2025', 'north-suburbs'],
-        ['Leyden', '7/21/2025', '9/2/2025', '10/10/2025', '10/22/2025', '10/23/2025 - 11/21/2025', 'north-suburbs'],
-        ['Wheeling', '8/18/2025', '9/30/2025', '10/30/2025', '11/6/2025', '11/20/2025 - 12/19/2025', 'north-suburbs'],
-        ['Palatine', '9/9/2025', '10/22/2025', '11/24/2025', '12/4/2025', '1/5/2026 - 2/3/2026', 'north-suburbs'],
-        ['Niles', '10/22/2025', '12/5/2025', '12/26/2025', '1/8/2026', '1/20/2026 - 2/18/2026', 'north-suburbs'],
-        ['Schaumburg', '10/2/2025', '11/17/2025', '12/12/2025', '12/18/2025', '', 'north-suburbs'],
-        ['Hanover', '11/6/2025', '12/22/2025', '1/2/2026', '1/8/2026', '1/20/2026 - 2/18/2026', 'north-suburbs'],
-        ['Riverside', '3/7/2025', '4/18/2025', '6/4/2025', '6/12/2025', '7/7/2025 - 8/5/2025', 'south-west-chicago'],
-        ['River Forest', '3/7/2025', '4/18/2025', '6/4/2025', '6/19/2025', '7/7/2025 - 8/5/2025', 'south-west-chicago'],
-        ['Rogers Park', '3/12/2025', '4/23/2025', '6/4/2025', '6/11/2025', '7/7/2025 - 8/5/2025', 'south-west-chicago'],
-        ['Berwyn', '3/25/2025', '5/6/2025', '6/10/2025', '6/19/2025', '7/7/2025 - 8/5/2025', 'south-west-chicago'],
-        ['Oak Park', '4/8/2025', '5/20/2025', '6/25/2025', '7/2/2025', '7/21/2025 - 8/19/2025', 'south-west-chicago'],
-        ['Palos', '4/19/2025', '6/2/2025', '6/26/2025', '7/3/2025', '7/21/2025 - 8/19/2025', 'south-west-chicago'],
-        ['Cicero', '4/24/2025', '6/6/2025', '7/10/2025', '7/17/2025', '7/21/2025 - 8/19/2025', 'south-west-chicago'],
-        ['Lake View', '5/23/2025', '7/9/2025', '8/5/2025', '8/13/2025', '8/18/2025 - 9/16/2025', 'south-west-chicago'],
-        ['Lyons', '6/2/2025', '7/16/2025', '8/13/2025', '8/21/2025', '8/18/2025 - 9/16/2025', 'south-west-chicago'],
-        ['Stickney', '6/11/2025', '7/25/2025', '8/20/2025', '8/28/2025', '9/22/2025 - 10/21/2025', 'south-west-chicago'],
-        ['West Chicago', '7/9/2025', '8/20/2025', '9/18/2025', '9/25/2025', '9/22/2025 - 10/21/2025', 'south-west-chicago'],
-        ['Lemont', '7/21/2025', '9/2/2025', '9/30/2025', '10/10/2025', '10/23/2025 - 11/21/2025', 'south-west-chicago'],
-        ['Bremen', '7/10/2025', '8/21/2025', '9/24/2025', '10/2/2025', '10/23/2025 - 11/21/2025', 'south-west-chicago'],
-        ['Jefferson', '8/21/2025', '10/3/2025', '11/14/2025', '11/22/2025', '11/20/2025 - 12/19/2025', 'south-west-chicago'],
-        ['Hyde Park', '8/4/2025', '9/16/2025', '10/16/2025', '10/23/2025', '10/23/2025 - 11/21/2025', 'south-west-chicago'],
-        ['Proviso', '8/25/2025', '10/7/2025', '11/4/2025', '11/12/2025', '11/20/2025 - 12/19/2025', 'south-west-chicago'],
-        ['Calumet', '7/30/2025', '9/11/2025', '9/30/2025', '10/10/2025', '10/23/2025 - 11/21/2025', 'south-west-chicago'],
-        ['Rich', '10/21/2025', '12/4/2025', '12/22/2025', '1/2/2026', '1/20/2026 - 2/18/2026', 'south-west-chicago'],
-        ['Worth', '8/11/2025', '9/23/2025', '10/20/2025', '10/30/2025', '10/23/2025 - 11/21/2025', 'south-west-chicago'],
-        ['Orland', '9/10/2025', '10/23/2025', '11/18/2025', '11/27/2025', '1/5/2026 - 2/3/2026', 'south-west-chicago'],
-        ['Thornton', '10/1/2025', '11/14/2025', '12/3/2025', '12/11/2025', '1/5/2026 - 2/3/2026', 'south-west-chicago'],
-        ['Bloom', '10/24/2025', '12/9/2025', '12/30/2025', '1/7/2026', '1/20/2026 - 2/18/2026', 'south-west-chicago'],
-        ['South Chicago', '10/15/2025', '11/28/2025', '12/19/2025', '12/27/2025', '1/20/2026 - 2/18/2026', 'south-west-chicago'],
-        ['Lake', '9/22/2025', '11/4/2025', '11/26/2025', '12/3/2025', '1/5/2026 - 2/3/2026', 'south-west-chicago'],
-        ['North Chicago', '10/7/2025', '11/20/2025', '12/16/2025', '12/24/2025', '1/20/2026 - 2/18/2026', 'south-west-chicago']
-].map(([name, reassessmentNoticeDate, lastFileDate, aRollCertifiedDate, aRollPublishedDate, boardOfReviewAppealDates, region]) => ({
-        name,
-        reassessmentNoticeDate,
-        lastFileDate,
-        aRollCertifiedDate,
-        aRollPublishedDate,
-        boardOfReviewAppealDates,
-        region
-}));
+const TODAY = new Date();
+const TODAY_DATE = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
 
 const CHICAGO_COMMUNITY_AREA_ALIASES = new Map(Object.entries({
         ROGERS_PARK: 'Rogers Park',
@@ -183,7 +142,7 @@ function matchCalendarName(value) {
         let best = null;
         let bestScore = 0;
 
-        for (const entry of APPEAL_CALENDAR_2025) {
+        for (const entry of APPEAL_CALENDAR_2026) {
                 const official = normalizeText(entry.name);
                 if (official === candidate) return { entry, confidence: 1, matchedBy: 'exact' };
 
@@ -197,11 +156,22 @@ function matchCalendarName(value) {
         return best && bestScore >= 0.92 ? { entry: best, confidence: bestScore, matchedBy: 'similarity' } : null;
 }
 
+function parseDate(value) {
+        const match = String(value || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (!match) return null;
+
+        const [, month, day, year] = match;
+        return new Date(Number(year), Number(month) - 1, Number(day));
+}
+
 function calendarPayload(entry, matchedBy, confidence, lookupName) {
         const assessorAppealWindow = entry.reassessmentNoticeDate && entry.lastFileDate
                 ? `${entry.reassessmentNoticeDate} - ${entry.lastFileDate}`
                 : entry.lastFileDate || null;
-        const nextAppealWindow = entry.boardOfReviewAppealDates || assessorAppealWindow;
+        const lastFileDate = parseDate(entry.lastFileDate);
+        const nextAppealWindow = lastFileDate
+                ? (lastFileDate < TODAY_DATE ? 'Past Appeal Window' : `Open For Appeals Until ${entry.lastFileDate}`)
+                : null;
 
         return {
                 areaName: entry.name,
@@ -217,7 +187,9 @@ function calendarPayload(entry, matchedBy, confidence, lookupName) {
                 matchedBy,
                 confidence,
                 sourceUrl: OFFICIAL_CALENDAR_URL,
-                sourceLastUpdated: '1/27/2026'
+                currentSourceUrl: CURRENT_CALENDAR_URL,
+                sourceLastUpdated: APPEAL_CALENDAR_SOURCE_LAST_UPDATED,
+                note: nextAppealWindow ? null : 'No current or future appeal window is posted for this area. Check the official Cook County Assessor calendar.'
         };
 }
 
@@ -252,7 +224,8 @@ export function getAppealCalendarForProperty(property) {
                 areaName: null,
                 lookupName: isChicago ? property?.chicagoCommunityArea || '' : municipalityName,
                 sourceUrl: OFFICIAL_CALENDAR_URL,
-                sourceLastUpdated: '1/27/2026',
+                currentSourceUrl: CURRENT_CALENDAR_URL,
+                sourceLastUpdated: APPEAL_CALENDAR_SOURCE_LAST_UPDATED,
                 nextAppealWindow: null,
                 assessorAppealWindow: null,
                 matchedBy: 'none',
