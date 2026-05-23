@@ -1,5 +1,6 @@
 import { getAddressSuggestions } from '../_property_addresses.js';
 import { getAppealCalendarForProperty } from '../_appeal_calendar.js';
+import { attachPropertyTaxContext } from '../_tax_context.js';
 
 const EARTH_RADIUS_MILES = 3958.8;
 const RESIDENTIAL_CLASS_CODES = new Set([
@@ -510,7 +511,7 @@ export async function findTargetProperty(db, { id, pin, address }) {
                         `SELECT ${PROPERTY_SELECT} FROM property_addresses WHERE id = ? LIMIT 1`
                 ).bind(id).first();
                 if (row) {
-                        return (await getPropertyGroup(db, row))[0] || rowToProperty(row);
+                        return attachPropertyTaxContext(db, (await getPropertyGroup(db, row))[0] || rowToProperty(row));
                 }
         }
 
@@ -519,7 +520,7 @@ export async function findTargetProperty(db, { id, pin, address }) {
                         `SELECT ${PROPERTY_SELECT} FROM property_addresses WHERE pin = ? LIMIT 1`
                 ).bind(pin).first();
                 if (row) {
-                        return (await getPropertyGroup(db, row))[0] || rowToProperty(row);
+                        return attachPropertyTaxContext(db, (await getPropertyGroup(db, row))[0] || rowToProperty(row));
                 }
         }
 
@@ -532,7 +533,7 @@ export async function findTargetProperty(db, { id, pin, address }) {
         const row = await db.prepare(
                 `SELECT ${PROPERTY_SELECT} FROM property_addresses WHERE id = ? LIMIT 1`
         ).bind(best.id).first();
-        return row ? ((await getPropertyGroup(db, row))[0] || rowToProperty(row)) : null;
+        return row ? attachPropertyTaxContext(db, (await getPropertyGroup(db, row))[0] || rowToProperty(row)) : null;
 }
 
 export async function findComparableProperties(db, target, radius) {

@@ -1,6 +1,7 @@
 import { requireFirebaseUser, jsonResponse } from './_auth.js';
 import { getAppealCalendarForProperty } from './_appeal_calendar.js';
 import { findBestPropertyAddress, getPropertyAddressCount } from './_property_addresses.js';
+import { attachPropertyTaxContext } from './_tax_context.js';
 
 const PROPERTY_GROUP_KEY = `CASE
         WHEN pin_proration_rate IS NOT NULL AND pin_proration_rate < 1
@@ -74,10 +75,11 @@ export const onRequestGet = async (context) => {
                          ORDER BY user_addresses.created_at DESC`
                 ).bind(user.uid).all();
 
-                return jsonResponse(results.map(row => {
+                const addresses = await Promise.all(results.map(async row => {
                         const propertyDetails = row.property_details ? JSON.parse(row.property_details) : null;
                         if (propertyDetails) {
                                 propertyDetails.appealCalendar = getAppealCalendarForProperty(propertyDetails);
+                                Object.assign(propertyDetails, await attachPropertyTaxContext(context.env.DB, propertyDetails));
                         }
 
                         return {
@@ -86,6 +88,8 @@ export const onRequestGet = async (context) => {
                                 property_details: undefined
                         };
                 }));
+
+                return jsonResponse(addresses);
         } catch (err) {
                 return jsonResponse({ error: err.message }, 500);
         }

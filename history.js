@@ -233,6 +233,8 @@ function selectAddress(propertyKey) {
                         details?.lastAppealYear ? ['Last Appeal', details.lastAppealYear] : null,
                         details?.municipalityName ? ['Municipality', details.municipalityName] : null,
                         details?.townshipName ? ['Township', details.townshipName] : null,
+                        details?.taxContext?.stateEqualizer ? ['State Equalizer', `${formatEqualizer(details.taxContext.stateEqualizer)} (${details.taxContext.taxYear})`] : null,
+                        details?.taxContext ? ['Local Tax Rate', formatTaxRate(details.taxContext.localTaxRate)] : null,
                         details?.mailingName ? ['Mailing Name', details.mailingName] : null,
                         details?.mailingAddress ? ['Mailing Address', details.mailingAddress] : null,
                         details?.appealCalendar?.boardOfReviewAppealDates ? ['Board Review', details.appealCalendar.boardOfReviewAppealDates] : null
@@ -433,6 +435,8 @@ function renderPropertyDetails(details) {
 
         const fields = [
                 ['Taxable Value', formatCurrency(details?.taxableValue)],
+                ['Equalized Assessed Value', formatCurrency(details?.taxContext?.equalizedAssessedValue)],
+                ['Imported Exemptions', formatExemptions(details?.taxContext?.exemptions)],
                 ['Bedrooms', formatNumber(details?.bedroomCount)],
                 ['Full Baths', formatFullBaths(details?.bathroomCount)],
                 ['Half Baths', formatHalfBaths(details?.bathroomCount)],
@@ -747,6 +751,24 @@ function formatWholeNumber(value) {
 function formatPercent(value) {
         if (value === null || value === undefined || value === '') return '';
         return `${Number(value).toLocaleString('en-US', { maximumFractionDigits: 3 })}`;
+}
+
+function formatTaxRate(value) {
+        if (value === null || value === undefined || value === '') return 'Not imported';
+        const number = Number(value);
+        if (!Number.isFinite(number)) return 'Not imported';
+        return `${number.toLocaleString('en-US', { maximumFractionDigits: 3 })}%`;
+}
+
+function formatEqualizer(value) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) return '';
+        return number.toFixed(4);
+}
+
+function formatExemptions(exemptions) {
+        if (!Array.isArray(exemptions) || !exemptions.length) return 'None imported';
+        return exemptions.map(item => item.type).filter(Boolean).join(', ') || 'Imported';
 }
 
 function escapeHtml(value) {

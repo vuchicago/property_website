@@ -418,6 +418,10 @@ function updatePropertyResults(data) {
     setText('snapshot-municipality', target.municipalityName || 'N/A');
     setText('snapshot-township', target.townshipName || 'N/A');
     setText('snapshot-next-appeal-window', target.appealCalendar?.nextAppealWindow || 'N/A');
+    setText('snapshot-equalizer', target.taxContext?.stateEqualizer ? `${formatEqualizer(target.taxContext.stateEqualizer)} (${target.taxContext.taxYear})` : 'N/A');
+    setText('snapshot-tax-rate', formatTaxRate(target.taxContext?.localTaxRate));
+    setText('snapshot-eav', formatCurrency(target.taxContext?.equalizedAssessedValue));
+    setText('snapshot-exemptions', formatExemptions(target.taxContext?.exemptions));
     setText('snapshot-single-multi', target.singleVsMultiFamily || 'N/A');
     setText('snapshot-basement', target.finishedBasement || 'N/A');
     setText('snapshot-garage', target.garageSize || 'N/A');
@@ -878,6 +882,23 @@ function formatNumber(value) {
     const number = Number(value);
     if (!Number.isFinite(number)) return 'N/A';
     return new Intl.NumberFormat('en-US', { maximumFractionDigits: number % 1 ? 1 : 0 }).format(number);
+}
+
+function formatTaxRate(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 'Not imported';
+    return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(number)}%`;
+}
+
+function formatEqualizer(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 'N/A';
+    return number.toFixed(4);
+}
+
+function formatExemptions(exemptions) {
+    if (!Array.isArray(exemptions) || !exemptions.length) return 'None imported';
+    return exemptions.map(item => item.type).filter(Boolean).join(', ') || 'Imported';
 }
 
 function bathParts(value) {
