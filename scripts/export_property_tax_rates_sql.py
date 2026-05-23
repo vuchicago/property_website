@@ -4,9 +4,10 @@
 The preferred source is a CSV with columns like:
 tax_year, tax_code, tax_code_rate
 
-The Cook County Open Data Socrata endpoint uses those names, but the script
-also accepts common Clerk report variants such as "Tax Year", "Tax Code", and
-"Tax Code Rate".
+The current source should be an extracted CSV from the official Cook County
+Clerk Tax Rate Report PDF. Do not use the old Cook County Open Data Socrata
+tax-rate dataset for current years; its metadata is updated, but the rows only
+run through 2013.
 """
 
 from __future__ import annotations
@@ -15,11 +16,7 @@ import argparse
 import csv
 import io
 import re
-import urllib.request
 from pathlib import Path
-
-
-DEFAULT_SOURCE_URL = "https://datacatalog.cookcountyil.gov/api/views/9sqg-vznj/rows.csv?accessType=DOWNLOAD"
 
 
 def normalize_header(value: str) -> str:
@@ -60,13 +57,6 @@ def sql_literal(value) -> str:
     return "'" + str(value).replace("'", "''") + "'"
 
 
-def read_text(path_or_url: str) -> str:
-    if path_or_url.startswith(("http://", "https://")):
-        with urllib.request.urlopen(path_or_url, timeout=120) as response:
-            return response.read().decode("utf-8-sig")
-    return Path(path_or_url).read_text(encoding="utf-8-sig")
-
-
 def find_column(fieldnames: list[str], aliases: set[str]) -> str | None:
     normalized = {normalize_header(field): field for field in fieldnames}
     for alias in aliases:
@@ -76,7 +66,7 @@ def find_column(fieldnames: list[str], aliases: set[str]) -> str | None:
 
 
 def export_rates(args) -> int:
-    raw_csv = read_text(args.input)
+    raw_csv = Path(args.input).read_text(encoding="utf-8-sig")
     reader = csv.DictReader(io.StringIO(raw_csv))
     fieldnames = reader.fieldnames or []
 
@@ -91,8 +81,10 @@ def export_rates(args) -> int:
         )
 
     rates: dict[tuple[int, str], float] = {}
+    available_years: set[int] = set()
     for row in reader:
         tax_year = int(clean_number(row.get(tax_year_column)) or args.tax_year)
+        available_years.add(tax_year)
         if args.tax_year and tax_year != args.tax_year:
             continue
 
@@ -106,6 +98,13 @@ def export_rates(args) -> int:
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     source = args.source or args.input
+
+    if not rates:
+        years = ", ".join(str(year) for year in sorted(available_years)) or "none detected"
+        raise SystemExit(
+            f"No tax-code rates found for tax year {args.tax_year}. "
+            f"Available years in {args.input}: {years}."
+        )
 
     with output.open("w", encoding="utf-8") as handle:
         handle.write(
@@ -131,7 +130,7 @@ def export_rates(args) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default=DEFAULT_SOURCE_URL, help="CSV file path or URL.")
+    parser.add_argument("--input", required=True, help="CSV file path extracted from the official Clerk Tax Rate Report.")
     parser.add_argument("--output", default="import/property_tax_rates.sql", help="SQL output path.")
     parser.add_argument("--tax-year", type=int, required=True, help="Tax year to export.")
     parser.add_argument("--source", default="", help="Source label/URL to store with each row.")

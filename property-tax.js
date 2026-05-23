@@ -3,6 +3,8 @@ let selectedProperty = null;
 let searchResults = null;
 let suggestionAbort = null;
 let comparableSort = { index: null, direction: 'asc' };
+const CURRENT_TAX_YEAR = 2024;
+const CURRENT_STATE_EQUALIZER = 3.0355;
 const COMPARABLE_COLUMNS = [
     { label: 'Address', value: c => escapeHtml(c.address), sortValue: c => c.address },
     { label: 'Taxable Value', value: c => formatCurrency(c.taxableValue), sortValue: c => c.taxableValue },
@@ -396,6 +398,7 @@ function scrollPropertyResultsIntoView() {
 
 function updatePropertyResults(data) {
     const target = data.target;
+    const taxContext = taxContextForDisplay(target);
     const summary = data.summary;
 
     document.getElementById('property-tax-empty').hidden = true;
@@ -418,10 +421,10 @@ function updatePropertyResults(data) {
     setText('snapshot-municipality', target.municipalityName || 'N/A');
     setText('snapshot-township', target.townshipName || 'N/A');
     setText('snapshot-next-appeal-window', target.appealCalendar?.nextAppealWindow || 'N/A');
-    setText('snapshot-equalizer', target.taxContext?.stateEqualizer ? `${formatEqualizer(target.taxContext.stateEqualizer)} (${target.taxContext.taxYear})` : 'N/A');
-    setText('snapshot-tax-rate', formatTaxRate(target.taxContext?.localTaxRate));
-    setText('snapshot-eav', formatCurrency(target.taxContext?.equalizedAssessedValue));
-    setText('snapshot-exemptions', formatExemptions(target.taxContext?.exemptions));
+    setText('snapshot-equalizer', `${formatEqualizer(taxContext.stateEqualizer)} (${taxContext.taxYear})`);
+    setText('snapshot-tax-rate', formatTaxRate(taxContext.localTaxRate));
+    setText('snapshot-eav', formatCurrency(taxContext.equalizedAssessedValue));
+    setText('snapshot-exemptions', formatExemptions(taxContext.exemptions));
     setText('snapshot-single-multi', target.singleVsMultiFamily || 'N/A');
     setText('snapshot-basement', target.finishedBasement || 'N/A');
     setText('snapshot-garage', target.garageSize || 'N/A');
@@ -866,6 +869,21 @@ function formatCurrency(value) {
         currency: 'USD',
         maximumFractionDigits: 0
     }).format(number);
+}
+
+function taxContextForDisplay(target) {
+    const taxableValue = Number(target?.taxableValue);
+    const fallbackEav = Number.isFinite(taxableValue)
+        ? Math.round(taxableValue * CURRENT_STATE_EQUALIZER)
+        : null;
+
+    return {
+        taxYear: target?.taxContext?.taxYear || CURRENT_TAX_YEAR,
+        stateEqualizer: Number(target?.taxContext?.stateEqualizer) || CURRENT_STATE_EQUALIZER,
+        equalizedAssessedValue: target?.taxContext?.equalizedAssessedValue ?? fallbackEav,
+        localTaxRate: target?.taxContext?.localTaxRate ?? null,
+        exemptions: Array.isArray(target?.taxContext?.exemptions) ? target.taxContext.exemptions : []
+    };
 }
 
 function formatCurrencyPerSqft(value) {

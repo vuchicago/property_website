@@ -1,6 +1,6 @@
 import { getAddressSuggestions } from '../_property_addresses.js';
 import { getAppealCalendarForProperty } from '../_appeal_calendar.js';
-import { attachPropertyTaxContext } from '../_tax_context.js';
+import { attachPropertyTaxContext, baseTaxContext } from '../_tax_context.js';
 
 const EARTH_RADIUS_MILES = 3958.8;
 const RESIDENTIAL_CLASS_CODES = new Set([
@@ -660,7 +660,8 @@ export async function findComparableProperties(db, target, radius) {
 export function buildAnalysis(target, comparables, radius, env) {
         const targetWithCalendar = target ? {
                 ...target,
-                appealCalendar: getAppealCalendarForProperty(target)
+                appealCalendar: getAppealCalendarForProperty(target),
+                taxContext: target.taxContext || baseTaxContext(target)
         } : target;
         const averageComparableValue = comparables.length
                 ? comparables.reduce((sum, item) => sum + (item.taxableValue || 0), 0) / comparables.length

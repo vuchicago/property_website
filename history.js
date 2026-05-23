@@ -8,6 +8,8 @@ let selectedPropertyKeySuggestion = '';
 let currentSuggestions = [];
 let selectedAddressForImage = '';
 let selectedPinForImage = '';
+const CURRENT_TAX_YEAR = 2024;
+const CURRENT_STATE_EQUALIZER = 3.0355;
 const DASHBOARD_CACHE_VERSION = '20260522-appeal-window';
 
 export async function loadAppealHistory() {
@@ -224,6 +226,7 @@ function selectAddress(propertyKey) {
 
         document.getElementById('selected-address-title').textContent = address;
         const details = selectedAddress?.propertyDetails;
+        const taxContext = taxContextForDisplay(details);
         const pinEl = document.getElementById('selected-address-pin');
 
         if (pinEl) {
@@ -233,8 +236,8 @@ function selectAddress(propertyKey) {
                         details?.lastAppealYear ? ['Last Appeal', details.lastAppealYear] : null,
                         details?.municipalityName ? ['Municipality', details.municipalityName] : null,
                         details?.townshipName ? ['Township', details.townshipName] : null,
-                        details?.taxContext?.stateEqualizer ? ['State Equalizer', `${formatEqualizer(details.taxContext.stateEqualizer)} (${details.taxContext.taxYear})`] : null,
-                        details?.taxContext ? ['Local Tax Rate', formatTaxRate(details.taxContext.localTaxRate)] : null,
+                        ['State Equalizer', `${formatEqualizer(taxContext.stateEqualizer)} (${taxContext.taxYear})`],
+                        ['Local Tax Rate', formatTaxRate(taxContext.localTaxRate)],
                         details?.mailingName ? ['Mailing Name', details.mailingName] : null,
                         details?.mailingAddress ? ['Mailing Address', details.mailingAddress] : null,
                         details?.appealCalendar?.boardOfReviewAppealDates ? ['Board Review', details.appealCalendar.boardOfReviewAppealDates] : null
@@ -432,11 +435,12 @@ function resizeImage(file, maxWidth, maxHeight) {
 function renderPropertyDetails(details) {
         const container = document.getElementById('selected-property-details');
         if (!container) return;
+        const taxContext = taxContextForDisplay(details);
 
         const fields = [
                 ['Taxable Value', formatCurrency(details?.taxableValue)],
-                ['Equalized Assessed Value', formatCurrency(details?.taxContext?.equalizedAssessedValue)],
-                ['Imported Exemptions', formatExemptions(details?.taxContext?.exemptions)],
+                ['Equalized Assessed Value', formatCurrency(taxContext.equalizedAssessedValue)],
+                ['Imported Exemptions', formatExemptions(taxContext.exemptions)],
                 ['Bedrooms', formatNumber(details?.bedroomCount)],
                 ['Full Baths', formatFullBaths(details?.bathroomCount)],
                 ['Half Baths', formatHalfBaths(details?.bathroomCount)],
@@ -710,6 +714,21 @@ function formatCurrency(value) {
                 currency: 'USD',
                 maximumFractionDigits: 0
         });
+}
+
+function taxContextForDisplay(details) {
+        const taxableValue = Number(details?.taxableValue);
+        const fallbackEav = Number.isFinite(taxableValue)
+                ? Math.round(taxableValue * CURRENT_STATE_EQUALIZER)
+                : null;
+
+        return {
+                taxYear: details?.taxContext?.taxYear || CURRENT_TAX_YEAR,
+                stateEqualizer: Number(details?.taxContext?.stateEqualizer) || CURRENT_STATE_EQUALIZER,
+                equalizedAssessedValue: details?.taxContext?.equalizedAssessedValue ?? fallbackEav,
+                localTaxRate: details?.taxContext?.localTaxRate ?? null,
+                exemptions: Array.isArray(details?.taxContext?.exemptions) ? details.taxContext.exemptions : []
+        };
 }
 
 function formatNumber(value, suffix = '') {

@@ -3401,9 +3401,9 @@ input[type="range"]::-webkit-slider-thumb {
 
 .deadlines-section .container {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-16);
-    align-items: center;
+    grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+    gap: var(--space-10);
+    align-items: start;
 }
 
 .deadlines-section .section-badge {
@@ -3423,7 +3423,11 @@ input[type="range"]::-webkit-slider-thumb {
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-    margin: var(--space-8) 0;
+    margin-top: var(--space-5);
+}
+
+.deadlines-visual {
+    margin-top: calc(var(--space-5) + 14rem);
 }
 
 .info-card {
@@ -3464,11 +3468,16 @@ input[type="range"]::-webkit-slider-thumb {
     opacity: 0.7;
 }
 
+.deadline-card-link {
+    margin-top: var(--space-3);
+}
+
 /* Calendar Preview */
 .calendar-preview {
     background: var(--white);
     border-radius: var(--radius-2xl);
-    padding: var(--space-6);
+    margin-top: var(--space-5);
+    padding: var(--space-5);
     color: var(--dark-700);
     box-shadow: var(--shadow-2xl);
 }
@@ -3528,7 +3537,7 @@ input[type="range"]::-webkit-slider-thumb {
     background: transparent;
     border: 1px solid transparent;
     color: var(--dark-700);
-    min-height: 40px;
+    min-height: 34px;
     position: relative;
     text-align: center;
     padding: var(--space-2);
@@ -3586,7 +3595,6 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .deadline-dashboard {
-    margin-top: var(--space-5);
     background: var(--white);
     border-radius: var(--radius-2xl);
     padding: var(--space-5);
@@ -4770,6 +4778,14 @@ textarea {
     .hero-content {
         padding: 0 var(--container-padding);
         max-width: 100%;
+    }
+
+    .hero-subtitle {
+        font-size: var(--font-size-base);
+        margin-left: auto;
+        margin-right: auto;
+        max-width: 22rem;
+        text-align: center;
     }
 
     .hero-cta {
