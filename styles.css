@@ -3445,6 +3445,11 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .calendar-day {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--dark-700);
+    min-height: 40px;
+    position: relative;
     text-align: center;
     padding: var(--space-2);
     font-size: var(--font-size-sm);
@@ -3456,6 +3461,7 @@ input[type="range"]::-webkit-slider-thumb {
     background: var(--dark-100);
 }
 
+.calendar-day.is-outside,
 .calendar-day.prev-month,
 .calendar-day.next-month {
     color: var(--dark-300);
@@ -3497,6 +3503,70 @@ input[type="range"]::-webkit-slider-thumb {
 
 .legend-dot.deadline {
     background: var(--danger);
+}
+
+.deadline-dashboard {
+    margin-top: var(--space-5);
+    background: var(--white);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-5);
+    color: var(--dark-700);
+    box-shadow: var(--shadow-xl);
+}
+
+.deadline-dashboard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+    color: var(--dark-900);
+    font-weight: 700;
+}
+
+.deadline-dashboard-header strong {
+    color: var(--danger);
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+}
+
+.deadline-dashboard-list {
+    display: grid;
+    gap: var(--space-3);
+}
+
+.deadline-dashboard-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-4);
+    align-items: center;
+    padding: var(--space-3);
+    border: 1px solid var(--dark-100);
+    border-radius: var(--radius-lg);
+    background: var(--dark-50);
+}
+
+.deadline-dashboard-township {
+    min-width: 0;
+    color: var(--dark-900);
+    font-weight: 700;
+}
+
+.deadline-dashboard-dates {
+    display: grid;
+    gap: 2px;
+    text-align: right;
+}
+
+.deadline-dashboard-dates strong {
+    color: var(--danger);
+    font-size: var(--font-size-sm);
+}
+
+.deadline-dashboard-dates span,
+.deadline-dashboard-empty {
+    color: var(--dark-500);
+    font-size: var(--font-size-xs);
 }
 
 /* ========================================

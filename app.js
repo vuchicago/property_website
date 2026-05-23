@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initMobileMenu();
     initScrollAnimations();
     initNavigation();
+    initAppealDeadlineCalendar();
     initHeroAnimations();
     initPreviewTools();
     initFAQ();
@@ -97,6 +98,178 @@ function initNavigation() {
                 }
             }
         });
+    });
+}
+
+// ========================================
+// Appeal Deadline Calendar
+// ========================================
+function initAppealDeadlineCalendar() {
+    const grid = document.getElementById('appeal-calendar-grid');
+    const title = document.getElementById('appeal-calendar-title');
+    const prevButton = document.getElementById('appeal-calendar-prev');
+    const nextButton = document.getElementById('appeal-calendar-next');
+    const list = document.getElementById('appeal-deadline-list');
+    const count = document.getElementById('appeal-deadline-count');
+
+    if (!grid || !title) return;
+
+    const today = getCentralDate();
+    let visibleMonth = today.getMonth();
+    let visibleYear = today.getFullYear();
+
+    const render = () => {
+        renderAppealCalendarMonth(grid, title, visibleYear, visibleMonth, today);
+        renderAppealDeadlineDashboard(list, count, today);
+    };
+
+    prevButton?.addEventListener('click', () => {
+        const nextDate = new Date(visibleYear, visibleMonth - 1, 1);
+        visibleMonth = nextDate.getMonth();
+        visibleYear = nextDate.getFullYear();
+        render();
+    });
+
+    nextButton?.addEventListener('click', () => {
+        const nextDate = new Date(visibleYear, visibleMonth + 1, 1);
+        visibleMonth = nextDate.getMonth();
+        visibleYear = nextDate.getFullYear();
+        render();
+    });
+
+    render();
+}
+
+function getCentralDate() {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Chicago',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric'
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return new Date(Number(values.year), Number(values.month) - 1, Number(values.day));
+}
+
+function hasAppealDate(value) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+}
+
+function parseLocalDate(value) {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day);
+}
+
+function getPostedAppealDeadlines() {
+    const rows = Array.isArray(window.APPEAL_DEADLINES) ? window.APPEAL_DEADLINES : [];
+    return rows
+        .filter(item => hasAppealDate(item.start) && hasAppealDate(item.deadline))
+        .map(item => ({
+            ...item,
+            startDate: parseLocalDate(item.start),
+            deadlineDate: parseLocalDate(item.deadline)
+        }));
+}
+
+function toDateKey(date) {
+    return [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0')
+    ].join('-');
+}
+
+function formatShortDate(date) {
+    return new Intl.DateTimeFormat('en-US', {
+        month: 'numeric',
+        day: 'numeric',
+        year: 'numeric'
+    }).format(date);
+}
+
+function renderAppealCalendarMonth(grid, title, year, month, today) {
+    title.textContent = new Intl.DateTimeFormat('en-US', {
+        month: 'long',
+        year: 'numeric'
+    }).format(new Date(year, month, 1));
+    grid.innerHTML = '';
+
+    const deadlinesByDate = getPostedAppealDeadlines()
+        .filter(item => item.deadlineDate >= today)
+        .reduce((map, item) => {
+            const key = toDateKey(item.deadlineDate);
+            if (!map.has(key)) map.set(key, []);
+            map.get(key).push(item);
+            return map;
+        }, new Map());
+
+    ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(day => {
+        const header = document.createElement('div');
+        header.className = 'calendar-day-header';
+        header.textContent = day;
+        grid.appendChild(header);
+    });
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startOffset = firstDay.getDay();
+    const totalCells = Math.ceil((startOffset + lastDay.getDate()) / 7) * 7;
+
+    for (let cell = 0; cell < totalCells; cell += 1) {
+        const date = new Date(year, month, cell - startOffset + 1);
+        const deadlines = deadlinesByDate.get(toDateKey(date)) || [];
+        const day = document.createElement('button');
+        day.type = 'button';
+        day.className = 'calendar-day';
+        day.textContent = String(date.getDate());
+        if (date.getMonth() !== month) day.classList.add('is-outside');
+        if (toDateKey(date) === toDateKey(today)) day.classList.add('today');
+        if (deadlines.length) {
+            day.classList.add('deadline');
+            day.setAttribute('aria-label', `${formatShortDate(date)} deadline: ${deadlines.map(item => item.township).join(', ')}`);
+        }
+        grid.appendChild(day);
+    }
+}
+
+function renderAppealDeadlineDashboard(list, count, today) {
+    if (!list || !count) return;
+
+    const upcoming = getPostedAppealDeadlines()
+        .filter(item => item.deadlineDate >= today)
+        .sort((a, b) => a.deadlineDate - b.deadlineDate || a.township.localeCompare(b.township));
+
+    count.textContent = `${upcoming.length} upcoming`;
+    list.innerHTML = '';
+
+    if (!upcoming.length) {
+        const empty = document.createElement('p');
+        empty.className = 'deadline-dashboard-empty';
+        empty.textContent = 'No future appeal deadlines are posted yet. Check the official calendar for the newest schedule.';
+        list.appendChild(empty);
+        return;
+    }
+
+    upcoming.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'deadline-dashboard-row';
+
+        const township = document.createElement('div');
+        township.className = 'deadline-dashboard-township';
+        township.textContent = item.township;
+
+        const dates = document.createElement('div');
+        dates.className = 'deadline-dashboard-dates';
+
+        const deadline = document.createElement('strong');
+        deadline.textContent = `Deadline: ${formatShortDate(item.deadlineDate)}`;
+
+        const window = document.createElement('span');
+        window.textContent = `${formatShortDate(item.startDate)} - ${formatShortDate(item.deadlineDate)}`;
+
+        dates.append(deadline, window);
+        row.append(township, dates);
+        list.appendChild(row);
     });
 }
 

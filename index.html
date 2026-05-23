@@ -798,66 +798,30 @@
             <div class="deadlines-visual animate-on-scroll delay-200">
                 <div class="calendar-preview">
                     <div class="calendar-header">
-                        <span>Official calendar reminder</span>
+                        <span id="appeal-calendar-title">Official calendar reminder</span>
                         <div class="calendar-nav">
-                            <button><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <button type="button" id="appeal-calendar-prev" aria-label="Previous month"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M15 19L8 12L15 5" stroke="currentColor" stroke-width="2"
                                         stroke-linecap="round" stroke-linejoin="round" />
                                 </svg></button>
-                            <button><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <button type="button" id="appeal-calendar-next" aria-label="Next month"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M9 5L16 12L9 19" stroke="currentColor" stroke-width="2"
                                         stroke-linecap="round" stroke-linejoin="round" />
                                 </svg></button>
                         </div>
                     </div>
-                    <div class="calendar-grid">
-                        <div class="calendar-day-header">Su</div>
-                        <div class="calendar-day-header">Mo</div>
-                        <div class="calendar-day-header">Tu</div>
-                        <div class="calendar-day-header">We</div>
-                        <div class="calendar-day-header">Th</div>
-                        <div class="calendar-day-header">Fr</div>
-                        <div class="calendar-day-header">Sa</div>
-                        <div class="calendar-day prev-month">29</div>
-                        <div class="calendar-day prev-month">30</div>
-                        <div class="calendar-day prev-month">31</div>
-                        <div class="calendar-day">1</div>
-                        <div class="calendar-day">2</div>
-                        <div class="calendar-day">3</div>
-                        <div class="calendar-day">4</div>
-                        <div class="calendar-day">5</div>
-                        <div class="calendar-day">6</div>
-                        <div class="calendar-day">7</div>
-                        <div class="calendar-day">8</div>
-                        <div class="calendar-day">9</div>
-                        <div class="calendar-day">10</div>
-                        <div class="calendar-day today">11</div>
-                        <div class="calendar-day">12</div>
-                        <div class="calendar-day">13</div>
-                        <div class="calendar-day">14</div>
-                        <div class="calendar-day deadline">15</div>
-                        <div class="calendar-day">16</div>
-                        <div class="calendar-day">17</div>
-                        <div class="calendar-day">18</div>
-                        <div class="calendar-day">19</div>
-                        <div class="calendar-day">20</div>
-                        <div class="calendar-day">21</div>
-                        <div class="calendar-day">22</div>
-                        <div class="calendar-day">23</div>
-                        <div class="calendar-day">24</div>
-                        <div class="calendar-day">25</div>
-                        <div class="calendar-day deadline">26</div>
-                        <div class="calendar-day">27</div>
-                        <div class="calendar-day">28</div>
-                        <div class="calendar-day">29</div>
-                        <div class="calendar-day">30</div>
-                        <div class="calendar-day">31</div>
-                        <div class="calendar-day next-month">1</div>
-                    </div>
+                    <div class="calendar-grid" id="appeal-calendar-grid"></div>
                     <div class="calendar-legend">
                         <span><span class="legend-dot today"></span> Today</span>
                         <span><span class="legend-dot deadline"></span> Deadline</span>
                     </div>
+                </div>
+                <div class="deadline-dashboard">
+                    <div class="deadline-dashboard-header">
+                        <span>Deadline Dashboard</span>
+                        <strong id="appeal-deadline-count">0 upcoming</strong>
+                    </div>
+                    <div class="deadline-dashboard-list" id="appeal-deadline-list"></div>
                 </div>
             </div>
         </div>
@@ -1207,7 +1171,8 @@
         initAuthUI();
     </script>
     <script type="module" src="appeal.js?v=20260521-address-suggestions"></script>
-    <script src="app.js"></script>
+    <script src="appeal_deadlines.js?v=20260523-deadlines"></script>
+    <script src="app.js?v=20260523-calendar"></script>
     <script src="property-tax.js?v=20260522-appeal-window"></script>
     <script src="roi-calculator.js"></script>
     <script src="loan-tool.js"></script>

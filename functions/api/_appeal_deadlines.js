@@ -2,7 +2,7 @@ export const OFFICIAL_CALENDAR_URL = 'https://www.cookcountyassessoril.gov/asses
 export const CURRENT_CALENDAR_URL = 'https://rpie.cookcountyassessor.com/assessment-calendar-and-deadlines';
 export const APPEAL_CALENDAR_SOURCE_LAST_UPDATED = '5/20/2026';
 
-const APPEAL_CALENDAR_ROWS_2026 = [
+const APPEAL_CALENDAR_ROWS = [
         ['Oak Park', '5/6/2026', '6/18/2026', '', '', '', 'south-west-suburbs'],
         ['Riverside', '4/24/2026', '6/8/2026', '', '', '', 'south-west-suburbs'],
         ['River Forest', '4/20/2026', '6/2/2026', '', '', '', 'south-west-suburbs'],
@@ -43,7 +43,7 @@ const APPEAL_CALENDAR_ROWS_2026 = [
         ['South Chicago', '', '', '', '', '', 'north-suburbs-chicago']
 ];
 
-export const APPEAL_CALENDAR_2026 = APPEAL_CALENDAR_ROWS_2026.map(([
+export const APPEAL_CALENDAR = APPEAL_CALENDAR_ROWS.map(([
         name,
         reassessmentNoticeDate,
         lastFileDate,

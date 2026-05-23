@@ -1,5 +1,5 @@
 import {
-        APPEAL_CALENDAR_2026,
+        APPEAL_CALENDAR,
         APPEAL_CALENDAR_SOURCE_LAST_UPDATED,
         CURRENT_CALENDAR_URL,
         OFFICIAL_CALENDAR_URL
@@ -142,7 +142,7 @@ function matchCalendarName(value) {
         let best = null;
         let bestScore = 0;
 
-        for (const entry of APPEAL_CALENDAR_2026) {
+        for (const entry of APPEAL_CALENDAR) {
                 const official = normalizeText(entry.name);
                 if (official === candidate) return { entry, confidence: 1, matchedBy: 'exact' };
 
