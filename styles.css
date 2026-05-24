@@ -497,6 +497,29 @@ ol {
     color: var(--white);
 }
 
+.address-loading-row {
+    animation: dashboardSkeletonPulse 1.2s ease-in-out infinite;
+    background: linear-gradient(90deg, var(--dark-100), var(--dark-50), var(--dark-100));
+    background-size: 220% 100%;
+    border-radius: var(--radius-md);
+    height: 78px;
+}
+
+.address-loading-row.short {
+    height: 58px;
+    opacity: 0.78;
+}
+
+@keyframes dashboardSkeletonPulse {
+    0% {
+        background-position: 120% 0;
+    }
+
+    100% {
+        background-position: -120% 0;
+    }
+}
+
 .property-details-grid {
     border-bottom: 1px solid var(--border-color);
     display: grid;

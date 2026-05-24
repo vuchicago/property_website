@@ -18,24 +18,30 @@ export async function loadAppealHistory(userOverride = null) {
         const user = userOverride || auth.currentUser;
         if (!user) return;
 
-        const hadCache = loadDashboardCache(user.uid);
-        if (hadCache) {
-                renderAccountSummary(user);
-                renderAddressList();
-        }
-
-        await Promise.all([
-                fetchAddresses(),
-                fetchAppeals()
-        ]);
-        saveDashboardCache(user.uid);
-
-        renderAccountSummary(user);
-        renderAddressList();
         setupAddAddressForm();
         setupPropertyImageUpload();
         setupGovernmentIdUpload();
         setupSupportingDocumentsUpload();
+        renderAccountSummary(user);
+
+        const hadCache = loadDashboardCache(user.uid);
+        if (hadCache) {
+                renderAccountSummary(user);
+                renderAddressList();
+        } else {
+                renderAddressLoadingState();
+        }
+
+        await fetchAddresses();
+        saveDashboardCache(user.uid);
+        renderAccountSummary(user);
+        renderAddressList();
+
+        await fetchAppeals();
+        saveDashboardCache(user.uid);
+
+        renderAccountSummary(user);
+        renderAddressList();
 }
 
 async function fetchAddresses() {
@@ -179,6 +185,25 @@ function renderAddressList() {
                         await deleteAddress(address, propertyKey);
                 });
         });
+}
+
+function renderAddressLoadingState() {
+        const listContainer = document.getElementById('address-list');
+        if (!listContainer) return;
+
+        listContainer.innerHTML = `
+                <li class="address-loading-row"></li>
+                <li class="address-loading-row short"></li>
+                <li class="address-loading-row"></li>
+        `;
+
+        const detailsPanel = document.getElementById('appeal-details-container');
+        const emptyPanel = document.getElementById('no-address-selected-msg');
+        if (detailsPanel) detailsPanel.style.display = 'none';
+        if (emptyPanel) {
+                emptyPanel.style.display = 'flex';
+                emptyPanel.textContent = 'Loading your properties...';
+        }
 }
 
 async function deleteAddress(address, propertyKey) {
