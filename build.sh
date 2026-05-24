@@ -41,7 +41,7 @@ cp partners.html dist/partners/index.html
 perl -0pi -e 's{<head>}{<head>\n    <base href="/">}i' dist/property-tax/index.html dist/how-property-taxes-work/index.html dist/partners/index.html
 
 # Copy crawl/indexing metadata and Pages routing rules when present
-cp robots.txt sitemap.xml llms.txt _redirects dist/ 2>/dev/null || true
+cp robots.txt sitemap.xml llms.txt _redirects favicon.ico favicon.svg favicon-16x16.png favicon-32x32.png favicon-48x48.png apple-touch-icon.png android-chrome-192x192.png android-chrome-512x512.png site.webmanifest dist/ 2>/dev/null || true
 
 # Copy public assets used by social previews, favicons, and page images
 cp -r assets/ dist/assets/ 2>/dev/null || true
