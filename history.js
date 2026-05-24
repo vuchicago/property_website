@@ -11,6 +11,7 @@ let selectedPinForImage = '';
 let dashboardUser = null;
 const CURRENT_TAX_YEAR = 2024;
 const CURRENT_STATE_EQUALIZER = 3.0355;
+const ASSESSED_VALUE_DISPLAY_MULTIPLIER = 10;
 const DASHBOARD_CACHE_VERSION = '20260522-appeal-window';
 const MAX_SUPPORTING_DOCUMENTS = 5;
 const SUPPORTING_DOCUMENT_ACCEPT = 'application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp,.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp';
@@ -654,7 +655,7 @@ function renderPropertyDetails(details) {
         const taxContext = taxContextForDisplay(details);
 
         const fields = [
-                ['Assessed Value', formatCurrency(details?.taxableValue)],
+                ['Assessed Value', formatCurrency(displayAssessedValue(details?.taxableValue))],
                 ['Equalized Assessed Value', formatCurrency(taxContext.equalizedAssessedValue)],
                 ['Imported Exemptions', formatExemptions(taxContext.exemptions)],
                 ['Bedrooms', formatNumber(details?.bedroomCount)],
@@ -690,12 +691,15 @@ function renderPropertyDetails(details) {
 function renderAppeals(appeals, address) {
         const historyContainer = document.getElementById('appeal-history-list');
         if (!historyContainer) return;
+        const selectedProperty = userAddresses.find(item => item.address === address) || null;
+        window.currentAppealPropertyContext = selectedProperty;
 
         if (appeals.length === 0) {
                 historyContainer.innerHTML = `
             <div style="text-align: center; padding: 2rem 0; color: var(--text-muted);">
                 <p>No appeals found for this property.</p>
-                <button class="btn btn-primary appeal-again-btn" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Start Appeal</button>
+                <p class="text-sm text-muted">We are not accepting appeal submissions yet. Join the waitlist and we will follow up when the service is ready.</p>
+                <button class="btn btn-primary appeal-again-btn" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Join the Waitlist</button>
                 ${uploadLegalFootnote()}
             </div>
         `;
@@ -726,7 +730,7 @@ function renderAppeals(appeals, address) {
             `;
                 });
                 html += '</ul>';
-                html += `<button class="btn btn-secondary appeal-again-btn btn-full" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Appeal Again</button>`;
+                html += `<button class="btn btn-secondary appeal-again-btn btn-full" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Join the Waitlist</button>`;
                 html += uploadLegalFootnote();
                 historyContainer.innerHTML = html;
         }
@@ -735,8 +739,8 @@ function renderAppeals(appeals, address) {
         historyContainer.querySelectorAll('.appeal-again-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                         const addr = e.currentTarget.dataset.address;
-                        const { openAppealModal } = await import('./appeal.js?v=20260521-address-suggestions');
-                        openAppealModal(addr);
+                        const { openAppealModal } = await import('./appeal.js?v=20260524-waitlist');
+                        openAppealModal(addr, selectedProperty);
                 });
         });
 }
@@ -940,6 +944,11 @@ function formatCurrency(value) {
                 currency: 'USD',
                 maximumFractionDigits: 0
         });
+}
+
+function displayAssessedValue(value) {
+        const number = Number(value);
+        return Number.isFinite(number) ? number * ASSESSED_VALUE_DISPLAY_MULTIPLIER : null;
 }
 
 function taxContextForDisplay(details) {

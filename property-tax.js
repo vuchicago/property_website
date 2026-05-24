@@ -5,9 +5,10 @@ let suggestionAbort = null;
 let comparableSort = { index: null, direction: 'asc' };
 const CURRENT_TAX_YEAR = 2024;
 const CURRENT_STATE_EQUALIZER = 3.0355;
+const ASSESSED_VALUE_DISPLAY_MULTIPLIER = 10;
 const COMPARABLE_COLUMNS = [
     { label: 'Address', value: c => escapeHtml(c.address), sortValue: c => c.address },
-    { label: 'Assessed Value', value: c => formatCurrency(c.taxableValue), sortValue: c => c.taxableValue },
+    { label: 'Assessed Value', value: c => formatCurrency(displayAssessedValue(c.taxableValue)), sortValue: c => displayAssessedValue(c.taxableValue) },
     { label: 'Last Appeal', value: c => escapeHtml(formatLastAppeal(c.lastAppealYear)), sortValue: c => Number(c.lastAppealYear) || c.lastAppealYear },
     { label: 'Home Size', value: c => c.homeSize ? `${formatNumber(c.homeSize)} sqft` : 'N/A', sortValue: c => c.homeSize },
     { label: 'Year Built', value: c => c.yearBuilt ? formatYear(c.yearBuilt) : 'N/A', sortValue: c => c.yearBuilt },
@@ -407,9 +408,9 @@ function updatePropertyResults(data) {
 
     updateDecision(data.appeal);
     updateWiderRadiusButton(data);
-    setText('your-value', formatCurrency(target.taxableValue));
-    setText('summary-your-value', formatCurrency(target.taxableValue));
-    setText('avg-value', summary.averageComparableValue === null ? 'N/A' : formatCurrency(summary.averageComparableValue));
+    setText('your-value', formatCurrency(displayAssessedValue(target.taxableValue)));
+    setText('summary-your-value', formatCurrency(displayAssessedValue(target.taxableValue)));
+    setText('avg-value', summary.averageComparableValue === null ? 'N/A' : formatCurrency(displayAssessedValue(summary.averageComparableValue)));
     setText('property-count', summary.comparableCount.toLocaleString());
     setText('lower-value-count', summary.lowerValueCount.toLocaleString());
     setText('last-appeal', formatLastAppeal(target.lastAppealYear));
@@ -438,8 +439,8 @@ function updatePropertyResults(data) {
     renderComparableRows(target, data.comparables);
     updateComparisonChart(
         'comparison-chart',
-        target.taxableValue,
-        summary.averageComparableValue,
+        displayAssessedValue(target.taxableValue),
+        displayAssessedValue(summary.averageComparableValue),
         {
             yourLabel: 'Your Assessed Value',
             compLabel: 'Average Comp Assessed Value',
@@ -448,7 +449,7 @@ function updatePropertyResults(data) {
     );
     updateComparisonChart(
         'comparison-chart-per-sqft',
-        summary.subjectValuePerSqft,
+        displayAssessedValue(summary.subjectValuePerSqft),
         averageComparableValuePerSqft(data.comparables),
         {
             yourLabel: 'Your Assessed Value / Sqft',
@@ -655,7 +656,7 @@ function averageComparableValuePerSqft(comparables) {
             const taxableValue = Number(item.taxableValue);
             const homeSize = Number(item.homeSize);
             return Number.isFinite(taxableValue) && Number.isFinite(homeSize) && homeSize > 0
-                ? taxableValue / homeSize
+                ? displayAssessedValue(taxableValue / homeSize)
                 : null;
         })
         .filter(value => value !== null);
@@ -693,7 +694,7 @@ function initializeMap(data) {
     }).addTo(propertyMap);
 
     L.marker([target.latitude, target.longitude]).addTo(propertyMap)
-        .bindPopup(`<strong>${escapeHtml(target.address)}</strong><br>${formatCurrency(target.taxableValue)}`);
+        .bindPopup(`<strong>${escapeHtml(target.address)}</strong><br>${formatCurrency(displayAssessedValue(target.taxableValue))}`);
 
     data.comparables.forEach((comp, index) => {
         if (!comp.latitude || !comp.longitude) return;
@@ -706,7 +707,7 @@ function initializeMap(data) {
             iconAnchor: [14, 14]
         });
         L.marker([comp.latitude, comp.longitude], { icon }).addTo(propertyMap)
-            .bindPopup(`<strong>${escapeHtml(comp.address)}</strong><br>${formatCurrency(comp.taxableValue)}<br>${comp.distanceMiles.toFixed(2)} mi`);
+            .bindPopup(`<strong>${escapeHtml(comp.address)}</strong><br>${formatCurrency(displayAssessedValue(comp.taxableValue))}<br>${comp.distanceMiles.toFixed(2)} mi`);
     });
 
     setTimeout(() => propertyMap?.invalidateSize(), 50);
@@ -779,7 +780,7 @@ function exportToCSV() {
         ['Address', 'Assessed Value', 'Last Appeal Year', 'Certified Land', 'Certified Building', 'Home Size', 'Year Built', 'Last Appeal Status', 'Beds', 'Full Baths', 'Half Baths', 'Masonry Type', 'Repair Condition', 'Finished Basement', 'Single vs Multi Family', 'Neighborhood Code', 'Garage Size', 'Class Description', 'PIN Proration Rate', 'PIN', 'PIN10', 'Latitude', 'Longitude', 'Class Code', 'Condo Unit Sqft', 'Condo Parking Space', 'Condo Common Area', 'Distance Miles'],
         [
             searchResults.target.address,
-            searchResults.target.taxableValue,
+            displayAssessedValue(searchResults.target.taxableValue),
             searchResults.target.lastAppealYear || '',
             searchResults.target.certifiedLand || '',
             searchResults.target.certifiedBuilding || '',
@@ -809,7 +810,7 @@ function exportToCSV() {
         ],
         ...searchResults.comparables.map(c => [
             c.address,
-            c.taxableValue,
+            displayAssessedValue(c.taxableValue),
             c.lastAppealYear || '',
             c.certifiedLand || '',
             c.certifiedBuilding || '',
@@ -878,6 +879,11 @@ function formatCurrency(value) {
         currency: 'USD',
         maximumFractionDigits: 0
     }).format(number);
+}
+
+function displayAssessedValue(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number * ASSESSED_VALUE_DISPLAY_MULTIPLIER : null;
 }
 
 function taxContextForDisplay(target) {

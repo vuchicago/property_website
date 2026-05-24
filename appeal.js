@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 let selectedAppealAddressSuggestion = '';
+let selectedAppealPropertyContext = null;
 
 function initAppealModal() {
         // We will dynamically create the modal HTML to keep index.html clean
@@ -14,7 +15,6 @@ function initAppealModal() {
         const modal = document.getElementById('appeal-modal');
         const closeBtn = document.getElementById('close-appeal-modal');
         const form = document.getElementById('appeal-form');
-        const payBtn = document.getElementById('pay-appeal-btn');
 
         // Close modal
         closeBtn?.addEventListener('click', () => {
@@ -28,10 +28,10 @@ function initAppealModal() {
                 }
         });
 
-        // Handle form submission (Pay button)
+        // Handle form submission (waitlist button)
         form?.addEventListener('submit', (e) => {
                 e.preventDefault();
-                handleAppealPayment();
+                handleAppealWaitlist();
         });
 
         const addressInput = document.getElementById('appeal-address');
@@ -61,8 +61,8 @@ function createAppealModalHTML() {
         <div class="modal-content">
             <span class="close-modal" id="close-appeal-modal">&times;</span>
             <div class="modal-header">
-                <h2>Appeal Your Property Tax</h2>
-                <p id="appeal-modal-subtitle">Enter your property address to start the appeal process. We'll handle the rest.</p>
+                <h2>Join the Appeal Waitlist</h2>
+                <p id="appeal-modal-subtitle">We are not ready to file appeals yet. Join the waitlist and we will follow up when service is available.</p>
             </div>
             <form id="appeal-form">
                 <div class="input-group">
@@ -72,17 +72,15 @@ function createAppealModalHTML() {
                         <div id="appeal-address-suggestions" class="address-suggestions" role="listbox"></div>
                     </div>
                 </div>
-                <!-- Hidden fields for user info if needed later -->
                 <div class="modal-actions">
                     <button type="submit" class="btn btn-primary btn-full" id="pay-appeal-btn">
-                        Pay $99 & Submit Appeal
+                        Join the Waitlist
                     </button>
                     <p class="secure-note">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                            <path d="M12 8V12L14.5 14.5M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"></path>
                         </svg>
-                        Secure payment via Stripe
+                        No payment today. We will use your saved account and property information for the waitlist request.
                     </p>
                 </div>
             </form>
@@ -91,15 +89,16 @@ function createAppealModalHTML() {
         document.body.appendChild(modal);
 }
 
-export function openAppealModal(propertyAddress = '') {
+export function openAppealModal(propertyAddress = '', propertyContext = null) {
         const modal = document.getElementById('appeal-modal');
+        selectedAppealPropertyContext = propertyContext;
         if (modal) {
                 setAppealAddress(propertyAddress);
                 modal.classList.add('show');
                 const addressInput = document.getElementById('appeal-address');
-                const payBtn = document.getElementById('pay-appeal-btn');
-                if (propertyAddress && payBtn) {
-                        payBtn.focus();
+                const waitlistBtn = document.getElementById('pay-appeal-btn');
+                if (propertyAddress && waitlistBtn) {
+                        waitlistBtn.focus();
                 } else if (addressInput) {
                         addressInput.focus();
                 }
@@ -117,6 +116,8 @@ export function openAppealModal(propertyAddress = '') {
 function setAppealAddress(propertyAddress = '') {
         const addressInput = document.getElementById('appeal-address');
         const subtitle = document.getElementById('appeal-modal-subtitle');
+        const note = document.querySelector('#appeal-form .secure-note');
+        const waitlistBtn = document.getElementById('pay-appeal-btn');
 
         if (!addressInput) {
                 return;
@@ -129,8 +130,22 @@ function setAppealAddress(propertyAddress = '') {
 
         if (subtitle) {
                 subtitle.textContent = propertyAddress
-                        ? 'This appeal will use the property already saved in your account.'
-                        : "Enter your property address to start the appeal process. We'll handle the rest.";
+                        ? 'This waitlist request will use the property already saved in your account.'
+                        : 'Enter your property address to join the appeal waitlist.';
+        }
+
+        if (note) {
+                note.innerHTML = `
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                            <path d="M12 8V12L14.5 14.5M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"></path>
+                        </svg>
+                        No payment today. We will use your saved account and property information for the waitlist request.
+                `;
+        }
+
+        if (waitlistBtn) {
+                waitlistBtn.innerHTML = 'Join the Waitlist';
+                waitlistBtn.disabled = false;
         }
 }
 
@@ -141,24 +156,7 @@ function closeAppealModal() {
         }
 }
 
-// Initialize Stripe
-let stripe;
-
-async function getStripe() {
-        if (stripe) return stripe;
-        try {
-                const res = await fetch('/api/config');
-                const { publishableKey } = await res.json();
-                if (!publishableKey) throw new Error('Missing Publishable Key');
-                stripe = Stripe(publishableKey);
-                return stripe;
-        } catch (err) {
-                console.error('Failed to load Stripe config:', err);
-                return null;
-        }
-}
-
-async function handleAppealPayment() {
+async function handleAppealWaitlist() {
         const addressInput = document.getElementById('appeal-address');
         const address = selectedAppealAddressSuggestion;
         const typedAddress = addressInput.value.trim();
@@ -173,8 +171,7 @@ async function handleAppealPayment() {
                 return;
         }
 
-        // Get current user
-        const { auth, authFetch } = await import('./auth-client.js');
+        const { auth, authFetch } = await import('./auth-client.js?v=20260524-auth-gate');
         const user = auth.currentUser;
 
         if (!user) {
@@ -185,15 +182,21 @@ async function handleAppealPayment() {
 
         const btn = document.getElementById('pay-appeal-btn');
         const originalText = btn.innerHTML;
-        btn.innerHTML = 'Processing...';
+        btn.innerHTML = 'Joining waitlist...';
         btn.disabled = true;
 
         try {
-                const response = await authFetch('/api/create-checkout-session', {
+                const profile = waitlistProfileFromProperty(user, selectedAppealPropertyContext, address);
+                const response = await authFetch('/api/contact', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                                propertyAddress: address
+                                inquiryType: 'property-tax-waitlist',
+                                name: profile.name,
+                                email: profile.email,
+                                phone: profile.phone,
+                                propertyAddress: address,
+                                message: profile.message
                         })
                 });
 
@@ -207,36 +210,49 @@ async function handleAppealPayment() {
                         } catch (e) {
                                 // Keep raw text for non-JSON responses.
                         }
-
                         throw new Error(errorMessage);
                 }
 
-                const text = await response.text();
-                if (!text) throw new Error("Server returned empty response");
-
-                let data;
-                try {
-                        data = JSON.parse(text);
-                } catch (e) {
-                        throw new Error(`Invalid JSON response: ${text.substring(0, 100)}...`);
+                btn.innerHTML = 'Joined Waitlist';
+                const note = document.querySelector('#appeal-form .secure-note');
+                if (note) {
+                        note.textContent = "You're on the waitlist. We will follow up when the appeal service is ready.";
                 }
-
-                if (data.error) {
-                        throw new Error(data.error);
-                }
-
-                if (data.url) {
-                        window.location.href = data.url;
-                } else {
-                        throw new Error("No checkout URL returned");
-                }
+                alert("You're on the waitlist. We will follow up when the appeal service is ready.");
+                closeAppealModal();
 
         } catch (error) {
-                console.error("Payment initiation failed:", error);
-                alert("Failed to start payment: " + error.message);
+                console.error("Waitlist request failed:", error);
+                alert("Could not join waitlist: " + error.message);
                 btn.innerHTML = originalText;
                 btn.disabled = false;
         }
+}
+
+function waitlistProfileFromProperty(user, propertyContext, address) {
+        const details = propertyContext?.propertyDetails || {};
+        const name = details.mailingName || user.displayName || user.email || 'Cook County Tax Compare User';
+        const email = user.email || '';
+        const phone = user.phoneNumber || '';
+        const propertyLines = [
+                `Property Address: ${address}`,
+                propertyContext?.pin ? `PIN: ${propertyContext.pin}` : '',
+                details.mailingName ? `Mailing Name: ${details.mailingName}` : '',
+                details.mailingAddress ? `Mailing Address: ${details.mailingAddress}` : '',
+                details.townshipName ? `Township: ${details.townshipName}` : '',
+                details.municipalityName ? `Municipality: ${details.municipalityName}` : ''
+        ].filter(Boolean);
+
+        return {
+                name,
+                email,
+                phone,
+                message: [
+                        'Signed-in user joined the property tax appeal waitlist from the dashboard.',
+                        '',
+                        ...propertyLines
+                ].join('\n')
+        };
 }
 
 async function updateAppealAddressSuggestions(query, forceVisible = false) {
@@ -252,7 +268,7 @@ async function updateAppealAddressSuggestions(query, forceVisible = false) {
         suggestionsPanel.classList.add('is-visible');
 
         try {
-                const { authFetch } = await import('./auth-client.js');
+                const { authFetch } = await import('./auth-client.js?v=20260524-auth-gate');
                 const response = await authFetch(`/api/address-lookup?q=${encodeURIComponent(query)}&limit=5`);
                 if (!response.ok) {
                         const error = await response.json().catch(() => ({}));

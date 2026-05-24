@@ -733,7 +733,7 @@
                 });
 
                 addAppealBtn.addEventListener('click', async () => {
-                        const { openAppealModal } = await import('./appeal.js?v=20260521-address-suggestions');
+                        const { openAppealModal } = await import('./appeal.js?v=20260524-waitlist');
                         openAppealModal();
                 });
 
@@ -750,7 +750,7 @@
                         pendingVerificationEmail = '';
                         hideVerificationPanel();
                         clearVerificationReturnFlag();
-                        const { loadAppealHistory } = await import('./history.js?v=20260524-login-user-pass');
+                        const { loadAppealHistory } = await import('./history.js?v=20260524-assessed-display');
                         await loadAppealHistory(userForDashboard || auth.currentUser);
                 }
 

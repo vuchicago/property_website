@@ -23,7 +23,9 @@ export const onRequestPost = async (context) => {
                         ? insuranceTypes.join(', ')
                         : 'Not provided';
 
-                if (!name || (!email && !isInsuranceInquiry)) {
+                const contactName = name || (isWaitlistInquiry && email ? email : '');
+
+                if (!contactName || (!email && !isInsuranceInquiry)) {
                         return jsonResponse({ error: 'Name and email are required' }, 400);
                 }
 
@@ -37,10 +39,6 @@ export const onRequestPost = async (context) => {
 
                 if (phone && !isValidPhone(phone)) {
                         return jsonResponse({ error: 'Please enter a valid 10-digit phone number.' }, 400);
-                }
-
-                if (isWaitlistInquiry && !phone) {
-                        return jsonResponse({ error: 'Phone number is required for the waitlist.' }, 400);
                 }
 
                 if (isWaitlistInquiry && !propertyAddress) {
@@ -58,7 +56,7 @@ export const onRequestPost = async (context) => {
 
                 savedMessageId = await saveContactMessage(context, {
                         inquiryType: normalizedType,
-                        name,
+                        name: contactName,
                         email,
                         phone,
                         propertyAddress,
@@ -70,7 +68,7 @@ export const onRequestPost = async (context) => {
                         <h2>New ${escapeHtml(normalizedType)}</h2>
                         <table cellpadding="8" cellspacing="0" style="border-collapse: collapse;">
                                 <tr><td><strong>Inquiry Type</strong></td><td>${escapeHtml(normalizedType)}</td></tr>
-                                <tr><td><strong>Name</strong></td><td>${escapeHtml(name)}</td></tr>
+                                <tr><td><strong>Name</strong></td><td>${escapeHtml(contactName)}</td></tr>
                                 <tr><td><strong>Email</strong></td><td>${escapeHtml(email)}</td></tr>
                                 <tr><td><strong>Phone</strong></td><td>${escapeHtml(phone || 'Not provided')}</td></tr>
                                 <tr><td><strong>Firm Name</strong></td><td>${escapeHtml(firmName || 'Not provided')}</td></tr>
@@ -85,7 +83,7 @@ export const onRequestPost = async (context) => {
                         `New ${normalizedType}`,
                         '',
                         `Inquiry Type: ${normalizedType}`,
-                        `Name: ${name}`,
+                        `Name: ${contactName}`,
                         `Email: ${email}`,
                         `Phone: ${phone || 'Not provided'}`,
                         `Firm Name: ${firmName || 'Not provided'}`,
@@ -108,7 +106,7 @@ export const onRequestPost = async (context) => {
                         from,
                         to,
                         replyTo: email || undefined,
-                        subject: `${normalizedType} from ${name}`,
+                        subject: `${normalizedType} from ${contactName}`,
                         html,
                         text
                 });

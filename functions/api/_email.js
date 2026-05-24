@@ -61,12 +61,12 @@ export async function sendNotificationEmail(env, email) {
                 return sendWithResend(env.RESEND_API_KEY, email);
         }
 
-        if (env.CLOUDFLARE_EMAIL_API_TOKEN && env.CLOUDFLARE_ACCOUNT_ID) {
-                return sendWithCloudflareEmailApi(env, email);
-        }
-
         if (env.EMAIL && typeof env.EMAIL.send === 'function') {
                 return sendWithCloudflareEmail(env.EMAIL, email);
+        }
+
+        if (env.CLOUDFLARE_EMAIL_API_TOKEN && env.CLOUDFLARE_ACCOUNT_ID) {
+                return sendWithCloudflareEmailApi(env, email);
         }
 
         console.warn('No outbound email provider is configured.');
@@ -129,9 +129,9 @@ async function sendWithCloudflareEmailApi(env, email) {
 
 async function sendWithCloudflareEmail(binding, email) {
         await binding.send({
-                from: email.from,
+                from: parseEmailIdentityForBinding(email.from),
                 to: email.to,
-                replyTo: email.replyTo,
+                replyTo: email.replyTo ? parseEmailIdentityForBinding(email.replyTo) : undefined,
                 subject: email.subject,
                 html: email.html,
                 text: email.text || stripHtml(email.html || '')
@@ -149,6 +149,18 @@ function parseEmailIdentity(value) {
         return {
                 name: match[1].replace(/^["']|["']$/g, '').trim(),
                 address: match[2].trim()
+        };
+}
+
+function parseEmailIdentityForBinding(value) {
+        const parsed = parseEmailIdentity(value);
+        if (typeof parsed === 'string') {
+                return parsed;
+        }
+
+        return {
+                name: parsed.name,
+                email: parsed.address
         };
 }
 
