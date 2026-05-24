@@ -523,7 +523,7 @@ function updateWiderRadiusButton(data) {
         button.dataset.action = 'create-account';
         button.classList.remove('btn-secondary');
         button.classList.add('btn-primary', 'appeal-cta-btn');
-        button.textContent = 'Create Account to Join Waitlist';
+        button.textContent = 'Create Account to Continue';
         return;
     }
 

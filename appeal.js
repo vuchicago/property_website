@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 let selectedAppealAddressSuggestion = '';
 let selectedAppealPropertyContext = null;
+let appealConfigPromise = null;
 
 function initAppealModal() {
         // We will dynamically create the modal HTML to keep index.html clean
@@ -28,10 +29,9 @@ function initAppealModal() {
                 }
         });
 
-        // Handle form submission (waitlist button)
         form?.addEventListener('submit', (e) => {
                 e.preventDefault();
-                handleAppealWaitlist();
+                handleAppealSubmit();
         });
 
         const addressInput = document.getElementById('appeal-address');
@@ -95,6 +95,7 @@ export function openAppealModal(propertyAddress = '', propertyContext = null) {
         if (modal) {
                 setAppealAddress(propertyAddress);
                 modal.classList.add('show');
+                refreshAppealModeText(propertyAddress);
                 const addressInput = document.getElementById('appeal-address');
                 const waitlistBtn = document.getElementById('pay-appeal-btn');
                 if (propertyAddress && waitlistBtn) {
@@ -108,6 +109,7 @@ export function openAppealModal(propertyAddress = '', propertyContext = null) {
                 initAppealModal();
                 setTimeout(() => {
                         setAppealAddress(propertyAddress);
+                        refreshAppealModeText(propertyAddress);
                         document.getElementById('appeal-modal').classList.add('show');
                 }, 10);
         }
@@ -149,6 +151,56 @@ function setAppealAddress(propertyAddress = '') {
         }
 }
 
+async function refreshAppealModeText(propertyAddress = '') {
+        const config = await getAppealConfig();
+        const title = document.querySelector('#appeal-modal .modal-header h2');
+        const subtitle = document.getElementById('appeal-modal-subtitle');
+        const note = document.querySelector('#appeal-form .secure-note');
+        const button = document.getElementById('pay-appeal-btn');
+
+        if (config.deploymentReady) {
+                if (title) title.textContent = 'Appeal Your Property Tax';
+                if (subtitle) {
+                        subtitle.textContent = propertyAddress
+                                ? 'This appeal will use the property already saved in your account.'
+                                : "Enter your property address to start the appeal process. We'll handle the rest.";
+                }
+                if (button) {
+                        button.innerHTML = `Pay ${formatPaymentAmount(config.appealHelpAmountCents)} & Submit Appeal`;
+                        button.disabled = false;
+                }
+                if (note) {
+                        note.innerHTML = `
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                </svg>
+                                Secure payment via Stripe
+                        `;
+                }
+                return;
+        }
+
+        if (title) title.textContent = 'Join the Appeal Waitlist';
+        if (subtitle) {
+                subtitle.textContent = propertyAddress
+                        ? 'This waitlist request will use the property already saved in your account.'
+                        : 'Enter your property address to join the appeal waitlist.';
+        }
+        if (button) {
+                button.innerHTML = 'Join the Waitlist';
+                button.disabled = false;
+        }
+        if (note) {
+                note.innerHTML = `
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                            <path d="M12 8V12L14.5 14.5M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"></path>
+                        </svg>
+                        No payment today. We will use your saved account and property information for the waitlist request.
+                `;
+        }
+}
+
 function closeAppealModal() {
         const modal = document.getElementById('appeal-modal');
         if (modal) {
@@ -156,30 +208,54 @@ function closeAppealModal() {
         }
 }
 
-async function handleAppealWaitlist() {
+async function handleAppealSubmit() {
+        const config = await getAppealConfig();
+        if (config.deploymentReady) {
+                return handleAppealPayment(config);
+        }
+
+        return handleAppealWaitlist();
+}
+
+async function getSelectedAppealAddress() {
         const addressInput = document.getElementById('appeal-address');
         const address = selectedAppealAddressSuggestion;
-        const typedAddress = addressInput.value.trim();
+        const typedAddress = addressInput?.value.trim() || '';
         if (!address && typedAddress) {
                 await updateAppealAddressSuggestions(typedAddress, true);
-                addressInput.focus();
-                return;
+                addressInput?.focus();
+                return '';
         }
 
         if (!address) {
                 alert("Please enter your property address.");
-                return;
+                return '';
         }
 
+        return address;
+}
+
+async function getCurrentAppealUser() {
         const { auth, authFetch } = await import('./auth-client.js?v=20260524-auth-gate');
         const user = auth.currentUser;
 
         if (!user) {
                 alert("Please log in to continue.");
                 window.location.href = 'login.html';
-                return;
+                return null;
         }
 
+        return { user, authFetch };
+}
+
+async function handleAppealWaitlist() {
+        const address = await getSelectedAppealAddress();
+        if (!address) return;
+
+        const authContext = await getCurrentAppealUser();
+        if (!authContext) return;
+
+        const { user, authFetch } = authContext;
         const btn = document.getElementById('pay-appeal-btn');
         const originalText = btn.innerHTML;
         btn.innerHTML = 'Joining waitlist...';
@@ -227,6 +303,77 @@ async function handleAppealWaitlist() {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
         }
+}
+
+async function handleAppealPayment(config = {}) {
+        const address = await getSelectedAppealAddress();
+        if (!address) return;
+
+        const authContext = await getCurrentAppealUser();
+        if (!authContext) return;
+
+        const { authFetch } = authContext;
+        const btn = document.getElementById('pay-appeal-btn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = 'Processing...';
+        btn.disabled = true;
+
+        try {
+                const response = await authFetch('/api/create-checkout-session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ propertyAddress: address })
+                });
+
+                if (!response.ok) {
+                        const text = await response.text();
+                        let errorMessage = text || response.statusText;
+                        try {
+                                errorMessage = JSON.parse(text).error || errorMessage;
+                        } catch (e) {
+                                // Keep raw text for non-JSON responses.
+                        }
+                        throw new Error(errorMessage);
+                }
+
+                const data = await response.json();
+                if (data.url) {
+                        window.location.href = data.url;
+                        return;
+                }
+
+                throw new Error('No checkout URL returned');
+        } catch (error) {
+                console.error('Payment initiation failed:', error);
+                alert('Failed to start payment: ' + error.message);
+                btn.innerHTML = originalText || `Pay ${formatPaymentAmount(config.appealHelpAmountCents)} & Submit Appeal`;
+                btn.disabled = false;
+        }
+}
+
+async function getAppealConfig() {
+        if (!appealConfigPromise) {
+                appealConfigPromise = fetch('/api/config')
+                        .then(response => response.ok ? response.json() : {})
+                        .catch(() => ({}))
+                        .then(config => ({
+                                deploymentReady: Boolean(config.deploymentReady),
+                                appealHelpAmountCents: Number.isInteger(Number(config.appealHelpAmountCents))
+                                        ? Number(config.appealHelpAmountCents)
+                                        : 9900
+                        }));
+        }
+
+        return appealConfigPromise;
+}
+
+function formatPaymentAmount(cents) {
+        const amount = Number(cents);
+        return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                maximumFractionDigits: amount % 100 === 0 ? 0 : 2
+        }).format(Number.isFinite(amount) ? amount / 100 : 99);
 }
 
 function waitlistProfileFromProperty(user, propertyContext, address) {

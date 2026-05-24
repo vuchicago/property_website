@@ -8,6 +8,10 @@ export const onRequestPost = async (context) => {
                 return authResponse;
         }
 
+        if (!isEnabled(context.env.DEPLOYMENT_READY)) {
+                return jsonResponse({ error: 'Appeal payments are not available yet. Please join the waitlist.' }, 403);
+        }
+
         const STRIPE_KEY = context.env.STRIPE_SECRET_KEY || context.env.STRIPE_API_KEY;
 
         if (!STRIPE_KEY) {
@@ -87,4 +91,8 @@ export const onRequestPost = async (context) => {
         } catch (err) {
                 return jsonResponse({ error: err.message }, 500);
         }
+}
+
+function isEnabled(value) {
+        return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
 }
