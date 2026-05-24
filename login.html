@@ -144,6 +144,34 @@
                         font-size: var(--font-size-sm);
                 }
 
+                .auth-inline-action {
+                        display: flex;
+                        justify-content: flex-end;
+                        margin-top: var(--space-2);
+                }
+
+                .auth-inline-action button {
+                        background: transparent;
+                        border: 0;
+                        color: var(--primary);
+                        cursor: pointer;
+                        font: inherit;
+                        font-size: var(--font-size-sm);
+                        font-weight: 700;
+                        padding: 0;
+                }
+
+                .reset-message {
+                        background: #ecfdf5;
+                        border: 1px solid #bbf7d0;
+                        border-radius: var(--radius-md);
+                        color: #166534;
+                        display: none;
+                        font-size: var(--font-size-sm);
+                        margin-bottom: var(--space-4);
+                        padding: var(--space-3);
+                }
+
                 .verification-panel {
                         background: #eff6ff;
                         border: 1px solid #bfdbfe;
@@ -361,6 +389,7 @@
                         </div>
 
                         <div id="error-alert" class="error-message"></div>
+                        <div id="reset-alert" class="reset-message"></div>
                         <div id="browser-warning" class="browser-warning"></div>
                         <div id="verification-panel" class="verification-panel"></div>
 
@@ -372,6 +401,9 @@
                                 <div class="form-group">
                                         <label for="password">Password</label>
                                         <input type="password" id="password" required placeholder="••••••••">
+                                        <div class="auth-inline-action" id="forgot-password-wrap">
+                                                <button type="button" id="forgot-password-btn">Forgot password?</button>
+                                        </div>
                                 </div>
                                 <button type="submit" class="btn btn-primary" style="width: 100%;">Sign In</button>
                         </form>
@@ -498,7 +530,7 @@
 
         <!-- Auth Logic Script -->
         <script type="module">
-                import { loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, refreshCurrentUser } from './auth-client.js?v=20260522-auth-client';
+                import { loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, refreshCurrentUser, resetPasswordForEmail } from './auth-client.js?v=20260524-auth-gate';
 
                 const form = document.getElementById('auth-form');
                 const emailInput = document.getElementById('email');
@@ -509,9 +541,12 @@
                 const submitBtn = form.querySelector('button');
                 const toggleText = document.getElementById('toggle-text');
                 const errorAlert = document.getElementById('error-alert');
+                const resetAlert = document.getElementById('reset-alert');
                 const browserWarning = document.getElementById('browser-warning');
                 const verificationPanel = document.getElementById('verification-panel');
                 const googleAuthBtn = document.getElementById('google-auth-btn');
+                const forgotPasswordWrap = document.getElementById('forgot-password-wrap');
+                const forgotPasswordBtn = document.getElementById('forgot-password-btn');
                 const authContainer = document.getElementById('auth-container');
                 const dashboard = document.getElementById('user-dashboard');
                 const addAppealBtn = document.getElementById('account-add-appeal-btn');
@@ -524,6 +559,7 @@
                 const returnedFromVerification = pageParams.get('verified') === '1';
                 const inBlockedOAuthBrowser = isBlockedOAuthBrowser();
                 let isLogin = authMode !== 'signup' && authMode !== 'create-account';
+                let pendingVerificationEmail = '';
                 updateUI();
                 updateBrowserWarning();
 
@@ -533,18 +569,21 @@
                 });
 
                 function updateUI() {
+                        resetAlert.style.display = 'none';
                         if (isLogin) {
                                 pageTitle.textContent = 'Welcome Back';
                                 pageSubtitle.textContent = 'Sign in to your account';
                                 submitBtn.textContent = 'Sign In';
                                 toggleText.textContent = "Don't have an account?";
                                 toggleBtn.textContent = 'Create one';
+                                forgotPasswordWrap.style.display = 'flex';
                         } else {
                                 pageTitle.textContent = 'Create Account';
                                 pageSubtitle.textContent = 'Get started with Cook County Tax Compare';
                                 submitBtn.textContent = 'Sign Up';
                                 toggleText.textContent = "Already have an account?";
                                 toggleBtn.textContent = 'Sign In';
+                                forgotPasswordWrap.style.display = 'none';
                         }
                         errorAlert.style.display = 'none';
                         hideVerificationPanel();
@@ -553,6 +592,7 @@
                 form.addEventListener('submit', async (e) => {
                         e.preventDefault();
                         errorAlert.style.display = 'none';
+                        resetAlert.style.display = 'none';
                         submitBtn.disabled = true;
                         submitBtn.textContent = 'Processing...';
 
@@ -572,19 +612,55 @@
                                 submitBtn.textContent = isLogin ? 'Sign In' : 'Sign Up';
                                 if (!result.user.emailVerified) {
                                         showVerificationPanel(result.user.email, result.emailVerificationSent !== false);
+                                        await logoutUser();
                                         return;
                                 }
                                 await showDashboard();
                         } else {
                                 errorAlert.textContent = result.error;
                                 errorAlert.style.display = 'block';
+                                if (isLogin && result.code === 'auth/too-many-requests') {
+                                        forgotPasswordWrap.style.display = 'flex';
+                                        forgotPasswordBtn.focus();
+                                }
                                 submitBtn.disabled = false;
                                 submitBtn.textContent = isLogin ? 'Sign In' : 'Sign Up';
                         }
                 });
 
+                forgotPasswordBtn.addEventListener('click', async () => {
+                        errorAlert.style.display = 'none';
+                        resetAlert.style.display = 'none';
+
+                        const email = emailInput.value.trim();
+                        if (!email) {
+                                errorAlert.textContent = 'Enter your email address first, then click Forgot password.';
+                                errorAlert.style.display = 'block';
+                                emailInput.focus();
+                                return;
+                        }
+
+                        forgotPasswordBtn.disabled = true;
+                        forgotPasswordBtn.textContent = 'Sending reset link...';
+
+                        const result = await resetPasswordForEmail(email);
+
+                        forgotPasswordBtn.disabled = false;
+                        forgotPasswordBtn.textContent = 'Forgot password?';
+
+                        if (result.success) {
+                                resetAlert.textContent = `Password reset email sent to ${email}. Open the link in that email to choose a new password.`;
+                                resetAlert.style.display = 'block';
+                                return;
+                        }
+
+                        errorAlert.textContent = result.error;
+                        errorAlert.style.display = 'block';
+                });
+
                 googleAuthBtn.addEventListener('click', async () => {
                         errorAlert.style.display = 'none';
+                        resetAlert.style.display = 'none';
 
                         if (inBlockedOAuthBrowser) {
                                 showBrowserWarning(true);
@@ -602,6 +678,7 @@
                         if (result.success) {
                                 if (!result.user.emailVerified) {
                                         showVerificationPanel(result.user.email, false);
+                                        await logoutUser();
                                         return;
                                 }
                                 await showDashboard();
@@ -620,12 +697,14 @@
 
                                 if (!user.emailVerified) {
                                         showVerificationPanel(user.email, false);
+                                        await logoutUser();
                                         return;
                                 }
                                 await showDashboard();
                         } else {
                                 authContainer.style.display = 'flex';
                                 dashboard.style.display = 'none';
+                                if (pendingVerificationEmail) return;
                                 hideVerificationPanel();
                                 if (returnedFromVerification) {
                                         errorAlert.textContent = 'Email verified. Please sign in to continue on this device.';
@@ -649,6 +728,7 @@
                 async function showDashboard() {
                         authContainer.style.display = 'none';
                         dashboard.style.display = 'block';
+                        pendingVerificationEmail = '';
                         hideVerificationPanel();
                         clearVerificationReturnFlag();
                         const { loadAppealHistory } = await import('./history.js?v=20260522-appeal-window');
@@ -670,6 +750,7 @@
                 }
 
                 function showVerificationPanel(email, emailSent) {
+                        pendingVerificationEmail = email || 'your email';
                         authContainer.style.display = 'flex';
                         dashboard.style.display = 'none';
                         form.style.display = 'none';
@@ -677,11 +758,12 @@
                         if (authDivider) authDivider.style.display = 'none';
                         if (authToggle) authToggle.style.display = 'none';
                         errorAlert.style.display = 'none';
+                        resetAlert.style.display = 'none';
                         pageTitle.textContent = 'Verify Your Email';
                         pageSubtitle.textContent = 'Check your inbox before continuing';
                         verificationPanel.innerHTML = `
                                 <h2>Email verification required</h2>
-                                <p>Please check email for verification link. <strong>(Check spam folder as well!)</strong></p>
+                                <p>Please check ${escapeHtml(pendingVerificationEmail)} for the verification link. <strong>(Check spam folder as well!)</strong></p>
                         `;
                         verificationPanel.style.display = 'block';
                 }
@@ -719,6 +801,7 @@
 
                 function hideVerificationPanel() {
                         if (!verificationPanel) return;
+                        pendingVerificationEmail = '';
                         verificationPanel.style.display = 'none';
                         verificationPanel.innerHTML = '';
                         form.style.display = '';

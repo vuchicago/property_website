@@ -1,6 +1,6 @@
 // Firebase Authentication Logic
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence, sendEmailVerification, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
 
 // Firebase Configuration
@@ -53,7 +53,7 @@ export const loginUser = async (email, password) => {
                 }
                 return { success: true, user: userCredential.user };
         } catch (error) {
-                return { success: false, error: error.message };
+                return { success: false, code: error.code, error: getFriendlyAuthError(error, email) };
         }
 };
 
@@ -76,9 +76,44 @@ export const registerUser = async (email, password) => {
                         };
                 }
         } catch (error) {
-                return { success: false, error: error.message };
+                return { success: false, code: error.code, error: getFriendlyAuthError(error, email) };
         }
 };
+
+export const resetPasswordForEmail = async (email) => {
+        try {
+                await sendPasswordResetEmail(auth, email, {
+                        url: `${window.location.origin}/login.html`,
+                        handleCodeInApp: false
+                });
+                return { success: true };
+        } catch (error) {
+                return { success: false, code: error.code, error: getFriendlyAuthError(error, email) };
+        }
+};
+
+function getFriendlyAuthError(error, email = '') {
+        const cleanEmail = String(email || '').trim();
+        const quotedEmail = cleanEmail || 'that email';
+
+        switch (error?.code) {
+                case 'auth/invalid-credential':
+                case 'auth/user-not-found':
+                        return `Account not found. We can't find an email with ${quotedEmail}. Please double check it and sign in again.`;
+                case 'auth/wrong-password':
+                        return 'That password does not match this account. Please try again or reset your password.';
+                case 'auth/too-many-requests':
+                        return 'Too many unsuccessful sign-in attempts. Please reset your password using the email link below, then try signing in again.';
+                case 'auth/invalid-email':
+                        return 'Please enter a valid email address.';
+                case 'auth/email-already-in-use':
+                        return 'An account already exists for this email. Please sign in instead.';
+                case 'auth/weak-password':
+                        return 'Please use a stronger password with at least 6 characters.';
+                default:
+                        return error?.message || 'Something went wrong. Please try again.';
+        }
+}
 
 export const sendCurrentUserVerificationEmail = async () => {
         try {
@@ -135,6 +170,10 @@ export const waitForAuthUser = async () => {
         }
 
         if (auth.currentUser) {
+                if (!auth.currentUser.emailVerified) {
+                        await signOut(auth).catch(() => { });
+                        throw new Error('Please verify your email address before continuing.');
+                }
                 return auth.currentUser;
         }
 
@@ -146,6 +185,13 @@ export const waitForAuthUser = async () => {
 
                 const unsubscribe = onAuthStateChanged(auth, (user) => {
                         if (!user) return;
+                        if (!user.emailVerified) {
+                                clearTimeout(timeout);
+                                unsubscribe();
+                                signOut(auth).catch(() => { });
+                                reject(new Error('Please verify your email address before continuing.'));
+                                return;
+                        }
                         clearTimeout(timeout);
                         unsubscribe();
                         resolve(user);
@@ -187,7 +233,11 @@ export const initAuthUI = () => {
         if (!auth) return;
 
         onAuthStateChanged(auth, (user) => {
-                updateNavigation(user);
+                const verifiedUser = user && user.emailVerified ? user : null;
+                updateNavigation(verifiedUser);
+                if (user && !user.emailVerified) {
+                        signOut(auth).catch(error => console.error('Failed to sign out unverified user:', error));
+                }
         });
 };
 
