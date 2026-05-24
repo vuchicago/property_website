@@ -11,6 +11,8 @@ let selectedPinForImage = '';
 const CURRENT_TAX_YEAR = 2024;
 const CURRENT_STATE_EQUALIZER = 3.0355;
 const DASHBOARD_CACHE_VERSION = '20260522-appeal-window';
+const MAX_SUPPORTING_DOCUMENTS = 5;
+const SUPPORTING_DOCUMENT_ACCEPT = 'application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp,.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp';
 
 export async function loadAppealHistory() {
         const user = auth.currentUser;
@@ -33,6 +35,7 @@ export async function loadAppealHistory() {
         setupAddAddressForm();
         setupPropertyImageUpload();
         setupGovernmentIdUpload();
+        setupSupportingDocumentsUpload();
 }
 
 async function fetchAddresses() {
@@ -259,8 +262,9 @@ function selectAddress(propertyKey) {
         }
 
         renderPropertyDetails(details);
-        renderPropertyImage(selectedAddress?.pin);
+        renderPropertyImage(selectedPinForImage);
         renderGovernmentIdImage();
+        renderSupportingDocuments(selectedPinForImage);
 
         const filteredAppeals = allAppeals.filter(a => a.propertyAddress === address);
         document.getElementById('total-appeals-count').textContent = filteredAppeals.length;
@@ -288,13 +292,13 @@ async function renderPropertyImage(pin) {
 
                 const data = await response.json();
                 if (!data.image) {
-                        dateEl.textContent = 'No image uploaded.';
+                        dateEl.textContent = 'No image uploaded. Re-uploading saves a new copy and shows the latest upload.';
                         return;
                 }
 
                 preview.src = data.image.image_data;
                 preview.style.display = 'block';
-                dateEl.textContent = `Uploaded ${new Date(data.image.uploaded_at).toLocaleString()}`;
+                dateEl.textContent = `Latest upload ${new Date(data.image.uploaded_at).toLocaleString()}`;
         } catch (error) {
                 console.error('Error loading property image:', error);
                 dateEl.textContent = 'Image could not be loaded.';
@@ -316,16 +320,56 @@ async function renderGovernmentIdImage() {
 
                 const data = await response.json();
                 if (!data.image) {
-                        dateEl.textContent = 'No ID uploaded.';
+                        dateEl.textContent = 'No ID uploaded. Re-uploading saves a new copy and shows the latest upload.';
                         return;
                 }
 
                 preview.src = data.image.image_data;
                 preview.style.display = 'block';
-                dateEl.textContent = `Uploaded ${new Date(data.image.uploaded_at).toLocaleString()}`;
+                dateEl.textContent = `Latest upload ${new Date(data.image.uploaded_at).toLocaleString()}`;
         } catch (error) {
                 console.error('Error loading government ID:', error);
                 dateEl.textContent = 'ID could not be loaded.';
+        }
+}
+
+async function renderSupportingDocuments(pin) {
+        const statusEl = document.getElementById('supporting-documents-status');
+        const listEl = document.getElementById('supporting-documents-list');
+        if (!statusEl || !listEl) return;
+
+        listEl.innerHTML = '';
+        updateSupportingDocumentSlots(0);
+
+        if (!pin) {
+                statusEl.textContent = 'PIN unavailable. Supporting document upload is disabled for this property.';
+                return;
+        }
+
+        statusEl.textContent = 'Loading supporting documents...';
+
+        try {
+                const response = await authFetch(`/api/supporting-documents?pin=${encodeURIComponent(pin)}`);
+                if (!response.ok) throw new Error('Failed to load supporting documents');
+
+                const data = await response.json();
+                const documents = Array.isArray(data.documents) ? data.documents : [];
+                if (!documents.length) {
+                        statusEl.textContent = 'No supporting documents uploaded.';
+                        return;
+                }
+
+                statusEl.textContent = `${documents.length} supporting document${documents.length === 1 ? '' : 's'} uploaded.`;
+                listEl.innerHTML = documents.map(doc => `
+                        <li>
+                                <strong>${escapeHtml(doc.file_name || 'Supporting document')}</strong>
+                                <span class="text-muted">uploaded ${escapeHtml(new Date(doc.uploaded_at).toLocaleString())}</span>
+                        </li>
+                `).join('');
+                updateSupportingDocumentSlots(documents.length);
+        } catch (error) {
+                console.error('Error loading supporting documents:', error);
+                statusEl.textContent = 'Supporting documents could not be loaded.';
         }
 }
 
@@ -403,6 +447,124 @@ function setupGovernmentIdUpload() {
         });
 }
 
+function setupSupportingDocumentsUpload() {
+        const slots = document.getElementById('supporting-documents-upload-slots');
+        if (!slots || slots.dataset.bound === 'true') return;
+        slots.dataset.bound = 'true';
+        slots.innerHTML = Array.from({ length: MAX_SUPPORTING_DOCUMENTS }, (_, index) => {
+                const number = index + 1;
+                return `
+                        <div class="supporting-document-slot" data-slot="${number}" ${index === 0 ? '' : 'hidden'}>
+                                <label class="btn btn-secondary btn-sm" for="supporting-document-input-${number}">Upload Doc ${number}</label>
+                                <input type="file" id="supporting-document-input-${number}" accept="${SUPPORTING_DOCUMENT_ACCEPT}" style="display: none;">
+                        </div>
+                `;
+        }).join('');
+
+        slots.querySelectorAll('input[type="file"]').forEach(input => {
+                input.addEventListener('change', async () => {
+                        const file = input.files?.[0];
+                        if (!file || !selectedAddressForImage || !selectedPinForImage) return;
+
+                        try {
+                                if (!isAllowedSupportingDocument(file)) {
+                                        alert(`${file.name} is not an accepted document type. Please upload PDF, DOC, DOCX, JPG, PNG, or WEBP files.`);
+                                        return;
+                                }
+
+                                if (file.size > 4 * 1024 * 1024) {
+                                        alert(`${file.name} is too large. Please upload files under 4 MB.`);
+                                        return;
+                                }
+
+                                const dataUrl = await readFileAsDataUrl(file);
+                                const response = await authFetch('/api/supporting-documents', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                                address: selectedAddressForImage,
+                                                pin: selectedPinForImage,
+                                                fileName: file.name,
+                                                fileData: dataUrl,
+                                                mimeType: file.type || mimeTypeFromFileName(file.name)
+                                        })
+                                });
+
+                                if (!response.ok) {
+                                        const err = await response.json();
+                                        alert(`Failed to upload ${file.name}: ${err.error}`);
+                                        return;
+                                }
+
+                                await renderSupportingDocuments(selectedPinForImage);
+                        } catch (error) {
+                                console.error('Error uploading supporting documents:', error);
+                                alert('The supporting document could not be uploaded.');
+                        } finally {
+                                input.value = '';
+                        }
+                });
+        });
+}
+
+function updateSupportingDocumentSlots(uploadedCount) {
+        const slots = document.getElementById('supporting-documents-upload-slots');
+        if (!slots) return;
+
+        const nextOpenSlot = Math.min(Number(uploadedCount || 0) + 1, MAX_SUPPORTING_DOCUMENTS);
+        slots.querySelectorAll('.supporting-document-slot').forEach(slot => {
+                const slotNumber = Number(slot.dataset.slot);
+                slot.hidden = slotNumber > nextOpenSlot;
+        });
+
+        const reachedLimit = Number(uploadedCount || 0) >= MAX_SUPPORTING_DOCUMENTS;
+        if (reachedLimit) {
+                slots.querySelectorAll('.supporting-document-slot').forEach(slot => {
+                        slot.hidden = Number(slot.dataset.slot) > MAX_SUPPORTING_DOCUMENTS;
+                });
+                slots.querySelectorAll('label').forEach(label => {
+                        label.classList.add('disabled');
+                        label.setAttribute('aria-disabled', 'true');
+                });
+                slots.querySelectorAll('input').forEach(input => {
+                        input.disabled = true;
+                });
+        } else {
+                slots.querySelectorAll('label').forEach(label => {
+                        label.classList.remove('disabled');
+                        label.removeAttribute('aria-disabled');
+                });
+                slots.querySelectorAll('input').forEach(input => {
+                        input.disabled = false;
+                });
+        }
+}
+
+function isAllowedSupportingDocument(file) {
+        const mimeType = (file.type || '').toLowerCase();
+        const name = (file.name || '').toLowerCase();
+        return ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(mimeType)
+                || ['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)
+                || name.endsWith('.pdf')
+                || name.endsWith('.doc')
+                || name.endsWith('.docx')
+                || name.endsWith('.jpg')
+                || name.endsWith('.jpeg')
+                || name.endsWith('.png')
+                || name.endsWith('.webp');
+}
+
+function mimeTypeFromFileName(fileName) {
+        const name = String(fileName || '').toLowerCase();
+        if (name.endsWith('.pdf')) return 'application/pdf';
+        if (name.endsWith('.doc')) return 'application/msword';
+        if (name.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
+        if (name.endsWith('.png')) return 'image/png';
+        if (name.endsWith('.webp')) return 'image/webp';
+        return 'application/octet-stream';
+}
+
 function resizeImage(file, maxWidth, maxHeight) {
         return new Promise((resolve, reject) => {
                 const image = new Image();
@@ -427,6 +589,15 @@ function resizeImage(file, maxWidth, maxHeight) {
                         image.onerror = reject;
                         image.src = reader.result;
                 };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+        });
+}
+
+function readFileAsDataUrl(file) {
+        return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
                 reader.onerror = reject;
                 reader.readAsDataURL(file);
         });

@@ -502,24 +502,41 @@
                                         <div id="selected-property-details" class="property-details-grid" style="display: none;"></div>
                                         <div id="property-image-panel" class="property-image-panel">
                                                 <div>
-                                                        <h4>Property Image</h4>
-                                                        <p id="property-image-date" class="text-sm text-muted">No image uploaded.</p>
+                                                        <h4>Property Image <span class="required-label">(Required)</span></h4>
+                                                        <p class="text-sm text-muted">Accepted formats: JPG, PNG, or WEBP.</p>
+                                                        <p id="property-image-date" class="text-sm text-muted">No image uploaded. Re-uploading saves a new copy and shows the latest upload.</p>
                                                 </div>
                                                 <div class="property-image-content">
                                                         <img id="property-image-preview" alt="Uploaded property" style="display: none;">
                                                         <label class="btn btn-secondary btn-sm" for="property-image-input">Upload Image</label>
-                                                        <input type="file" id="property-image-input" accept="image/*" style="display: none;">
+                                                        <input type="file" id="property-image-input" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" style="display: none;">
                                                 </div>
                                         </div>
                                         <div id="government-id-panel" class="property-image-panel">
                                                 <div>
-                                                        <h4>Government Identification</h4>
-                                                        <p id="government-id-date" class="text-sm text-muted">No ID uploaded.</p>
+                                                        <h4>Government Identification <span class="required-label">(Required)</span></h4>
+                                                        <p class="text-sm text-muted">Accepted formats: JPG, PNG, or WEBP.</p>
+                                                        <p id="government-id-date" class="text-sm text-muted">No ID uploaded. Re-uploading saves a new copy and shows the latest upload.</p>
                                                 </div>
                                                 <div class="property-image-content">
                                                         <img id="government-id-preview" alt="Uploaded government identification" style="display: none;">
                                                         <label class="btn btn-secondary btn-sm" for="government-id-input">Upload ID</label>
-                                                        <input type="file" id="government-id-input" accept="image/*" style="display: none;">
+                                                        <input type="file" id="government-id-input" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" style="display: none;">
+                                                </div>
+                                        </div>
+                                        <div id="supporting-documents-panel" class="property-image-panel supporting-documents-panel">
+                                                <div>
+                                                        <h4>Additional Supporting Docs <span class="optional-label">(Optional)</span></h4>
+                                                        <p class="text-sm text-muted">Upload additional documents to support your appeal.</p>
+                                                        <p class="text-sm text-muted">Accepted formats: PDF, DOC, DOCX, JPG, PNG, or WEBP.</p>
+                                                        <p id="supporting-documents-status" class="text-sm text-muted">No supporting documents uploaded.</p>
+                                                        <ul id="supporting-documents-list" class="supporting-documents-list"></ul>
+                                                        <p class="upload-legal-copy">
+                                                                By uploading images or documents, you represent that you have the right to provide them and authorize Cook County Tax Compare, its service providers, and any attorney or representative assisting with your appeal to store, review, reproduce, transmit, and submit the materials as reasonably necessary to evaluate, prepare, file, support, or respond to your property tax appeal. Uploaded materials remain associated with your account and appeal records. We do not use uploaded materials for unrelated marketing or non-appeal purposes.
+                                                        </p>
+                                                </div>
+                                                <div class="property-image-content">
+                                                        <div id="supporting-documents-upload-slots" class="supporting-documents-upload-slots"></div>
                                                 </div>
                                         </div>
                                         <div id="appeal-history-list"></div>
