@@ -8,6 +8,7 @@ let selectedPropertyKeySuggestion = '';
 let currentSuggestions = [];
 let selectedAddressForImage = '';
 let selectedPinForImage = '';
+let dashboardUser = null;
 const CURRENT_TAX_YEAR = 2024;
 const CURRENT_STATE_EQUALIZER = 3.0355;
 const DASHBOARD_CACHE_VERSION = '20260522-appeal-window';
@@ -17,6 +18,7 @@ const SUPPORTING_DOCUMENT_ACCEPT = 'application/pdf,application/msword,applicati
 export async function loadAppealHistory(userOverride = null) {
         const user = userOverride || auth.currentUser;
         if (!user) return;
+        dashboardUser = user;
 
         setupAddAddressForm();
         setupPropertyImageUpload();
@@ -46,7 +48,7 @@ export async function loadAppealHistory(userOverride = null) {
 
 async function fetchAddresses() {
         try {
-                const response = await authFetch('/api/addresses');
+                const response = await dashboardAuthFetch('/api/addresses');
                 if (!response.ok) throw new Error('Failed to fetch addresses');
                 userAddresses = await response.json();
         } catch (error) {
@@ -89,9 +91,26 @@ function saveDashboardCache(uid) {
         }
 }
 
+async function dashboardAuthFetch(url, options = {}) {
+        if (!dashboardUser) {
+                return authFetch(url, options);
+        }
+
+        const user = auth.currentUser || dashboardUser;
+        const token = await user.getIdToken();
+        const headers = new Headers(options.headers || {});
+        headers.set('Authorization', `Bearer ${token}`);
+        headers.set('X-Firebase-Auth', token);
+
+        return fetch(url, {
+                ...options,
+                headers
+        });
+}
+
 async function fetchAppeals() {
         try {
-                const response = await authFetch('/api/history');
+                const response = await dashboardAuthFetch('/api/history');
                 if (!response.ok) throw new Error('Failed to fetch appeals');
                 allAppeals = await response.json();
         } catch (error) {
@@ -211,7 +230,7 @@ async function deleteAddress(address, propertyKey) {
         if (!confirmed) return;
 
         try {
-                const response = await authFetch('/api/addresses', {
+                const response = await dashboardAuthFetch('/api/addresses', {
                         method: 'DELETE',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ address, propertyKey })
@@ -224,8 +243,8 @@ async function deleteAddress(address, propertyKey) {
                 }
 
                 await fetchAddresses();
-                if (auth.currentUser) saveDashboardCache(auth.currentUser.uid);
-                renderAccountSummary(auth.currentUser);
+                if (dashboardUser) saveDashboardCache(dashboardUser.uid);
+                renderAccountSummary(dashboardUser || auth.currentUser);
                 renderAddressList();
         } catch (error) {
                 console.error('Error deleting address:', error);
@@ -313,7 +332,7 @@ async function renderPropertyImage(pin) {
         dateEl.textContent = 'Loading image...';
 
         try {
-                const response = await authFetch(`/api/property-image?pin=${encodeURIComponent(pin)}`);
+                const response = await dashboardAuthFetch(`/api/property-image?pin=${encodeURIComponent(pin)}`);
                 if (!response.ok) throw new Error('Failed to load image');
 
                 const data = await response.json();
@@ -341,7 +360,7 @@ async function renderGovernmentIdImage() {
         dateEl.textContent = 'Loading ID...';
 
         try {
-                const response = await authFetch('/api/government-id-image');
+                const response = await dashboardAuthFetch('/api/government-id-image');
                 if (!response.ok) throw new Error('Failed to load government ID');
 
                 const data = await response.json();
@@ -375,7 +394,7 @@ async function renderSupportingDocuments(pin) {
         statusEl.textContent = 'Loading supporting documents...';
 
         try {
-                const response = await authFetch(`/api/supporting-documents?pin=${encodeURIComponent(pin)}`);
+                const response = await dashboardAuthFetch(`/api/supporting-documents?pin=${encodeURIComponent(pin)}`);
                 if (!response.ok) throw new Error('Failed to load supporting documents');
 
                 const data = await response.json();
@@ -410,7 +429,7 @@ function setupPropertyImageUpload() {
 
                 try {
                         const resized = await resizeImage(file, 400, 400);
-                        const response = await authFetch('/api/property-image', {
+                        const response = await dashboardAuthFetch('/api/property-image', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
@@ -448,7 +467,7 @@ function setupGovernmentIdUpload() {
 
                 try {
                         const resized = await resizeImage(file, 900, 900);
-                        const response = await authFetch('/api/government-id-image', {
+                        const response = await dashboardAuthFetch('/api/government-id-image', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
@@ -504,7 +523,7 @@ function setupSupportingDocumentsUpload() {
                                 }
 
                                 const dataUrl = await readFileAsDataUrl(file);
-                                const response = await authFetch('/api/supporting-documents', {
+                                const response = await dashboardAuthFetch('/api/supporting-documents', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({
@@ -756,7 +775,7 @@ function setupAddAddressForm() {
                 btn.disabled = true;
 
                 try {
-                        const response = await authFetch('/api/addresses', {
+                        const response = await dashboardAuthFetch('/api/addresses', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ address, propertyKey })
@@ -769,8 +788,8 @@ function setupAddAddressForm() {
                                 hideAddressSuggestions('property-address-suggestions');
                                 // Refresh data
                                 await fetchAddresses();
-                                if (auth.currentUser) saveDashboardCache(auth.currentUser.uid);
-                                renderAccountSummary(auth.currentUser);
+                                if (dashboardUser) saveDashboardCache(dashboardUser.uid);
+                                renderAccountSummary(dashboardUser || auth.currentUser);
                                 renderAddressList();
                         } else {
                                 const err = await response.json();
@@ -822,7 +841,7 @@ async function updateAddressSuggestions(query, forceVisible = false) {
         suggestionsPanel.classList.add('is-visible');
 
         try {
-                const response = await authFetch(`/api/address-lookup?q=${encodeURIComponent(query)}&limit=5`);
+                const response = await dashboardAuthFetch(`/api/address-lookup?q=${encodeURIComponent(query)}&limit=5`);
                 if (!response.ok) {
                         const error = await response.json().catch(() => ({}));
                         renderAddressSuggestionMessage(

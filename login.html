@@ -750,7 +750,7 @@
                         pendingVerificationEmail = '';
                         hideVerificationPanel();
                         clearVerificationReturnFlag();
-                        const { loadAppealHistory } = await import('./history.js?v=20260524-fast-dashboard');
+                        const { loadAppealHistory } = await import('./history.js?v=20260524-dashboard-auth-fetch');
                         await loadAppealHistory(auth.currentUser);
                 }
 
