@@ -76,8 +76,11 @@ export const onRequestPut = async (context) => {
                 }
 
                 const result = await context.env.DB.prepare(
-                        "UPDATE appeals SET appeal_status = ? WHERE transaction_id = ?"
-                ).bind(newStatus, transactionId).run();
+                        `UPDATE appeals
+                         SET appeal_status = ?,
+                             appeal_date = CASE WHEN ? = 'Finished' THEN CURRENT_TIMESTAMP ELSE appeal_date END
+                         WHERE transaction_id = ?`
+                ).bind(newStatus, newStatus, transactionId).run();
 
                 if (result.meta.changes === 0) {
                         return jsonResponse({ error: 'Appeal not found' }, 404);

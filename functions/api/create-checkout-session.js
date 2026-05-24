@@ -1,6 +1,12 @@
 import { requireFirebaseUser, jsonResponse } from './_auth.js';
 import { findBestPropertyAddress, getPropertyAddressCount } from './_property_addresses.js';
 
+const PROPERTY_GROUP_KEY = `CASE
+        WHEN pin_proration_rate IS NOT NULL AND pin_proration_rate < 1
+        THEN normalized_address || '|fractional'
+        ELSE normalized_address || '|pin:' || COALESCE(pin, id)
+END`;
+
 export const onRequestPost = async (context) => {
         const { user, response: authResponse } = await requireFirebaseUser(context.request);
 
@@ -19,7 +25,7 @@ export const onRequestPost = async (context) => {
         }
 
         try {
-                const { propertyAddress } = await context.request.json();
+                const { propertyAddress, propertyKey, propertyPin } = await context.request.json();
 
                 if (!propertyAddress) {
                         return jsonResponse({ error: 'Missing property address' }, 400);
@@ -29,7 +35,11 @@ export const onRequestPost = async (context) => {
                         return jsonResponse({ error: 'Database not configured' }, 500);
                 }
 
-                const validatedProperty = await findBestPropertyAddress(context.env.DB, propertyAddress);
+                const validatedProperty = await findCheckoutProperty(context.env.DB, {
+                        propertyAddress,
+                        propertyKey,
+                        propertyPin
+                });
 
                 if (!validatedProperty) {
                         const propertyAddressCount = await getPropertyAddressCount(context.env.DB);
@@ -44,7 +54,7 @@ export const onRequestPost = async (context) => {
                         }, 400);
                 }
 
-                const appealHelpAmountCents = Number(context.env.APPEAL_HELP_AMOUNT_CENTS || 9900);
+                const appealHelpAmountCents = parseAmountCents(context.env.APPEAL_HELP_AMOUNT_CENTS, 9900);
                 if (!Number.isInteger(appealHelpAmountCents) || appealHelpAmountCents < 50) {
                         return jsonResponse({ error: 'Invalid appeal help amount configured' }, 500);
                 }
@@ -63,6 +73,7 @@ export const onRequestPost = async (context) => {
                 body.append('cancel_url', `${DOMAIN}/index.html`);
                 body.append('client_reference_id', user.uid);
                 body.append('metadata[propertyAddress]', validatedProperty.address);
+                body.append('metadata[propertyKey]', validatedProperty.property_key || '');
                 if (validatedProperty.pin) {
                         body.append('metadata[propertyPin]', validatedProperty.pin);
                 }
@@ -70,6 +81,10 @@ export const onRequestPost = async (context) => {
                         body.append('customer_email', user.email);
                         body.append('metadata[userEmail]', user.email);
                 }
+                body.append('payment_intent_data[metadata][propertyAddress]', validatedProperty.address);
+                body.append('payment_intent_data[metadata][propertyKey]', validatedProperty.property_key || '');
+                body.append('payment_intent_data[metadata][propertyPin]', validatedProperty.pin || '');
+                body.append('payment_intent_data[metadata][userEmail]', user.email || '');
 
                 const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
                         method: 'POST',
@@ -95,4 +110,55 @@ export const onRequestPost = async (context) => {
 
 function isEnabled(value) {
         return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
+async function findCheckoutProperty(db, { propertyAddress, propertyKey, propertyPin }) {
+        if (propertyKey) {
+                const row = await db.prepare(
+                        `SELECT MIN(id) AS id,
+                                group_concat(pin, ', ') AS pin,
+                                address,
+                                normalized_address,
+                                ${PROPERTY_GROUP_KEY} AS property_key
+                         FROM property_addresses
+                         WHERE ${PROPERTY_GROUP_KEY} = ?
+                         GROUP BY property_key
+                         LIMIT 1`
+                ).bind(propertyKey).first();
+                if (row) return row;
+        }
+
+        if (propertyPin) {
+                const firstPin = String(propertyPin).split(',')[0].trim();
+                if (firstPin) {
+                        const row = await db.prepare(
+                                `SELECT MIN(id) AS id,
+                                        group_concat(pin, ', ') AS pin,
+                                        address,
+                                        normalized_address,
+                                        ${PROPERTY_GROUP_KEY} AS property_key
+                                 FROM property_addresses
+                                 WHERE pin = ?
+                                 GROUP BY property_key
+                                 LIMIT 1`
+                        ).bind(firstPin).first();
+                        if (row) return row;
+                }
+        }
+
+        return findBestPropertyAddress(db, propertyAddress);
+}
+
+function parseAmountCents(value, fallbackCents) {
+        const raw = String(value ?? '').trim();
+        if (!raw) return fallbackCents;
+
+        const numeric = Number(raw);
+        if (!Number.isFinite(numeric)) return fallbackCents;
+
+        if (raw.includes('.')) {
+                return Math.round(numeric * 100);
+        }
+
+        return Math.round(numeric);
 }

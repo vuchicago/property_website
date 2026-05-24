@@ -36,6 +36,9 @@ export const onRequestGet = async (context) => {
                                                 customerName: session.customer_details?.name || session.metadata?.userName || null,
                                                 customerEmail: session.customer_details?.email || session.metadata?.userEmail || null,
                                                 propertyAddress: session.metadata?.propertyAddress || null,
+                                                propertyKey: session.metadata?.propertyKey || null,
+                                                propertyPin: session.metadata?.propertyPin || null,
+                                                paymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id || null,
                                                 paymentAmount: session.amount_total,
                                                 paymentStatus: session.payment_status
                                         });

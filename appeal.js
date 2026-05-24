@@ -322,7 +322,11 @@ async function handleAppealPayment(config = {}) {
                 const response = await authFetch('/api/create-checkout-session', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ propertyAddress: address })
+                        body: JSON.stringify({
+                                propertyAddress: address,
+                                propertyKey: selectedAppealPropertyContext?.property_key || selectedAppealPropertyContext?.propertyKey || '',
+                                propertyPin: selectedAppealPropertyContext?.pin || selectedAppealPropertyContext?.propertyDetails?.pin || ''
+                        })
                 });
 
                 if (!response.ok) {
@@ -353,7 +357,7 @@ async function handleAppealPayment(config = {}) {
 
 async function getAppealConfig() {
         if (!appealConfigPromise) {
-                appealConfigPromise = fetch('/api/config')
+                appealConfigPromise = fetch('/api/config', { cache: 'no-store' })
                         .then(response => response.ok ? response.json() : {})
                         .catch(() => ({}))
                         .then(config => ({

@@ -1,4 +1,4 @@
-import { recordPaidAppeal } from './_appeals.js';
+import { markAppealPaymentStatus, recordPaidAppeal } from './_appeals.js';
 
 export const onRequestPost = async (context) => {
         const STRIPE_KEY = context.env.STRIPE_SECRET_KEY || context.env.STRIPE_API_KEY;
@@ -59,8 +59,7 @@ export const onRequestPost = async (context) => {
                         event = JSON.parse(body);
                 }
 
-                // --- Handle the checkout.session.completed event ---
-                if (event.type === 'checkout.session.completed') {
+                if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
                         const session = event.data.object;
 
                         const transactionId = session.id;
@@ -68,6 +67,11 @@ export const onRequestPost = async (context) => {
                         const customerName = session.customer_details?.name || session.metadata?.userName || null;
                         const customerEmail = session.customer_details?.email || null;
                         const propertyAddress = session.metadata?.propertyAddress || null;
+                        const propertyKey = session.metadata?.propertyKey || null;
+                        const propertyPin = session.metadata?.propertyPin || null;
+                        const paymentIntentId = typeof session.payment_intent === 'string'
+                                ? session.payment_intent
+                                : session.payment_intent?.id || null;
                         const paymentAmount = session.amount_total; // in cents
                         const paymentStatus = session.payment_status; // "paid", "unpaid", "no_payment_required"
 
@@ -79,11 +83,31 @@ export const onRequestPost = async (context) => {
                                         customerName,
                                         customerEmail,
                                         propertyAddress,
+                                        propertyKey,
+                                        propertyPin,
+                                        paymentIntentId,
                                         paymentAmount,
                                         paymentStatus
                                 });
                         } else {
                                 console.error('D1 database (DB) binding not available — could not save appeal record.');
+                        }
+                } else if (event.type === 'checkout.session.async_payment_failed' || event.type === 'checkout.session.expired') {
+                        const session = event.data.object;
+                        if (context.env.DB) {
+                                await markAppealPaymentStatus(context.env, {
+                                        transactionId: session.id,
+                                        paymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id,
+                                        paymentStatus: event.type === 'checkout.session.expired' ? 'expired' : 'failed'
+                                });
+                        }
+                } else if (event.type === 'charge.refunded') {
+                        const charge = event.data.object;
+                        if (context.env.DB) {
+                                await markAppealPaymentStatus(context.env, {
+                                        paymentIntentId: typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id,
+                                        paymentStatus: 'refunded'
+                                });
                         }
                 }
 

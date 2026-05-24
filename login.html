@@ -267,6 +267,47 @@
                         font-size: var(--font-size-3xl);
                 }
 
+                .property-appeal-status {
+                        align-items: center;
+                        display: inline-flex;
+                        font-size: var(--font-size-xs);
+                        font-weight: 700;
+                        gap: 0.35rem;
+                        margin-top: 0.35rem;
+                }
+
+                .property-appeal-status span {
+                        border-radius: 999px;
+                        display: inline-block;
+                        height: 0.55rem;
+                        width: 0.55rem;
+                }
+
+                .property-appeal-status-pending {
+                        color: hsl(0, 72%, 38%);
+                }
+
+                .property-appeal-status-pending span {
+                        background: hsl(0, 72%, 52%);
+                        box-shadow: 0 0 0 4px hsla(0, 72%, 52%, 0.14);
+                }
+
+                .property-appeal-status-completed {
+                        color: hsl(142, 72%, 29%);
+                }
+
+                .property-appeal-status-completed span {
+                        background: hsl(142, 72%, 38%);
+                }
+
+                .property-appeal-status-refunded {
+                        color: var(--dark-600);
+                }
+
+                .property-appeal-status-refunded span {
+                        background: var(--dark-400);
+                }
+
                 .account-actions {
                         display: flex;
                         gap: 0.75rem;
@@ -451,11 +492,11 @@
 
                         <div class="account-summary">
                                 <div class="summary-tile">
-                                        <span>Tracked Properties</span>
+                                        <span>Number of Properties</span>
                                         <strong id="property-count">0</strong>
                                 </div>
                                 <div class="summary-tile">
-                                        <span>Total Appeals</span>
+                                        <span>Appeal Completed</span>
                                         <strong id="appeal-count">0</strong>
                                 </div>
                                 <div class="summary-tile">
@@ -733,7 +774,7 @@
                 });
 
                 addAppealBtn.addEventListener('click', async () => {
-                        const { openAppealModal } = await import('./appeal.js?v=20260524-deployment-ready');
+                        const { openAppealModal } = await import('./appeal.js?v=20260524-payment-property-key');
                         openAppealModal();
                 });
 
@@ -750,7 +791,7 @@
                         pendingVerificationEmail = '';
                         hideVerificationPanel();
                         clearVerificationReturnFlag();
-                        const { loadAppealHistory } = await import('./history.js?v=20260524-assessed-display');
+                        const { loadAppealHistory } = await import('./history.js?v=20260524-payment-status');
                         await loadAppealHistory(userForDashboard || auth.currentUser);
                 }
 

@@ -131,7 +131,7 @@ function renderAccountSummary(user) {
         if (appealCountEl) {
                 appealCountEl.textContent = allAppeals.filter(appeal => {
                         const status = (appeal.appealStatus || appeal.status || '').toLowerCase();
-                        return status && status !== 'pending';
+                        return status === 'finished' || status === 'completed' || status === 'complete';
                 }).length;
         }
         if (pendingCountEl) {
@@ -152,7 +152,9 @@ function renderAddressList() {
         let html = '';
         userAddresses.forEach(addrObj => {
                 // Count appeals for this address
-                const appealCount = allAppeals.filter(a => a.propertyAddress === addrObj.address).length;
+                const propertyAppeals = appealsForProperty(addrObj);
+                const appealCount = propertyAppeals.length;
+                const propertyStatus = propertyAppealStatus(propertyAppeals);
                 const canDelete = appealCount === 0;
 
                 const safeAddress = escapeHtml(addrObj.address);
@@ -166,6 +168,7 @@ function renderAddressList() {
                                 ${addrObj.pin ? `<div class="text-xs text-muted">${String(addrObj.pin).includes(',') ? 'PINs' : 'PIN'} ${escapeHtml(addrObj.pin)}</div>` : ''}
                                 ${addrObj.propertyDetails?.mailingName ? `<div class="text-xs text-muted">${escapeHtml(addrObj.propertyDetails.mailingName)}</div>` : ''}
                                 <div class="text-xs text-muted">${appealCount} appeal(s)</div>
+                                ${propertyStatus ? renderPropertyAppealStatus(propertyStatus) : ''}
                         </div>
                         ${canDelete ? `<button type="button" class="btn btn-secondary btn-sm delete-address-btn" data-address="${safeAddress}" data-property-key="${safePropertyKey}" aria-label="Delete ${safeAddress}">Delete</button>` : ''}
                 </div>
@@ -226,6 +229,51 @@ function renderAddressLoadingState() {
         }
 }
 
+function propertyKeyOf(item) {
+        return item?.property_key || item?.propertyKey || '';
+}
+
+function appealsForProperty(property) {
+        if (!property) return [];
+        const key = propertyKeyOf(property);
+        const address = property.address || '';
+        return allAppeals.filter(appeal => {
+                if (key && appeal.propertyKey) {
+                        return appeal.propertyKey === key;
+                }
+                return appeal.propertyAddress === address;
+        });
+}
+
+function propertyAppealStatus(appeals) {
+        if (!appeals.length) return '';
+        if (appeals.some(appeal => String(appeal.paymentStatus || '').toLowerCase() === 'refunded')) {
+                return 'Refunded';
+        }
+        if (appeals.some(appeal => String(appeal.appealStatus || appeal.status || '').toLowerCase() === 'pending')) {
+                return 'Pending';
+        }
+        if (appeals.some(appeal => ['finished', 'completed', 'complete'].includes(String(appeal.appealStatus || appeal.status || '').toLowerCase()))) {
+                return 'Completed';
+        }
+        return capitalize(String(appeals[0].appealStatus || appeals[0].status || 'Appeal'));
+}
+
+function renderPropertyAppealStatus(status) {
+        const normalized = String(status || '').toLowerCase();
+        const statusClass = normalized === 'pending'
+                ? 'property-appeal-status-pending'
+                : normalized === 'refunded'
+                        ? 'property-appeal-status-refunded'
+                        : 'property-appeal-status-completed';
+        return `
+                <div class="property-appeal-status ${statusClass}">
+                        <span aria-hidden="true"></span>
+                        Appeal Status: ${escapeHtml(status)}
+                </div>
+        `;
+}
+
 async function deleteAddress(address, propertyKey) {
         const confirmed = window.confirm(`Delete ${address} from My Properties?`);
         if (!confirmed) return;
@@ -277,10 +325,13 @@ function selectAddress(propertyKey) {
         const details = selectedAddress?.propertyDetails;
         const taxContext = taxContextForDisplay(details);
         const pinEl = document.getElementById('selected-address-pin');
+        const filteredAppeals = appealsForProperty(selectedAddress);
+        const selectedAppealStatus = propertyAppealStatus(filteredAppeals);
 
         if (pinEl) {
                 const meta = [
                         selectedAddress?.pin ? [String(selectedAddress.pin).includes(',') ? 'PINs' : 'PIN', selectedAddress.pin] : null,
+                        selectedAppealStatus ? ['Appeal Status', selectedAppealStatus] : null,
                         details?.pinProrationRate ? ['PIN Proration Code', formatPercent(details.pinProrationRate)] : null,
                         details?.lastAppealYear ? ['Last Appeal', details.lastAppealYear] : null,
                         details?.municipalityName ? ['Municipality', details.municipalityName] : null,
@@ -312,7 +363,6 @@ function selectAddress(propertyKey) {
         renderGovernmentIdImage();
         renderSupportingDocuments(selectedPinForImage);
 
-        const filteredAppeals = allAppeals.filter(a => a.propertyAddress === address);
         document.getElementById('total-appeals-count').textContent = filteredAppeals.length;
 
         renderAppeals(filteredAppeals, address);
@@ -699,7 +749,7 @@ function renderAppeals(appeals, address) {
             <div style="text-align: center; padding: 2rem 0; color: var(--text-muted);">
                 <p>No appeals found for this property.</p>
                 <p class="text-sm text-muted">We are not accepting appeal submissions yet. Join the waitlist and we will follow up when the service is ready.</p>
-                <button class="btn btn-primary appeal-again-btn" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Join the Waitlist</button>
+                <button class="btn btn-primary appeal-again-btn" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Start Appeal</button>
                 ${uploadLegalFootnote()}
             </div>
         `;
@@ -710,7 +760,9 @@ function renderAppeals(appeals, address) {
                         const appDate = data.appealDate ? new Date(data.appealDate).toLocaleDateString() : 'N/A';
 
                         // Use explicit appealStatus if available, otherwise fallback
-                        const displayStatus = data.appealStatus || capitalize(data.status || 'pending');
+                        const displayStatus = String(data.paymentStatus || '').toLowerCase() === 'refunded'
+                                ? 'Refunded'
+                                : data.appealStatus || capitalize(data.status || 'pending');
                         // For class styling let's use a normalized version
                         const statusClass = getStatusClass(displayStatus.toLowerCase());
 
@@ -718,8 +770,9 @@ function renderAppeals(appeals, address) {
                 <li class="history-item" style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <div class="history-info">
-                            <span class="history-date text-sm text-muted">Paid on ${payDate}</span>
-                            <div style="margin-top: 0.25rem; font-size: 0.875rem;" class="text-muted">Appeal Date: ${appDate}</div>
+                            <span class="history-date text-sm text-muted">Date of Successful Payment: ${payDate}</span>
+                            <div style="margin-top: 0.25rem; font-size: 0.875rem;" class="text-muted">Date of Appeal: ${appDate}</div>
+                            <div style="margin-top: 0.25rem; font-size: 0.875rem;" class="text-muted">Payment Status: ${escapeHtml(formatPaymentStatus(data.paymentStatus))}</div>
                             <div style="margin-top: 0.5rem; font-weight: 500;">Amount: $${data.amount ? (data.amount / 100).toFixed(2) : '0.00'}</div>
                         </div>
                         <div class="history-status" style="text-align: right;">
@@ -730,7 +783,7 @@ function renderAppeals(appeals, address) {
             `;
                 });
                 html += '</ul>';
-                html += `<button class="btn btn-secondary appeal-again-btn btn-full" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Join the Waitlist</button>`;
+                html += `<button class="btn btn-secondary appeal-again-btn btn-full" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Start Another Appeal</button>`;
                 html += uploadLegalFootnote();
                 historyContainer.innerHTML = html;
         }
@@ -739,7 +792,7 @@ function renderAppeals(appeals, address) {
         historyContainer.querySelectorAll('.appeal-again-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                         const addr = e.currentTarget.dataset.address;
-                        const { openAppealModal } = await import('./appeal.js?v=20260524-deployment-ready');
+                        const { openAppealModal } = await import('./appeal.js?v=20260524-payment-property-key');
                         openAppealModal(addr, selectedProperty);
                 });
         });
@@ -927,6 +980,7 @@ function getStatusClass(status) {
                 case 'finished': return 'status-success';
                 case 'pending': return 'status-pending';
                 case 'failed': return 'status-error';
+                case 'refunded': return 'status-error';
                 case 'denied': return 'status-error';
                 default: return 'status-neutral';
         }
@@ -944,6 +998,16 @@ function formatCurrency(value) {
                 currency: 'USD',
                 maximumFractionDigits: 0
         });
+}
+
+function formatPaymentStatus(status) {
+        const normalized = String(status || '').toLowerCase();
+        if (normalized === 'paid') return 'Paid';
+        if (normalized === 'refunded') return 'Refunded';
+        if (normalized === 'expired') return 'Expired';
+        if (normalized === 'failed') return 'Failed';
+        if (!normalized) return 'N/A';
+        return capitalize(normalized);
 }
 
 function displayAssessedValue(value) {

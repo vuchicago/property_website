@@ -182,7 +182,7 @@ DEPLOYMENT_READY=0
 ```
 
 `CLOUDFLARE_EMAIL_API_TOKEN` must be a Cloudflare API token with permission to send emails. `ADMIN_NOTIFICATION_EMAIL` defaults to `vu@cookcountytaxcompare.com` if it is not set. With Resend, `NOTIFICATION_FROM_EMAIL` should be a sender address verified in Resend for production delivery. With Cloudflare Email Sending, it must be an address on the outbound email domain. The default Cloudflare sender is `notifications@inquiry.cookcountytaxcompare.com`.
-`APPEAL_HELP_AMOUNT_CENTS` controls the Stripe Checkout amount for appeal help. Use cents, so `9900` is $99.00.
+`APPEAL_HELP_AMOUNT_CENTS` controls the Stripe Checkout amount for appeal help. Use cents, so `99` is $0.99 and `9900` is $99.00. Decimal dollar values such as `0.99` are also accepted and converted to cents.
 `DEPLOYMENT_READY` controls whether appeal submissions use Stripe Checkout or the waitlist. Use `0` while appeals are not ready. Set `DEPLOYMENT_READY=1` only when Stripe payment, webhook secrets, and appeal operations are ready. The code also accepts `true`, `yes`, and `on`.
 
 ## Email Verification
