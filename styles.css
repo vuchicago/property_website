@@ -595,6 +595,18 @@ ol {
     object-fit: cover;
 }
 
+.upload-action-btn {
+    justify-content: center;
+    min-width: 128px;
+    text-align: center;
+}
+
+.upload-action-btn sup {
+    font-size: 0.7em;
+    line-height: 0;
+    margin-left: 2px;
+}
+
 .supporting-documents-panel {
     align-items: flex-start;
 }
@@ -634,6 +646,11 @@ ol {
     line-height: 1.45;
     margin-top: var(--space-3);
     max-width: 52rem;
+}
+
+.upload-legal-copy-appeal {
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .status-badge {

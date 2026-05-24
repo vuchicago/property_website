@@ -261,8 +261,8 @@ const updateNavigation = (user) => {
                 if (user) {
                         dashboard.style.display = 'block';
                         // Load history
-                        import('./history.js?v=20260522-appeal-window').then(module => {
-                                module.loadAppealHistory();
+                        import('./history.js?v=20260524-dashboard-email').then(module => {
+                                module.loadAppealHistory(user);
                         }).catch(err => console.error("Failed to load history module:", err));
                 } else {
                         dashboard.style.display = 'none';

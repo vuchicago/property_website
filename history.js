@@ -14,8 +14,8 @@ const DASHBOARD_CACHE_VERSION = '20260522-appeal-window';
 const MAX_SUPPORTING_DOCUMENTS = 5;
 const SUPPORTING_DOCUMENT_ACCEPT = 'application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp,.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp';
 
-export async function loadAppealHistory() {
-        const user = auth.currentUser;
+export async function loadAppealHistory(userOverride = null) {
+        const user = userOverride || auth.currentUser;
         if (!user) return;
 
         const hadCache = loadDashboardCache(user.uid);
@@ -98,8 +98,9 @@ function renderAccountSummary(user) {
         const propertyCountEl = document.getElementById('property-count');
         const appealCountEl = document.getElementById('appeal-count');
         const pendingCountEl = document.getElementById('pending-appeal-count');
+        const email = user?.email || user?.providerData?.find(provider => provider.email)?.email || 'Signed in';
 
-        if (emailEl) emailEl.textContent = user.email || 'Signed in';
+        if (emailEl) emailEl.textContent = email;
         if (propertyCountEl) propertyCountEl.textContent = userAddresses.length;
         if (appealCountEl) {
                 appealCountEl.textContent = allAppeals.filter(appeal => {
@@ -455,7 +456,7 @@ function setupSupportingDocumentsUpload() {
                 const number = index + 1;
                 return `
                         <div class="supporting-document-slot" data-slot="${number}" ${index === 0 ? '' : 'hidden'}>
-                                <label class="btn btn-secondary btn-sm" for="supporting-document-input-${number}">Upload Doc ${number}</label>
+                                <label class="btn btn-secondary btn-sm upload-action-btn" for="supporting-document-input-${number}">Upload Doc ${number}<sup>1</sup></label>
                                 <input type="file" id="supporting-document-input-${number}" accept="${SUPPORTING_DOCUMENT_ACCEPT}" style="display: none;">
                         </div>
                 `;
@@ -651,6 +652,7 @@ function renderAppeals(appeals, address) {
             <div style="text-align: center; padding: 2rem 0; color: var(--text-muted);">
                 <p>No appeals found for this property.</p>
                 <button class="btn btn-primary appeal-again-btn" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Start Appeal</button>
+                ${uploadLegalFootnote()}
             </div>
         `;
         } else {
@@ -681,6 +683,7 @@ function renderAppeals(appeals, address) {
                 });
                 html += '</ul>';
                 html += `<button class="btn btn-secondary appeal-again-btn btn-full" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Appeal Again</button>`;
+                html += uploadLegalFootnote();
                 historyContainer.innerHTML = html;
         }
 
@@ -692,6 +695,14 @@ function renderAppeals(appeals, address) {
                         openAppealModal(addr);
                 });
         });
+}
+
+function uploadLegalFootnote() {
+        return `
+                <p class="upload-legal-copy upload-legal-copy-appeal">
+                        <sup>1</sup> By uploading images or documents, you represent that you have the right to provide them and authorize Cook County Tax Compare, its service providers, and any attorney or representative assisting with your appeal to store, review, reproduce, transmit, and submit the materials as reasonably necessary to evaluate, prepare, file, support, or respond to your property tax appeal. Uploaded materials remain associated with your account and appeal records. We do not use uploaded materials for unrelated marketing or non-appeal purposes.
+                </p>
+        `;
 }
 
 function setupAddAddressForm() {

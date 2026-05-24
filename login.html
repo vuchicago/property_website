@@ -508,7 +508,7 @@
                                                 </div>
                                                 <div class="property-image-content">
                                                         <img id="property-image-preview" alt="Uploaded property" style="display: none;">
-                                                        <label class="btn btn-secondary btn-sm" for="property-image-input">Upload Image</label>
+                                                        <label class="btn btn-secondary btn-sm upload-action-btn" for="property-image-input">Upload Image<sup>1</sup></label>
                                                         <input type="file" id="property-image-input" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" style="display: none;">
                                                 </div>
                                         </div>
@@ -520,7 +520,7 @@
                                                 </div>
                                                 <div class="property-image-content">
                                                         <img id="government-id-preview" alt="Uploaded government identification" style="display: none;">
-                                                        <label class="btn btn-secondary btn-sm" for="government-id-input">Upload ID</label>
+                                                        <label class="btn btn-secondary btn-sm upload-action-btn" for="government-id-input">Upload ID<sup>1</sup></label>
                                                         <input type="file" id="government-id-input" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" style="display: none;">
                                                 </div>
                                         </div>
@@ -531,9 +531,6 @@
                                                         <p class="text-sm text-muted">Accepted formats: PDF, DOC, DOCX, JPG, PNG, or WEBP.</p>
                                                         <p id="supporting-documents-status" class="text-sm text-muted">No supporting documents uploaded.</p>
                                                         <ul id="supporting-documents-list" class="supporting-documents-list"></ul>
-                                                        <p class="upload-legal-copy">
-                                                                By uploading images or documents, you represent that you have the right to provide them and authorize Cook County Tax Compare, its service providers, and any attorney or representative assisting with your appeal to store, review, reproduce, transmit, and submit the materials as reasonably necessary to evaluate, prepare, file, support, or respond to your property tax appeal. Uploaded materials remain associated with your account and appeal records. We do not use uploaded materials for unrelated marketing or non-appeal purposes.
-                                                        </p>
                                                 </div>
                                                 <div class="property-image-content">
                                                         <div id="supporting-documents-upload-slots" class="supporting-documents-upload-slots"></div>
@@ -753,8 +750,8 @@
                         pendingVerificationEmail = '';
                         hideVerificationPanel();
                         clearVerificationReturnFlag();
-                        const { loadAppealHistory } = await import('./history.js?v=20260522-appeal-window');
-                        await loadAppealHistory();
+                        const { loadAppealHistory } = await import('./history.js?v=20260524-dashboard-email');
+                        await loadAppealHistory(auth.currentUser);
                 }
 
                 async function handleVerificationReturn() {
