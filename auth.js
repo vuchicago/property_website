@@ -242,6 +242,8 @@ export const initAuthUI = () => {
 };
 
 const updateNavigation = (user) => {
+        updateDesktopNavForAuth(user);
+
         // Desktop Nav Action Button
         const desktopContainer = document.getElementById('auth-action-container');
         if (desktopContainer) {
@@ -298,9 +300,12 @@ const updateAuthButton = (container, user) => {
                 // Create Account History Button
                 const historyBtn = document.createElement('a');
                 historyBtn.href = "login.html";
-                historyBtn.className = "btn btn-sm btn-secondary";
+                historyBtn.className = "btn btn-sm btn-secondary account-nav-btn";
                 historyBtn.style.marginLeft = "0.5rem";
-                historyBtn.textContent = "My Account";
+                historyBtn.innerHTML = `
+                        <span>My Account</span>
+                        <small>${escapeHtml(user.email || 'Signed in')}</small>
+                `;
                 historyBtn.onclick = (e) => {
                         const dashboard = document.getElementById('user-dashboard');
                         if (dashboard) {
@@ -335,6 +340,43 @@ const updateAuthButton = (container, user) => {
             </a>
         `;
         }
+};
+
+function escapeHtml(value) {
+        return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+}
+
+const updateDesktopNavForAuth = (user) => {
+        const navLinks = document.getElementById('nav-links');
+        if (!navLinks) return;
+
+        const resourcesMenu = navLinks.querySelector('.nav-dropdown-menu');
+        navLinks.querySelectorAll('[data-auth-hidden]').forEach(item => item.removeAttribute('data-auth-hidden'));
+        resourcesMenu?.querySelectorAll('[data-auth-added]').forEach(item => item.remove());
+
+        if (!user) return;
+
+        [
+                ['insurance.html', 'Insurance'],
+                ['partners.html', 'Partners']
+        ].forEach(([href, label]) => {
+                const link = Array.from(navLinks.querySelectorAll(`a[href="${href}"]`))
+                        .find(item => !item.closest('.nav-dropdown-menu'));
+                link?.closest('li')?.setAttribute('data-auth-hidden', 'true');
+
+                if (resourcesMenu && !resourcesMenu.querySelector(`a[href="${href}"]`)) {
+                        const resourceLink = document.createElement('a');
+                        resourceLink.href = href;
+                        resourceLink.textContent = label;
+                        resourceLink.setAttribute('data-auth-added', 'true');
+                        resourcesMenu.prepend(resourceLink);
+                }
+        });
 };
 
 const updateMobileMenu = (ulElement, user) => {

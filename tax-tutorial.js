@@ -28,7 +28,7 @@ function initTaxTutorialCalculator() {
         const marketValue = numberValue(fields.marketValue, 410000);
         const assessmentLevel = numberValue(fields.assessmentLevel, 10) / 100;
         const equalizer = numberValue(fields.equalizer, 3.0355);
-        const taxRate = numberValue(fields.taxRate, 17.601587) / 100;
+        const taxRate = numberValue(fields.taxRate, 9) / 100;
         const exemption = numberValue(fields.exemption, 10000);
 
         const assessedValue = marketValue * assessmentLevel;

@@ -1197,6 +1197,10 @@ ol {
     position: relative;
 }
 
+.nav-links li[data-auth-hidden] {
+    display: none;
+}
+
 .nav-links a,
 .nav-dropdown-trigger {
     font-size: var(--font-size-sm);
@@ -1229,6 +1233,24 @@ ol {
 
 #auth-action-container {
     min-width: 0;
+}
+
+.account-nav-btn {
+    align-items: center;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 1px;
+    line-height: 1.1;
+    min-height: 42px;
+}
+
+.account-nav-btn small {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 600;
+    max-width: 11rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .nav-links a::after,
@@ -3837,7 +3859,7 @@ input[type="range"]::-webkit-slider-thumb {
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: var(--space-3);
-    margin-bottom: var(--space-10);
+    margin-bottom: var(--space-4);
 }
 
 .tax-flow div {
@@ -3877,6 +3899,12 @@ input[type="range"]::-webkit-slider-thumb {
 .tax-flow small {
     color: var(--dark-500);
     line-height: 1.45;
+}
+
+.tax-flow-actions {
+    display: flex;
+    justify-content: center;
+    margin-bottom: var(--space-10);
 }
 
 .tax-tutorial-grid {

@@ -152,11 +152,14 @@
         <div class="container">
             <div class="tax-flow" aria-label="Property tax calculation flow">
                 <div><span>1</span><strong>Market Value</strong><small>What the Assessor thinks the property is worth</small></div>
-                <div><span>2</span><strong>10% Level</strong><small>Taxable value in our data</small></div>
+                <div><span>2</span><strong>10% Level</strong><small>Assessed value in our data</small></div>
                 <div><span>3</span><strong>Equalizer</strong><small>State multiplier</small></div>
                 <div><span>4</span><strong>Tax Rate</strong><small>Local taxing districts</small></div>
                 <div><span>5</span><strong>Exemptions</strong><small>Discounts you qualify for</small></div>
                 <div><span>6</span><strong>Tax Bill</strong><small>Estimated final amount</small></div>
+            </div>
+            <div class="tax-flow-actions">
+                <a href="#tax-calculator" class="btn btn-primary">Go Directly to Calculator</a>
             </div>
 
             <div class="tax-tutorial-grid">
@@ -178,12 +181,12 @@
                     <span class="section-badge">Step 2</span>
                     <h2>Use The Residential Assessment Level</h2>
                     <p>Cook County residential property generally starts with 10% of the estimated market value. This
-                        assessed value is the taxable value field used in our property data before the state equalizer is applied.</p>
+                        assessed value is the value used in our property data before the state equalizer is applied.</p>
                     <div class="tax-slice-visual">
                         <div class="tax-slice-fill"></div>
                         <div>
                             <strong>$410,000 x 10%</strong>
-                            <span>$41,000 taxable / assessed value</span>
+                            <span>$41,000 assessed value</span>
                         </div>
                     </div>
                 </article>
@@ -196,7 +199,7 @@
                         determined by the State of Illinois and is countywide for Cook County. For the current tax
                         year shown here, the Cook County equalizer is 3.0355.</p>
                     <div class="tax-multiplier">
-                        <div><span>Taxable / Assessed Value</span><strong>$41,000</strong></div>
+                        <div><span>Assessed Value</span><strong>$41,000</strong></div>
                         <div><span>State Equalizer</span><strong>3.0355</strong><small>Determined by state</small></div>
                         <div><span>EAV</span><strong>$124,456</strong></div>
                     </div>
@@ -246,7 +249,7 @@
         </div>
     </section>
 
-    <section class="tax-tutorial-section alt-bg">
+    <section class="tax-tutorial-section alt-bg" id="tax-calculator">
         <div class="container">
             <div class="section-header">
                 <span class="section-badge">Try The Math</span>
@@ -267,12 +270,12 @@
                     </label>
                     <label>
                         <span>Step 3: State equalizer</span>
-                        <input type="number" id="tutorial-equalizer" value="3.0355" readonly>
-                        <small>Determined by the State of Illinois. Cook County current tax year: 3.0355.</small>
+                        <input type="number" id="tutorial-equalizer" value="3.0355" min="0" step="0.0001">
+                        <small>Default shown is Cook County's current equalizer. Change it for another Illinois county.</small>
                     </label>
                     <label>
                         <span>Step 4: Local tax rate (%)</span>
-                        <input type="number" id="tutorial-tax-rate" value="17.601587" min="0" step="0.0001">
+                        <input type="number" id="tutorial-tax-rate" value="9" min="0" step="0.0001">
                     </label>
                     <label>
                         <span>Step 5: Exemption EAV amount</span>
@@ -283,7 +286,7 @@
                 <div class="dashboard-card tax-output-panel">
                     <div class="tax-output-formula" id="tutorial-formula"></div>
                     <div class="tax-output-grid">
-                        <div><span>Taxable / Assessed Value</span><strong id="tutorial-assessed-value">$41,000</strong></div>
+                        <div><span>Assessed Value</span><strong id="tutorial-assessed-value">$41,000</strong></div>
                         <div><span>EAV</span><strong id="tutorial-eav">$124,456</strong></div>
                         <div><span>Before Exemptions</span><strong id="tutorial-before-exemptions">$21,906</strong></div>
                         <div><span>Estimated Bill</span><strong id="tutorial-final-bill">$20,146</strong></div>

@@ -481,7 +481,7 @@ function decisionFor(target, comparables, radius, env, now = new Date()) {
                 return {
                         decision: 'Yes, Appeal',
                         label: 'Appeal recommended',
-                        reason: `Uniformity signal: your taxable value is ${(pctHigher * 100).toFixed(1)}% above the average of ${comparables.length} ${context}; ${stats.lowerValueCount} comps have lower taxable value.`
+                        reason: `Uniformity signal: your assessed value is ${(pctHigher * 100).toFixed(1)}% above the average of ${comparables.length} ${context}; ${stats.lowerValueCount} comps have lower assessed value.`
                 };
         }
 
@@ -501,7 +501,7 @@ function decisionFor(target, comparables, radius, env, now = new Date()) {
         return {
                 decision: 'No Need to Appeal',
                 label: 'Appeal likely not needed',
-                reason: `Your taxable value is in line with ${comparables.length} ${context}; this does not show a strong uniformity appeal signal.`
+                reason: `Your assessed value is in line with ${comparables.length} ${context}; this does not show a strong uniformity appeal signal.`
         };
 }
 

@@ -654,7 +654,7 @@ function renderPropertyDetails(details) {
         const taxContext = taxContextForDisplay(details);
 
         const fields = [
-                ['Taxable Value', formatCurrency(details?.taxableValue)],
+                ['Assessed Value', formatCurrency(details?.taxableValue)],
                 ['Equalized Assessed Value', formatCurrency(taxContext.equalizedAssessedValue)],
                 ['Imported Exemptions', formatExemptions(taxContext.exemptions)],
                 ['Bedrooms', formatNumber(details?.bedroomCount)],

@@ -7,7 +7,7 @@ const CURRENT_TAX_YEAR = 2024;
 const CURRENT_STATE_EQUALIZER = 3.0355;
 const COMPARABLE_COLUMNS = [
     { label: 'Address', value: c => escapeHtml(c.address), sortValue: c => c.address },
-    { label: 'Taxable Value', value: c => formatCurrency(c.taxableValue), sortValue: c => c.taxableValue },
+    { label: 'Assessed Value', value: c => formatCurrency(c.taxableValue), sortValue: c => c.taxableValue },
     { label: 'Last Appeal', value: c => escapeHtml(formatLastAppeal(c.lastAppealYear)), sortValue: c => Number(c.lastAppealYear) || c.lastAppealYear },
     { label: 'Home Size', value: c => c.homeSize ? `${formatNumber(c.homeSize)} sqft` : 'N/A', sortValue: c => c.homeSize },
     { label: 'Year Built', value: c => c.yearBuilt ? formatYear(c.yearBuilt) : 'N/A', sortValue: c => c.yearBuilt },
@@ -441,8 +441,8 @@ function updatePropertyResults(data) {
         target.taxableValue,
         summary.averageComparableValue,
         {
-            yourLabel: 'Your Taxable Value',
-            compLabel: 'Average Comp Taxable Value',
+            yourLabel: 'Your Assessed Value',
+            compLabel: 'Average Comp Assessed Value',
             formatter: formatCurrency
         }
     );
@@ -451,8 +451,8 @@ function updatePropertyResults(data) {
         summary.subjectValuePerSqft,
         averageComparableValuePerSqft(data.comparables),
         {
-            yourLabel: 'Your Taxable Value / Sqft',
-            compLabel: 'Average Comp Taxable Value / Sqft',
+            yourLabel: 'Your Assessed Value / Sqft',
+            compLabel: 'Average Comp Assessed Value / Sqft',
             formatter: formatCurrencyPerSqft
         }
     );
@@ -641,7 +641,7 @@ function updateComparisonChart(containerId, yourValue, avgValue, options = {}) {
             </div>
         </div>
         <div class="property-tax-chart-row">
-            <span>${escapeHtml(options.compLabel || 'Average Comp Value')}</span>
+            <span>${escapeHtml(options.compLabel || 'Average Comp Assessed Value')}</span>
             <div class="property-tax-chart-track">
                 <div class="property-tax-chart-fill avg-comps" style="width:${avgWidth}%">${formatter(avgValue)}</div>
             </div>
@@ -776,7 +776,7 @@ function exportToCSV() {
     if (!searchResults) return;
 
     const rows = [
-        ['Address', 'Taxable Value', 'Last Appeal Year', 'Certified Land', 'Certified Building', 'Home Size', 'Year Built', 'Last Appeal Status', 'Beds', 'Full Baths', 'Half Baths', 'Masonry Type', 'Repair Condition', 'Finished Basement', 'Single vs Multi Family', 'Neighborhood Code', 'Garage Size', 'Class Description', 'PIN Proration Rate', 'PIN', 'PIN10', 'Latitude', 'Longitude', 'Class Code', 'Condo Unit Sqft', 'Condo Parking Space', 'Condo Common Area', 'Distance Miles'],
+        ['Address', 'Assessed Value', 'Last Appeal Year', 'Certified Land', 'Certified Building', 'Home Size', 'Year Built', 'Last Appeal Status', 'Beds', 'Full Baths', 'Half Baths', 'Masonry Type', 'Repair Condition', 'Finished Basement', 'Single vs Multi Family', 'Neighborhood Code', 'Garage Size', 'Class Description', 'PIN Proration Rate', 'PIN', 'PIN10', 'Latitude', 'Longitude', 'Class Code', 'Condo Unit Sqft', 'Condo Parking Space', 'Condo Common Area', 'Distance Miles'],
         [
             searchResults.target.address,
             searchResults.target.taxableValue,
