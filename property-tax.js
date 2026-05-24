@@ -195,7 +195,7 @@ function hydratePropertyFromQuery() {
         radiusSlider.value = String(radius);
         radiusValue.textContent = radius.toFixed(1);
     }
-    setSelectedPropertyText(`Selected property: ${selectedProperty.address}`);
+    setSelectedPropertyText(selectedPropertyLabel(selectedProperty));
 
     if (params.get('auto') === '1') {
         requestAnimationFrame(() => searchProperty(radius, { scrollToResults: true }));
@@ -213,7 +213,7 @@ function selectSuggestion(button) {
     };
     addressInput.value = selectedProperty.address;
     searchBtn.disabled = false;
-    setSelectedPropertyText(`Selected property: ${selectedProperty.address}`);
+    setSelectedPropertyText(selectedPropertyLabel(selectedProperty));
     hideSuggestions();
 }
 
@@ -430,7 +430,9 @@ function updatePropertyResults(data) {
     setText('snapshot-garage', target.garageSize || 'N/A');
     setText('snapshot-type', target.propertyClass || target.classCode || 'N/A');
     if (target.isSimulated) {
-        setSelectedPropertyText(`Simulating changes for ${target.address}`);
+        setSelectedPropertyText(`${selectedPropertyLabel(target).replace('Selected property:', 'Simulating changes for')}`);
+    } else {
+        setSelectedPropertyText(selectedPropertyLabel(target));
     }
 
     renderComparableRows(target, data.comparables);
@@ -854,6 +856,13 @@ function csvCell(value) {
 
 function setSelectedPropertyText(value) {
     setText('selected-property', value);
+}
+
+function selectedPropertyLabel(property) {
+    const address = property?.address || '';
+    const pin = property?.pin || (Array.isArray(property?.pinList) ? property.pinList.join(', ') : '');
+    const pinLabel = pin ? ` | ${String(pin).includes(',') ? 'PINs' : 'PIN'}: ${pin}` : '';
+    return address ? `Selected property: ${address}${pinLabel}` : 'Enter an address and choose the closest match.';
 }
 
 function setText(id, value) {
