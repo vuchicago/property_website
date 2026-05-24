@@ -148,8 +148,8 @@ function initPropertyTaxTool() {
     });
     exportCsvBtn?.addEventListener('click', exportToCSV);
     increaseRadiusBtn?.addEventListener('click', async () => {
-        if (increaseRadiusBtn.dataset.action === 'appeal') {
-            window.location.href = 'login.html?mode=signup&source=property-tax-appeal';
+        if (increaseRadiusBtn.dataset.action === 'create-account') {
+            window.location.href = buildCreateAccountUrl();
             return;
         }
 
@@ -520,10 +520,10 @@ function updateWiderRadiusButton(data) {
 
     if (data.appeal?.decision === 'Yes, Appeal') {
         button.hidden = false;
-        button.dataset.action = 'appeal';
+        button.dataset.action = 'create-account';
         button.classList.remove('btn-secondary');
         button.classList.add('btn-primary', 'appeal-cta-btn');
-        button.textContent = 'I want to appeal';
+        button.textContent = 'Create Account to Join Waitlist';
         return;
     }
 
@@ -537,6 +537,23 @@ function updateWiderRadiusButton(data) {
     } else {
         button.textContent = 'Try Wider Radius';
     }
+}
+
+function buildCreateAccountUrl() {
+    const params = new URLSearchParams({
+        mode: 'signup',
+        source: 'property-tax-appeal'
+    });
+
+    if (selectedProperty?.address) {
+        params.set('address', selectedProperty.address);
+    }
+
+    if (selectedProperty?.pin) {
+        params.set('pin', selectedProperty.pin);
+    }
+
+    return `login.html?${params.toString()}`;
 }
 
 function updateDecision(appeal) {
