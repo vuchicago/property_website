@@ -549,7 +549,7 @@
 
         <!-- Auth Logic Script -->
         <script type="module">
-                import { loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, refreshCurrentUser, resetPasswordForEmail } from './auth-client.js?v=20260524-auth-gate';
+                import { auth, loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, refreshCurrentUser, resetPasswordForEmail } from './auth-client.js?v=20260524-auth-gate';
 
                 const form = document.getElementById('auth-form');
                 const emailInput = document.getElementById('email');
@@ -634,7 +634,7 @@
                                         await logoutUser();
                                         return;
                                 }
-                                await showDashboard();
+                                await showDashboard(result.user);
                         } else {
                                 errorAlert.textContent = result.error;
                                 errorAlert.style.display = 'block';
@@ -700,7 +700,7 @@
                                         await logoutUser();
                                         return;
                                 }
-                                await showDashboard();
+                                await showDashboard(result.user);
                         } else {
                                 errorAlert.textContent = result.error;
                                 errorAlert.style.display = 'block';
@@ -719,7 +719,7 @@
                                         await logoutUser();
                                         return;
                                 }
-                                await showDashboard();
+                                await showDashboard(user);
                         } else {
                                 authContainer.style.display = 'flex';
                                 dashboard.style.display = 'none';
@@ -744,14 +744,14 @@
                         }
                 });
 
-                async function showDashboard() {
+                async function showDashboard(userForDashboard = null) {
                         authContainer.style.display = 'none';
                         dashboard.style.display = 'block';
                         pendingVerificationEmail = '';
                         hideVerificationPanel();
                         clearVerificationReturnFlag();
-                        const { loadAppealHistory } = await import('./history.js?v=20260524-dashboard-auth-fetch');
-                        await loadAppealHistory(auth.currentUser);
+                        const { loadAppealHistory } = await import('./history.js?v=20260524-login-user-pass');
+                        await loadAppealHistory(userForDashboard || auth.currentUser);
                 }
 
                 async function handleVerificationReturn() {
@@ -761,7 +761,7 @@
 
                         const result = await refreshCurrentUser();
                         if (result.success && result.user.emailVerified) {
-                                await showDashboard();
+                                await showDashboard(result.user);
                                 return true;
                         }
 
