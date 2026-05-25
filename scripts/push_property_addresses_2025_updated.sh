@@ -10,15 +10,18 @@ if [ ! -f "$FIRST_IMPORT_FILE" ]; then
         exit 1
 fi
 
-if ! sed -n '2p' "$FIRST_IMPORT_FILE" | grep -q "city, zip_code"; then
-        echo "$FIRST_IMPORT_FILE does not include city/zip_code columns. Regenerate it from the current parquet before pushing."
-        exit 1
-fi
+for file in import/property_addresses_2025_updated_part_*.sql; do
+        insert_line="$(grep -m 1 "INSERT OR REPLACE INTO property_addresses" "$file" || true)"
+        if ! printf '%s' "$insert_line" | grep -q "city, zip_code"; then
+                echo "$file does not include city/zip_code columns. Regenerate all import parts from the current parquet before pushing."
+                exit 1
+        fi
 
-if ! sed -n '2p' "$FIRST_IMPORT_FILE" | grep -q "township_name, township_code"; then
-        echo "$FIRST_IMPORT_FILE does not include township columns. Regenerate it from the current parquet before pushing."
-        exit 1
-fi
+        if ! printf '%s' "$insert_line" | grep -q "township_name, township_code"; then
+                echo "$file does not include township columns. Regenerate all import parts from the current parquet before pushing."
+                exit 1
+        fi
+done
 
 $WRANGLER d1 execute "$DB_NAME" --remote --yes --file=migrations/0006_rebuild_property_addresses_full.sql
 IMPORT_STEM=property_addresses_2025_updated DB_NAME="$DB_NAME" WRANGLER="$WRANGLER" bash scripts/import_property_addresses_parts.sh

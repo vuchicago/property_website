@@ -172,7 +172,7 @@ function hydratePropertyFromQuery() {
     const params = new URLSearchParams(window.location.search);
     const id = Number(params.get('propertyId') || params.get('id'));
     const address = params.get('address') || '';
-    if (!id || !address) return;
+    if (!address) return;
 
     const addressInput = document.getElementById('property-address');
     const searchBtn = document.getElementById('search-property');
@@ -180,26 +180,28 @@ function hydratePropertyFromQuery() {
     const radiusValue = document.getElementById('radius-value');
     const radius = Math.max(0.1, Math.min(5, Number(params.get('radius') || radiusSlider?.value || 0.5)));
 
-    selectedProperty = {
+    selectedProperty = id ? {
         id,
         pin: params.get('pin') || '',
         address
-    };
+    } : null;
 
     if (addressInput) {
-        addressInput.value = selectedProperty.address;
+        addressInput.value = address;
     }
-    if (searchBtn) {
+    if (searchBtn && selectedProperty) {
         searchBtn.disabled = false;
     }
     if (radiusSlider && radiusValue) {
         radiusSlider.value = String(radius);
         radiusValue.textContent = radius.toFixed(1);
     }
-    setSelectedPropertyText(selectedPropertyLabel(selectedProperty));
+    setSelectedPropertyText(selectedProperty ? selectedPropertyLabel(selectedProperty) : 'Choose the closest match from the suggestions.');
 
-    if (params.get('auto') === '1') {
+    if (selectedProperty && params.get('auto') === '1') {
         requestAnimationFrame(() => searchProperty(radius, { scrollToResults: true }));
+    } else if (!selectedProperty) {
+        requestAnimationFrame(() => fetchAddressSuggestions(address));
     }
 }
 

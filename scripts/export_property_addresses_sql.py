@@ -221,6 +221,10 @@ def main() -> None:
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    if args.rows_per_file:
+        for old_part in output_path.parent.glob(f"{output_path.stem}_part_*{output_path.suffix}"):
+            old_part.unlink()
+
     parquet_file = pq.ParquetFile(input_path)
     exported = 0
     batch: list[list] = []

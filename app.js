@@ -497,17 +497,19 @@ function initHomePropertySearch() {
     });
 
     analyzeBtn.addEventListener('click', () => {
-        if (!selectedHomeProperty) {
+        const typedAddress = addressInput.value.trim();
+        if (!selectedHomeProperty && !typedAddress) {
             showNotification('Please choose a property from the suggestions', 'error');
             return;
         }
 
+        const property = selectedHomeProperty || { id: '', pin: '', address: typedAddress };
         const params = new URLSearchParams({
-            propertyId: String(selectedHomeProperty.id),
-            pin: selectedHomeProperty.pin || '',
-            address: selectedHomeProperty.address,
+            address: property.address,
             auto: '1'
         });
+        if (property.id) params.set('propertyId', String(property.id));
+        if (property.pin) params.set('pin', property.pin);
         window.location.href = `property-tax.html?${params.toString()}`;
     });
 
