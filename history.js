@@ -792,7 +792,7 @@ function renderAppeals(appeals, address) {
         historyContainer.querySelectorAll('.appeal-again-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                         const addr = e.currentTarget.dataset.address;
-                        const { openAppealModal } = await import('./appeal.js?v=20260524-payment-property-key');
+                        const { openAppealModal } = await import('./appeal.js?v=20260524-checkout-address');
                         openAppealModal(addr, selectedProperty);
                 });
         });

@@ -167,6 +167,7 @@ ADMIN_NOTIFICATION_EMAIL=vu@cookcountytaxcompare.com
 NOTIFICATION_FROM_EMAIL="Cook County Tax Compare <notifications@inquiry.cookcountytaxcompare.com>"
 APPEAL_HELP_AMOUNT_CENTS=9900
 DEPLOYMENT_READY=0
+STRIPE_CHECKOUT_DOMAIN=https://your-preview-or-production-domain.example
 ```
 
 If Cloudflare requires the destination to be a verified destination address, set `ADMIN_NOTIFICATION_EMAIL` to your verified personal email instead. You can still use `NOTIFICATION_FROM_EMAIL="Cook County Tax Compare <notifications@inquiry.cookcountytaxcompare.com>"`.
@@ -179,11 +180,13 @@ ADMIN_NOTIFICATION_EMAIL=vu@cookcountytaxcompare.com
 NOTIFICATION_FROM_EMAIL="Cook County Tax Compare <alerts@yourdomain.com>"
 APPEAL_HELP_AMOUNT_CENTS=9900
 DEPLOYMENT_READY=0
+STRIPE_CHECKOUT_DOMAIN=https://your-preview-or-production-domain.example
 ```
 
 `CLOUDFLARE_EMAIL_API_TOKEN` must be a Cloudflare API token with permission to send emails. `ADMIN_NOTIFICATION_EMAIL` defaults to `vu@cookcountytaxcompare.com` if it is not set. With Resend, `NOTIFICATION_FROM_EMAIL` should be a sender address verified in Resend for production delivery. With Cloudflare Email Sending, it must be an address on the outbound email domain. The default Cloudflare sender is `notifications@inquiry.cookcountytaxcompare.com`.
 `APPEAL_HELP_AMOUNT_CENTS` controls the Stripe Checkout amount for appeal help. Use cents, so `99` is $0.99 and `9900` is $99.00. Decimal dollar values such as `0.99` are also accepted and converted to cents.
 `DEPLOYMENT_READY` controls whether appeal submissions use Stripe Checkout or the waitlist. Use `0` while appeals are not ready. Set `DEPLOYMENT_READY=1` only when Stripe payment, webhook secrets, and appeal operations are ready. The code also accepts `true`, `yes`, and `on`.
+`STRIPE_CHECKOUT_DOMAIN` is optional. If it is not set, Stripe returns to the same Production, Stage, or preview origin that created the checkout session. Only set it when you intentionally want to force a specific return domain. Do not set Stage to the Production domain.
 
 ## Email Verification
 

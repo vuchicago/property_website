@@ -59,7 +59,10 @@ export const onRequestPost = async (context) => {
                         return jsonResponse({ error: 'Invalid appeal help amount configured' }, 500);
                 }
 
-                const DOMAIN = context.env.YOUR_DOMAIN || new URL(context.request.url).origin;
+                const DOMAIN = context.env.STRIPE_CHECKOUT_DOMAIN || new URL(context.request.url).origin;
+                const checkoutPropertyAddress = String(propertyAddress || '').trim();
+                const checkoutPropertyKey = validatedProperty.property_key || propertyKey || '';
+                const checkoutPropertyPin = validatedProperty.pin || propertyPin || '';
 
                 // Construct form-urlencoded body manually for nested params
                 const body = new URLSearchParams();
@@ -67,23 +70,24 @@ export const onRequestPost = async (context) => {
                 body.append('line_items[0][price_data][currency]', 'usd');
                 body.append('line_items[0][price_data][unit_amount]', String(appealHelpAmountCents));
                 body.append('line_items[0][price_data][product_data][name]', 'Cook County Property Tax Appeal Help');
-                body.append('line_items[0][price_data][product_data][description]', validatedProperty.address);
+                body.append('line_items[0][price_data][product_data][description]', checkoutPropertyAddress);
                 body.append('line_items[0][quantity]', '1');
                 body.append('success_url', `${DOMAIN}/return.html?session_id={CHECKOUT_SESSION_ID}`);
                 body.append('cancel_url', `${DOMAIN}/index.html`);
                 body.append('client_reference_id', user.uid);
-                body.append('metadata[propertyAddress]', validatedProperty.address);
-                body.append('metadata[propertyKey]', validatedProperty.property_key || '');
-                if (validatedProperty.pin) {
-                        body.append('metadata[propertyPin]', validatedProperty.pin);
+                body.append('metadata[propertyAddress]', checkoutPropertyAddress);
+                body.append('metadata[propertyKey]', checkoutPropertyKey);
+                if (checkoutPropertyPin) {
+                        body.append('metadata[propertyPin]', checkoutPropertyPin);
                 }
                 if (user.email) {
                         body.append('customer_email', user.email);
                         body.append('metadata[userEmail]', user.email);
+                        body.append('payment_intent_data[receipt_email]', user.email);
                 }
-                body.append('payment_intent_data[metadata][propertyAddress]', validatedProperty.address);
-                body.append('payment_intent_data[metadata][propertyKey]', validatedProperty.property_key || '');
-                body.append('payment_intent_data[metadata][propertyPin]', validatedProperty.pin || '');
+                body.append('payment_intent_data[metadata][propertyAddress]', checkoutPropertyAddress);
+                body.append('payment_intent_data[metadata][propertyKey]', checkoutPropertyKey);
+                body.append('payment_intent_data[metadata][propertyPin]', checkoutPropertyPin);
                 body.append('payment_intent_data[metadata][userEmail]', user.email || '');
 
                 const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
@@ -145,6 +149,19 @@ async function findCheckoutProperty(db, { propertyAddress, propertyKey, property
                         if (row) return row;
                 }
         }
+
+        const exactAddress = await db.prepare(
+                `SELECT MIN(id) AS id,
+                        group_concat(pin, ', ') AS pin,
+                        address,
+                        normalized_address,
+                        ${PROPERTY_GROUP_KEY} AS property_key
+                 FROM property_addresses
+                 WHERE address = ?
+                 GROUP BY property_key
+                 LIMIT 1`
+        ).bind(propertyAddress).first();
+        if (exactAddress) return exactAddress;
 
         return findBestPropertyAddress(db, propertyAddress);
 }
