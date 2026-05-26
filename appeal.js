@@ -170,12 +170,15 @@ async function refreshAppealModeText(propertyAddress = '') {
                         button.disabled = false;
                 }
                 if (note) {
+                        const paymentModeText = config.stripeMode === 'test'
+                                ? 'Stripe test mode. Use test card 4242 4242 4242 4242.'
+                                : 'Secure payment via Stripe';
                         note.innerHTML = `
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
                                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                                     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                 </svg>
-                                Secure payment via Stripe
+                                ${paymentModeText}
                         `;
                 }
                 return;
@@ -364,7 +367,8 @@ async function getAppealConfig() {
                                 deploymentReady: Boolean(config.deploymentReady),
                                 appealHelpAmountCents: Number.isInteger(Number(config.appealHelpAmountCents))
                                         ? Number(config.appealHelpAmountCents)
-                                        : 9900
+                                        : 9900,
+                                stripeMode: config.stripeMode === 'live' ? 'live' : 'test'
                         }));
         }
 

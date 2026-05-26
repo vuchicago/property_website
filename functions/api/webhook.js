@@ -1,8 +1,9 @@
 import { markAppealPaymentStatus, recordPaidAppeal } from './_appeals.js';
+import { getStripeConfig } from './_stripe.js';
 
 export const onRequestPost = async (context) => {
-        const STRIPE_KEY = context.env.STRIPE_SECRET_KEY || context.env.STRIPE_API_KEY;
-        const WEBHOOK_SECRET = context.env.STRIPE_WEBHOOK_SECRET;
+        const stripe = getStripeConfig(context.env);
+        const WEBHOOK_SECRET = stripe.webhookSecret;
 
         try {
                 const body = await context.request.text();

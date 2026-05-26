@@ -1,13 +1,22 @@
 import { recordPaidAppeal } from './_appeals.js';
+import { getStripeConfig } from './_stripe.js';
 
 export const onRequestGet = async (context) => {
-        const STRIPE_KEY = context.env.STRIPE_SECRET_KEY || context.env.STRIPE_API_KEY;
+        const stripe = getStripeConfig(context.env);
+        const STRIPE_KEY = stripe.secretKey;
         const { searchParams } = new URL(context.request.url);
         const sessionId = searchParams.get('session_id');
 
         if (!sessionId) {
                 return new Response(JSON.stringify({ error: 'Missing session_id' }), {
                         status: 400,
+                        headers: { 'Content-Type': 'application/json' }
+                });
+        }
+
+        if (!STRIPE_KEY) {
+                return new Response(JSON.stringify({ error: `Stripe ${stripe.mode} API key is missing` }), {
+                        status: 500,
                         headers: { 'Content-Type': 'application/json' }
                 });
         }
@@ -61,7 +70,8 @@ export const onRequestGet = async (context) => {
                         client_reference_id: session.client_reference_id,
                         amount_total: session.amount_total,
                         db_status: dbStatus,
-                        email_status: emailStatus
+                        email_status: emailStatus,
+                        stripe_mode: stripe.mode
                 }), {
                         headers: { 'Content-Type': 'application/json' }
                 });

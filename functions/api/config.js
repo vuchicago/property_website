@@ -1,9 +1,13 @@
 
+import { getStripeConfig } from './_stripe.js';
+
 export const onRequestGet = async (context) => {
         const appealHelpAmountCents = parseAmountCents(context.env.APPEAL_HELP_AMOUNT_CENTS, 9900);
+        const stripe = getStripeConfig(context.env);
         // It is safe to expose the publishable key
         return new Response(JSON.stringify({
-                publishableKey: context.env.STRIPE_PUBLISHABLE_KEY || context.env.stripe_publishable_key,
+                publishableKey: stripe.publishableKey,
+                stripeMode: stripe.mode,
                 deploymentReady: isEnabled(context.env.DEPLOYMENT_READY),
                 appealHelpAmountCents
         }), {

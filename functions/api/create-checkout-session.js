@@ -1,6 +1,7 @@
 import { requireFirebaseUser, jsonResponse } from './_auth.js';
 import { recordCheckoutAppeal } from './_appeals.js';
 import { findBestPropertyAddress, getPropertyAddressCount } from './_property_addresses.js';
+import { getStripeConfig } from './_stripe.js';
 
 const PROPERTY_GROUP_KEY = `CASE
         WHEN pin_proration_rate IS NOT NULL AND pin_proration_rate < 1
@@ -19,10 +20,11 @@ export const onRequestPost = async (context) => {
                 return jsonResponse({ error: 'Appeal payments are not available yet. Please join the waitlist.' }, 403);
         }
 
-        const STRIPE_KEY = context.env.STRIPE_SECRET_KEY || context.env.STRIPE_API_KEY;
+        const stripe = getStripeConfig(context.env);
+        const STRIPE_KEY = stripe.secretKey;
 
         if (!STRIPE_KEY) {
-                return jsonResponse({ error: 'Stripe API key is missing' }, 500);
+                return jsonResponse({ error: `Stripe ${stripe.mode} API key is missing` }, 500);
         }
 
         try {
@@ -126,7 +128,7 @@ export const onRequestPost = async (context) => {
                         console.error('Could not record checkout appeal:', dbError);
                 }
 
-                return jsonResponse({ url: session.url, dbStatus });
+                return jsonResponse({ url: session.url, dbStatus, stripeMode: stripe.mode });
 
         } catch (err) {
                 return jsonResponse({ error: err.message }, 500);

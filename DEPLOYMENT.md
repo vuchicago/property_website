@@ -168,6 +168,13 @@ NOTIFICATION_FROM_EMAIL="Cook County Tax Compare <notifications@inquiry.cookcoun
 APPEAL_HELP_AMOUNT_CENTS=9900
 DEPLOYMENT_READY=0
 STRIPE_CHECKOUT_DOMAIN=https://your-preview-or-production-domain.example
+STRIPE_MODE=auto
+STRIPE_TEST_SECRET_KEY=sk_test_...
+STRIPE_TEST_PUBLISHABLE_KEY=pk_test_...
+STRIPE_TEST_WEBHOOK_SECRET=whsec_...
+STRIPE_LIVE_SECRET_KEY=sk_live_...
+STRIPE_LIVE_PUBLISHABLE_KEY=pk_live_...
+STRIPE_LIVE_WEBHOOK_SECRET=whsec_...
 ```
 
 If Cloudflare requires the destination to be a verified destination address, set `ADMIN_NOTIFICATION_EMAIL` to your verified personal email instead. You can still use `NOTIFICATION_FROM_EMAIL="Cook County Tax Compare <notifications@inquiry.cookcountytaxcompare.com>"`.
@@ -187,6 +194,9 @@ STRIPE_CHECKOUT_DOMAIN=https://your-preview-or-production-domain.example
 `APPEAL_HELP_AMOUNT_CENTS` controls the Stripe Checkout amount for appeal help. Use cents, so `99` is $0.99 and `9900` is $99.00. Decimal dollar values such as `0.99` are also accepted and converted to cents.
 `DEPLOYMENT_READY` controls whether appeal submissions use Stripe Checkout or the waitlist. Use `0` while appeals are not ready. Set `DEPLOYMENT_READY=1` only when Stripe payment, webhook secrets, and appeal operations are ready. The code also accepts `true`, `yes`, and `on`.
 `STRIPE_CHECKOUT_DOMAIN` is optional. If it is not set, Stripe returns to the same Production, Stage, or preview origin that created the checkout session. Only set it when you intentionally want to force a specific return domain. Do not set Stage to the Production domain.
+`STRIPE_MODE` can be `auto`, `test`, or `live`. In `auto`, Cloudflare Pages preview branches use Stripe test keys and the production branch uses live keys. The production branch defaults to `Production`; set `PRODUCTION_BRANCH` if your production branch has a different name.
+
+For Preview environment variables in Cloudflare Pages, set `DEPLOYMENT_READY=1`, `STRIPE_MODE=auto`, and the `STRIPE_TEST_*` values. Use Stripe test card `4242 4242 4242 4242` with any future expiration date, any CVC, and any ZIP. For Production environment variables, set `DEPLOYMENT_READY=1`, `STRIPE_MODE=auto`, and the `STRIPE_LIVE_*` values.
 
 ## Email Verification
 
