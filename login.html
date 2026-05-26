@@ -314,6 +314,10 @@
                         flex-wrap: wrap;
                 }
 
+                #account-admin-dashboard-btn {
+                        display: none;
+                }
+
                 .address-search-wrap {
                         flex: 1;
                         position: relative;
@@ -485,6 +489,7 @@
                                         <p class="text-muted">Signed in as <strong id="account-email">your account</strong></p>
                                 </div>
                                 <div class="account-actions">
+                                        <a href="admin.html" class="btn btn-secondary" id="account-admin-dashboard-btn">Admin Dashboard</a>
                                         <button type="button" class="btn btn-primary" id="account-add-appeal-btn">Add Property Appeal</button>
                                         <button type="button" class="btn btn-secondary" id="account-logout-btn">Logout</button>
                                 </div>
@@ -590,7 +595,7 @@
 
         <!-- Auth Logic Script -->
         <script type="module">
-                import { auth, loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, refreshCurrentUser, resetPasswordForEmail } from './auth-client.js?v=20260524-auth-gate';
+                import { auth, authFetch, loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, refreshCurrentUser, resetPasswordForEmail } from './auth-client.js?v=20260524-auth-gate';
 
                 const form = document.getElementById('auth-form');
                 const emailInput = document.getElementById('email');
@@ -609,6 +614,7 @@
                 const forgotPasswordBtn = document.getElementById('forgot-password-btn');
                 const authContainer = document.getElementById('auth-container');
                 const dashboard = document.getElementById('user-dashboard');
+                const adminDashboardBtn = document.getElementById('account-admin-dashboard-btn');
                 const addAppealBtn = document.getElementById('account-add-appeal-btn');
                 const logoutBtn = document.getElementById('account-logout-btn');
                 const authDivider = document.querySelector('.auth-divider');
@@ -791,8 +797,29 @@
                         pendingVerificationEmail = '';
                         hideVerificationPanel();
                         clearVerificationReturnFlag();
+                        await updateAdminWorkspaceButton();
                         const { loadAppealHistory } = await import('./history.js?v=20260524-payment-status');
                         await loadAppealHistory(userForDashboard || auth.currentUser);
+                }
+
+                async function updateAdminWorkspaceButton() {
+                        if (!adminDashboardBtn) return;
+
+                        adminDashboardBtn.style.display = 'none';
+                        adminDashboardBtn.textContent = 'Admin Dashboard';
+
+                        try {
+                                const response = await authFetch('/api/admin/roles?checkRoleOnly=true');
+                                if (!response.ok) return;
+
+                                const data = await response.json();
+                                if (!data.role) return;
+
+                                adminDashboardBtn.textContent = data.role === 'partner' ? 'Partner Inbox' : 'Admin Dashboard';
+                                adminDashboardBtn.style.display = 'inline-flex';
+                        } catch (error) {
+                                console.warn('Could not check admin/partner access:', error);
+                        }
                 }
 
                 async function handleVerificationReturn() {
