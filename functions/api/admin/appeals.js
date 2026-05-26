@@ -10,59 +10,74 @@ export const onRequestGet = async (context) => {
         }
 
         try {
-                let query;
-                let sql;
-                let statement;
+                const columns = await getAppealsColumns(context.env.DB);
+                const selectList = buildAppealSelectList(columns);
+                const orderBy = columns.has('payment_date')
+                        ? 'payment_date ASC, created_at ASC'
+                        : 'created_at ASC';
+                const historyOrderBy = columns.has('payment_date')
+                        ? 'payment_date DESC, created_at DESC'
+                        : 'created_at DESC';
+                const pendingWhere = columns.has('appeal_status')
+                        ? "COALESCE(appeal_status, 'Pending') = 'Pending'"
+                        : "'Pending' = 'Pending'";
 
                 if (searchEmail) {
-                        query = `%${searchEmail.toLowerCase()}%`;
-                        sql = `SELECT id, transaction_id, customer_id, customer_name, customer_email, property_address, property_key, property_pin, payment_amount, payment_status, payment_date, appeal_status, appeal_date, assigned_partner_email, assigned_partner_at, partner_status, created_at
+                        const query = `%${searchEmail.toLowerCase()}%`;
+                        const { results } = await context.env.DB.prepare(
+                                `SELECT ${selectList}
                                FROM appeals
                                WHERE lower(customer_email) LIKE ?
-                               ORDER BY payment_date DESC, created_at DESC`;
-                        statement = context.env.DB.prepare(sql).bind(query);
-                } else {
-                        sql = `SELECT id, transaction_id, customer_id, customer_name, customer_email, property_address, property_key, property_pin, payment_amount, payment_status, payment_date, appeal_status, appeal_date, assigned_partner_email, assigned_partner_at, partner_status, created_at
-                               FROM appeals
-                               WHERE appeal_status = 'Pending'
-                                 AND payment_status = 'paid'
-                               ORDER BY payment_date ASC`;
-                        statement = context.env.DB.prepare(sql);
+                               ORDER BY ${historyOrderBy}`
+                        ).bind(query).all();
+
+                        return jsonResponse(results);
                 }
 
-                let results;
-                try {
-                        ({ results } = await statement.all());
-                } catch (error) {
-                        if (!error.message.includes('customer_name')) {
-                                throw error;
-                        }
-
-                        if (searchEmail) {
-                                statement = context.env.DB.prepare(
-                                        `SELECT id, transaction_id, customer_id, NULL AS customer_name, customer_email, property_address, property_key, property_pin, payment_amount, payment_status, payment_date, appeal_status, appeal_date, NULL AS assigned_partner_email, NULL AS assigned_partner_at, NULL AS partner_status, created_at
-                                         FROM appeals
-                                         WHERE lower(customer_email) LIKE ?
-                                         ORDER BY payment_date DESC, created_at DESC`
-                                ).bind(query);
-                        } else {
-                                statement = context.env.DB.prepare(
-                                        `SELECT id, transaction_id, customer_id, NULL AS customer_name, customer_email, property_address, property_key, property_pin, payment_amount, payment_status, payment_date, appeal_status, appeal_date, NULL AS assigned_partner_email, NULL AS assigned_partner_at, NULL AS partner_status, created_at
-                                         FROM appeals
-                                         WHERE appeal_status = 'Pending'
-                                           AND payment_status = 'paid'
-                                         ORDER BY payment_date ASC`
-                                );
-                        }
-
-                        ({ results } = await statement.all());
-                }
+                const { results } = await context.env.DB.prepare(
+                        `SELECT ${selectList}
+                         FROM appeals
+                         WHERE ${pendingWhere}
+                           AND payment_status = 'paid'
+                         ORDER BY ${orderBy}`
+                ).all();
 
                 return jsonResponse(results);
         } catch (err) {
                 return jsonResponse({ error: err.message }, 500);
         }
 };
+
+async function getAppealsColumns(db) {
+        const { results } = await db.prepare("PRAGMA table_info(appeals)").all();
+        return new Set((results || []).map(column => column.name));
+}
+
+function buildAppealSelectList(columns) {
+        return [
+                appealColumn(columns, 'id'),
+                appealColumn(columns, 'transaction_id'),
+                appealColumn(columns, 'customer_id'),
+                appealColumn(columns, 'customer_name'),
+                appealColumn(columns, 'customer_email'),
+                appealColumn(columns, 'property_address'),
+                appealColumn(columns, 'property_key'),
+                appealColumn(columns, 'property_pin'),
+                appealColumn(columns, 'payment_amount'),
+                appealColumn(columns, 'payment_status'),
+                appealColumn(columns, 'payment_date'),
+                appealColumn(columns, 'appeal_status', "'Pending'"),
+                appealColumn(columns, 'appeal_date'),
+                appealColumn(columns, 'assigned_partner_email'),
+                appealColumn(columns, 'assigned_partner_at'),
+                appealColumn(columns, 'partner_status'),
+                appealColumn(columns, 'created_at')
+        ].join(', ');
+}
+
+function appealColumn(columns, column, fallback = 'NULL') {
+        return columns.has(column) ? column : `${fallback} AS ${column}`;
+}
 
 export const onRequestPut = async (context) => {
         const { user, response } = await requireAdminAccount(context);
@@ -108,6 +123,15 @@ export const onRequestPut = async (context) => {
 };
 
 async function assignPartner(context, { transactionId, partnerEmail, adminEmail }) {
+        const columns = await getAppealsColumns(context.env.DB);
+        const requiredColumns = ['assigned_partner_email', 'assigned_partner_at', 'assigned_by_admin_email', 'partner_status'];
+        const missingColumns = requiredColumns.filter(column => !columns.has(column));
+        if (missingColumns.length) {
+                return jsonResponse({
+                        error: `Assignment columns are missing. Apply the latest D1 migrations. Missing: ${missingColumns.join(', ')}`
+                }, 500);
+        }
+
         const appeal = await context.env.DB.prepare(
                 `SELECT id, property_address
                  FROM appeals
