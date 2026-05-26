@@ -127,10 +127,16 @@ async function insertAppeal(env, payment) {
                         )
                         .run();
         } catch (error) {
-                if (!error.message.includes('customer_name') && !error.message.includes('property_key') && !error.message.includes('payment_intent_id')) {
+                if (!isLegacyAppealsSchemaError(error)) {
                         throw error;
                 }
 
+                await insertAppealWithLegacySchema(env, payment);
+        }
+}
+
+async function insertAppealWithLegacySchema(env, payment) {
+        try {
                 await env.DB.prepare(
                         `INSERT INTO appeals (transaction_id, customer_id, customer_email, property_address, payment_amount, payment_status, payment_date, appeal_status, appeal_date)
                          VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'Pending', NULL)
@@ -138,6 +144,27 @@ async function insertAppeal(env, payment) {
                          customer_email = excluded.customer_email,
                          payment_status = excluded.payment_status,
                          payment_date = excluded.payment_date`
+                )
+                        .bind(
+                                payment.transactionId,
+                                payment.customerId,
+                                payment.customerEmail,
+                                payment.propertyAddress,
+                                payment.paymentAmount,
+                                payment.paymentStatus
+                        )
+                        .run();
+        } catch (error) {
+                if (!isLegacyAppealsSchemaError(error)) {
+                        throw error;
+                }
+
+                await env.DB.prepare(
+                        `INSERT INTO appeals (transaction_id, customer_id, customer_email, property_address, payment_amount, payment_status)
+                         VALUES (?, ?, ?, ?, ?, ?)
+                         ON CONFLICT(transaction_id) DO UPDATE SET
+                         customer_email = excluded.customer_email,
+                         payment_status = excluded.payment_status`
                 )
                         .bind(
                                 payment.transactionId,
@@ -193,4 +220,10 @@ function propertyGroupKeySql() {
                 THEN normalized_address || '|fractional'
                 ELSE normalized_address || '|pin:' || COALESCE(pin, id)
         END`;
+}
+
+function isLegacyAppealsSchemaError(error) {
+        const message = String(error?.message || '');
+        return ['customer_name', 'property_key', 'payment_intent_id', 'payment_date', 'appeal_status', 'appeal_date']
+                .some(column => message.includes(column));
 }

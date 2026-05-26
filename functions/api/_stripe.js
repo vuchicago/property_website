@@ -1,14 +1,14 @@
 export function getStripeConfig(env) {
         const mode = getStripeMode(env);
         const secretKey = mode === 'live'
-                ? env.STRIPE_LIVE_SECRET_KEY || env.STRIPE_SECRET_KEY || env.STRIPE_API_KEY
-                : env.STRIPE_TEST_SECRET_KEY || env.STRIPE_SECRET_KEY || env.STRIPE_API_KEY;
+                ? firstLiveKey(env.STRIPE_LIVE_SECRET_KEY, env.STRIPE_SECRET_KEY, env.STRIPE_API_KEY)
+                : firstTestKey(env.STRIPE_TEST_SECRET_KEY, env.STRIPE_SECRET_KEY, env.STRIPE_API_KEY);
         const publishableKey = mode === 'live'
-                ? env.STRIPE_LIVE_PUBLISHABLE_KEY || env.STRIPE_PUBLISHABLE_KEY || env.stripe_publishable_key
-                : env.STRIPE_TEST_PUBLISHABLE_KEY || env.STRIPE_PUBLISHABLE_KEY || env.stripe_publishable_key;
+                ? firstLiveKey(env.STRIPE_LIVE_PUBLISHABLE_KEY, env.STRIPE_PUBLISHABLE_KEY, env.stripe_publishable_key)
+                : firstTestKey(env.STRIPE_TEST_PUBLISHABLE_KEY, env.STRIPE_PUBLISHABLE_KEY, env.stripe_publishable_key);
         const webhookSecret = mode === 'live'
                 ? env.STRIPE_LIVE_WEBHOOK_SECRET || env.STRIPE_WEBHOOK_SECRET
-                : env.STRIPE_TEST_WEBHOOK_SECRET || env.STRIPE_WEBHOOK_SECRET;
+                : env.STRIPE_TEST_WEBHOOK_SECRET;
 
         return {
                 mode,
@@ -40,4 +40,14 @@ function isProductionDeployment(env) {
 
 function isEnabled(value) {
         return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
+function firstTestKey(...values) {
+        return values.find(value => String(value || '').trim().startsWith('sk_test_')
+                || String(value || '').trim().startsWith('pk_test_'));
+}
+
+function firstLiveKey(...values) {
+        return values.find(value => String(value || '').trim().startsWith('sk_live_')
+                || String(value || '').trim().startsWith('pk_live_'));
 }

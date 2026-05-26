@@ -196,7 +196,9 @@ STRIPE_CHECKOUT_DOMAIN=https://your-preview-or-production-domain.example
 `STRIPE_CHECKOUT_DOMAIN` is optional. If it is not set, Stripe returns to the same Production, Stage, or preview origin that created the checkout session. Only set it when you intentionally want to force a specific return domain. Do not set Stage to the Production domain.
 `STRIPE_MODE` can be `auto`, `test`, or `live`. In `auto`, Cloudflare Pages preview branches use Stripe test keys and the production branch uses live keys. The production branch defaults to `Production`; set `PRODUCTION_BRANCH` if your production branch has a different name.
 
-For Preview environment variables in Cloudflare Pages, set `DEPLOYMENT_READY=1`, `STRIPE_MODE=auto`, and the `STRIPE_TEST_*` values. Use Stripe test card `4242 4242 4242 4242` with any future expiration date, any CVC, and any ZIP. For Production environment variables, set `DEPLOYMENT_READY=1`, `STRIPE_MODE=auto`, and the `STRIPE_LIVE_*` values.
+For Preview environment variables in Cloudflare Pages, set `DEPLOYMENT_READY=1`, `STRIPE_MODE=auto`, and the `STRIPE_TEST_*` values. Preview/test mode does not fall back to generic production Stripe variables, so a missing test key will fail closed instead of creating a live checkout. Use Stripe test card `4242 4242 4242 4242` with any future expiration date, any CVC, and any ZIP.
+
+For Production environment variables, set `DEPLOYMENT_READY=1`, `STRIPE_MODE=auto`, and either the `STRIPE_LIVE_*` values or the existing generic live values (`STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`).
 
 ## Email Verification
 
