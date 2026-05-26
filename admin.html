@@ -85,6 +85,77 @@
                         gap: 0.5rem;
                 }
 
+                .partner-assignment-select {
+                        background: var(--bg-primary);
+                        border: 1px solid var(--border-color);
+                        border-radius: var(--radius-md);
+                        color: var(--text);
+                        min-width: 180px;
+                        padding: 0.65rem 0.75rem;
+                        width: 100%;
+                }
+
+                .partner-inbox-header {
+                        align-items: center;
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 1rem;
+                        justify-content: space-between;
+                        margin-bottom: 1rem;
+                }
+
+                .partner-appeal-list {
+                        display: grid;
+                        gap: 1rem;
+                }
+
+                .partner-appeal-card {
+                        border: 1px solid var(--border-color);
+                        border-radius: var(--radius-md);
+                        padding: 1rem;
+                }
+
+                .partner-file-grid {
+                        display: grid;
+                        gap: 0.75rem;
+                        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                        margin: 1rem 0;
+                }
+
+                .partner-file-preview,
+                .partner-file-missing,
+                .partner-document-link {
+                        border: 1px solid var(--border-color);
+                        border-radius: var(--radius-md);
+                        color: inherit;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 0.5rem;
+                        padding: 0.75rem;
+                        text-decoration: none;
+                }
+
+                .partner-file-preview img {
+                        aspect-ratio: 16 / 9;
+                        border-radius: var(--radius-sm);
+                        object-fit: cover;
+                        width: 100%;
+                }
+
+                .partner-file-missing {
+                        background: var(--bg-secondary);
+                }
+
+                .partner-documents {
+                        display: grid;
+                        gap: 0.5rem;
+                }
+
+                .partner-document-link span {
+                        color: var(--text-muted);
+                        font-size: 0.8rem;
+                }
+
                 .admin-search-form {
                         display: flex;
                         gap: 1rem;
@@ -146,7 +217,7 @@
                         <div class="section-header left">
                                 <span class="section-badge" id="admin-badge">Admin</span>
                                 <h2>Administrator Dashboard</h2>
-                                <p>Manage pending appeals and system administrators.</p>
+                                <p>Manage pending appeals, partner assignments, and account roles.</p>
                         </div>
 
                         <div class="admin-nav">
@@ -159,26 +230,31 @@
                         <div class="dashboard-card">
                                 <!-- Appeals Tab -->
                                 <div id="appeals" class="tab-content active">
-                                        <h3>Appeals Awaiting Action</h3>
-                                        <div style="overflow-x: auto;">
+                                        <div id="admin-appeals-panel">
+                                                <h3>Appeals Awaiting Action</h3>
+                                                <div id="admin-notifications" class="partner-inbox-header" style="display: none;"></div>
+                                                <div style="overflow-x: auto;">
                                                 <table class="pending-list" id="appeals-table">
                                                         <thead>
                                                                 <tr>
                                                                         <th>Address</th>
-                                                                        <th>Email</th>
+                                                                        <th>User</th>
                                                                         <th>Payment Date</th>
                                                                         <th>Status</th>
+                                                                        <th>Partner</th>
                                                                         <th>Action</th>
                                                                 </tr>
                                                         </thead>
                                                         <tbody>
                                                                 <tr>
-                                                                        <td colspan="5" style="text-align:center;">
+                                                                        <td colspan="6" style="text-align:center;">
                                                                                 Loading...</td>
                                                                 </tr>
                                                         </tbody>
                                                 </table>
+                                                </div>
                                         </div>
+                                        <div id="partner-inbox" style="display: none;"></div>
                                 </div>
 
                                 <!-- User History Tab -->
@@ -202,11 +278,12 @@
                                                                         <th>Address</th>
                                                                         <th>Payment Date</th>
                                                                         <th>Status</th>
+                                                                        <th>Partner</th>
                                                                 </tr>
                                                         </thead>
                                                         <tbody>
                                                                 <tr>
-                                                                        <td colspan="5" style="text-align:center;">
+                                                                        <td colspan="6" style="text-align:center;">
                                                                                 Search an email to view history.</td>
                                                                 </tr>
                                                         </tbody>
@@ -216,7 +293,7 @@
 
                                 <!-- Roles Tab -->
                                 <div id="roles" class="tab-content">
-                                        <h3>System Administrators</h3>
+                                        <h3>System Accounts</h3>
 
                                         <form id="add-admin-form"
                                                 style="display: flex; gap: 1rem; margin-bottom: 2rem; align-items: flex-end;">
@@ -230,10 +307,11 @@
                                                         <select id="new-admin-role"
                                                                 style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); width: 100%; background: var(--bg-primary); color: var(--text);">
                                                                 <option value="admin">Admin</option>
+                                                                <option value="partner">Partner</option>
                                                                 <option value="superadmin">Super Admin</option>
                                                         </select>
                                                 </div>
-                                                <button type="submit" class="btn btn-primary">Add Admin</button>
+                                                <button type="submit" class="btn btn-primary">Add Account</button>
                                         </form>
 
                                         <div style="overflow-x: auto;">

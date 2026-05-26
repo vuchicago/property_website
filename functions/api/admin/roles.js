@@ -1,4 +1,4 @@
-import { getAdminUser, jsonResponse } from './_admin.js';
+import { getAdminUser, jsonResponse, normalizeEmail, PRIMARY_SUPERADMIN_EMAIL } from './_admin.js';
 
 export const onRequestGet = async (context) => {
         const url = new URL(context.request.url);
@@ -19,7 +19,7 @@ export const onRequestGet = async (context) => {
                         return jsonResponse({ error: 'Unauthorized. Superadmin only.' }, 403);
                 }
 
-                const { results } = await context.env.DB.prepare("SELECT email, role FROM admins").all();
+                const { results } = await context.env.DB.prepare("SELECT email, role FROM admins ORDER BY role DESC, email ASC").all();
 
                 return jsonResponse(results);
         } catch (err) {
@@ -40,16 +40,17 @@ export const onRequestPost = async (context) => {
 
         try {
                 const { newAdminEmail, role } = await context.request.json();
+                const email = normalizeEmail(newAdminEmail);
 
-                if (!newAdminEmail) {
-                        return jsonResponse({ error: 'Missing new admin email' }, 400);
+                if (!email) {
+                        return jsonResponse({ error: 'Missing account email' }, 400);
                 }
 
-                const finalRole = role === 'superadmin' ? 'superadmin' : 'admin';
+                const finalRole = ['superadmin', 'admin', 'partner'].includes(role) ? role : 'admin';
 
                 await context.env.DB.prepare(
                         "INSERT INTO admins (email, role) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET role = excluded.role"
-                ).bind(newAdminEmail, finalRole).run();
+                ).bind(email, finalRole).run();
 
                 return jsonResponse({ success: true });
 
@@ -71,14 +72,15 @@ export const onRequestDelete = async (context) => {
 
         try {
                 const { removeEmail } = await context.request.json();
+                const email = normalizeEmail(removeEmail);
 
-                if (removeEmail === 'vu@cookcountytaxcompare.com') {
+                if (email === PRIMARY_SUPERADMIN_EMAIL) {
                         return jsonResponse({ error: 'Cannot remove the primary superadmin' }, 400);
                 }
 
                 await context.env.DB.prepare(
                         "DELETE FROM admins WHERE email = ?"
-                ).bind(removeEmail).run();
+                ).bind(email).run();
 
                 return jsonResponse({ success: true });
 

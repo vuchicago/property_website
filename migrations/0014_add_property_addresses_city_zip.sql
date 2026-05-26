@@ -1,2 +1,3 @@
-ALTER TABLE property_addresses ADD COLUMN city TEXT;
-ALTER TABLE property_addresses ADD COLUMN zip_code INTEGER;
+-- No-op: these columns are already created by 0006_rebuild_property_addresses_full.sql.
+-- D1/SQLite does not support ALTER TABLE ADD COLUMN IF NOT EXISTS, so keeping this
+-- migration empty prevents duplicate-column failures when applying historical migrations.

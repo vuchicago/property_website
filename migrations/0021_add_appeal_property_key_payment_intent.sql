@@ -1,3 +1,3 @@
-ALTER TABLE appeals ADD COLUMN property_key TEXT;
-ALTER TABLE appeals ADD COLUMN property_pin TEXT;
-ALTER TABLE appeals ADD COLUMN payment_intent_id TEXT;
+-- No-op: these columns are already present in the current appeals table.
+-- D1/SQLite does not support ALTER TABLE ADD COLUMN IF NOT EXISTS, so keeping this
+-- migration empty prevents duplicate-column failures when applying historical migrations.

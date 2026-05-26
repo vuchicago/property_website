@@ -48,12 +48,40 @@ export async function recordPaidAppeal(env, payment) {
                         emailStatus = `error: ${error.message}`;
                         console.error('Payment notification failed:', error);
                 }
+
+                await notifyAdminsOfPaidAppeal(env, payment);
         }
 
         return {
                 dbStatus: 'recorded',
                 emailStatus
         };
+}
+
+async function notifyAdminsOfPaidAppeal(env, payment) {
+        try {
+                const appeal = await env.DB.prepare(
+                        "SELECT id FROM appeals WHERE transaction_id = ?"
+                ).bind(payment.transactionId).first();
+
+                const admins = await env.DB.prepare(
+                        "SELECT email, role FROM admins WHERE role IN ('superadmin', 'admin')"
+                ).all();
+
+                for (const admin of admins.results || []) {
+                        await env.DB.prepare(
+                                `INSERT INTO account_notifications (recipient_email, recipient_role, appeal_id, notification_type, title, message)
+                                 VALUES (?, ?, ?, 'appeal_paid', 'Property appeal paid', ?)`
+                        ).bind(
+                                admin.email,
+                                admin.role,
+                                appeal?.id || null,
+                                `${payment.customerEmail || 'A customer'} paid for an appeal for ${payment.propertyAddress || 'a property'}.`
+                        ).run();
+                }
+        } catch (error) {
+                console.error('Could not create admin appeal notifications:', error);
+        }
 }
 
 async function insertAppeal(env, payment) {
