@@ -1,4 +1,5 @@
 import { requireFirebaseUser, jsonResponse } from './_auth.js';
+import { recordCheckoutAppeal } from './_appeals.js';
 import { findBestPropertyAddress, getPropertyAddressCount } from './_property_addresses.js';
 
 const PROPERTY_GROUP_KEY = `CASE
@@ -105,7 +106,27 @@ export const onRequestPost = async (context) => {
                         throw new Error(session.error?.message || 'Failed to create Stripe session');
                 }
 
-                return jsonResponse({ url: session.url });
+                let dbStatus = 'not_recorded';
+                try {
+                        const result = await recordCheckoutAppeal(context.env, {
+                                transactionId: session.id,
+                                customerId: user.uid,
+                                customerName: session.customer_details?.name || null,
+                                customerEmail: user.email || null,
+                                propertyAddress: checkoutPropertyAddress,
+                                propertyKey: checkoutPropertyKey,
+                                propertyPin: checkoutPropertyPin,
+                                paymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id || null,
+                                paymentAmount: session.amount_total,
+                                paymentStatus: session.payment_status || 'unpaid'
+                        });
+                        dbStatus = result.dbStatus;
+                } catch (dbError) {
+                        dbStatus = `error: ${dbError.message}`;
+                        console.error('Could not record checkout appeal:', dbError);
+                }
+
+                return jsonResponse({ url: session.url, dbStatus });
 
         } catch (err) {
                 return jsonResponse({ error: err.message }, 500);

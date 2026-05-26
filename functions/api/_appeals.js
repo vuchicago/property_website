@@ -1,12 +1,25 @@
 import { sendPaymentNotification } from './_email.js';
 
+export async function recordCheckoutAppeal(env, payment) {
+        if (!env.DB) {
+                return { dbStatus: 'not_configured' };
+        }
+
+        await insertAppeal(env, {
+                ...payment,
+                paymentStatus: payment.paymentStatus || 'unpaid'
+        });
+
+        return { dbStatus: 'checkout_recorded' };
+}
+
 export async function recordPaidAppeal(env, payment) {
         if (!env.DB) {
                 return { dbStatus: 'not_configured', emailStatus: 'skipped' };
         }
 
         const existing = await env.DB.prepare(
-                "SELECT transaction_id FROM appeals WHERE transaction_id = ?"
+                "SELECT transaction_id, payment_status FROM appeals WHERE transaction_id = ?"
         ).bind(payment.transactionId).first();
 
         await insertAppeal(env, payment);
@@ -39,8 +52,10 @@ export async function recordPaidAppeal(env, payment) {
                 }
         }
 
-        let emailStatus = 'not_sent_existing_payment';
-        if (!existing && payment.paymentStatus === 'paid') {
+        const becamePaid = payment.paymentStatus === 'paid'
+                && (!existing || String(existing.payment_status || '').toLowerCase() !== 'paid');
+        let emailStatus = becamePaid ? 'not_sent' : 'not_sent_existing_payment';
+        if (becamePaid) {
                 try {
                         await sendPaymentNotification(env, payment);
                         emailStatus = 'sent';

@@ -25,6 +25,7 @@ export const onRequestGet = async (context) => {
                         sql = `SELECT id, transaction_id, customer_id, customer_name, customer_email, property_address, property_key, property_pin, payment_amount, payment_status, payment_date, appeal_status, appeal_date, assigned_partner_email, assigned_partner_at, partner_status, created_at
                                FROM appeals
                                WHERE appeal_status = 'Pending'
+                                 AND payment_status = 'paid'
                                ORDER BY payment_date ASC`;
                         statement = context.env.DB.prepare(sql);
                 }
@@ -49,6 +50,7 @@ export const onRequestGet = async (context) => {
                                         `SELECT id, transaction_id, customer_id, NULL AS customer_name, customer_email, property_address, property_key, property_pin, payment_amount, payment_status, payment_date, appeal_status, appeal_date, NULL AS assigned_partner_email, NULL AS assigned_partner_at, NULL AS partner_status, created_at
                                          FROM appeals
                                          WHERE appeal_status = 'Pending'
+                                           AND payment_status = 'paid'
                                          ORDER BY payment_date ASC`
                                 );
                         }

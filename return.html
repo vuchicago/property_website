@@ -65,16 +65,16 @@
 
                                 if (data.status === 'complete' || data.payment_status === 'paid') {
 
-                                        // Payment verified and recorded by backend
-                                        if (data.db_status && data.db_status.startsWith('error')) {
-                                                console.error("Database recording error:", data.db_status);
-                                        }
+                                        const dbWarning = data.db_status && data.db_status.startsWith('error')
+                                                ? `<p style="color: var(--error);">Payment succeeded, but saving the appeal failed: ${escapeHtml(data.db_status)}</p>`
+                                                : '';
 
                                         statusDiv.innerHTML = `
         <h2 style="color: var(--success); margin-bottom: 1rem;">Payment Successful!</h2>
         <p class="lead">Your appeal for <strong>${data.metadata?.propertyAddress || 'your property'}</strong> has been
                 submitted.</p>
         <p class="lead" style="font-size: 0.9em; color: #666;">Ref: ${sessionId}</p>
+        ${dbWarning}
         <p>We have recorded your request and are processing it.</p>
         <div style="margin-top: 2rem;">
                 <a href="login.html" class="btn btn-primary" style="margin-right: 1rem;">Go to Dashboard</a>
@@ -91,6 +91,15 @@
                                 statusDiv.innerText = 'An error occurred verifying your payment.';
                         }
                 });
+
+                function escapeHtml(value) {
+                        return String(value ?? '')
+                                .replace(/&/g, '&amp;')
+                                .replace(/</g, '&lt;')
+                                .replace(/>/g, '&gt;')
+                                .replace(/"/g, '&quot;')
+                                .replace(/'/g, '&#039;');
+                }
         </script>
 </body>
 
