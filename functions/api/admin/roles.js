@@ -49,8 +49,14 @@ export const onRequestPost = async (context) => {
                 const finalRole = ['superadmin', 'admin', 'partner'].includes(role) ? role : 'admin';
 
                 await context.env.DB.prepare(
-                        "INSERT INTO admins (email, role) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET role = excluded.role"
-                ).bind(email, finalRole).run();
+                        "UPDATE admins SET role = ? WHERE email = ?"
+                ).bind(finalRole, email).run();
+
+                await context.env.DB.prepare(
+                        `INSERT INTO admins (email, role)
+                         SELECT ?, ?
+                         WHERE NOT EXISTS (SELECT 1 FROM admins WHERE email = ?)`
+                ).bind(email, finalRole, email).run();
 
                 return jsonResponse({ success: true });
 

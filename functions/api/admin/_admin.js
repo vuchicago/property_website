@@ -48,8 +48,14 @@ export async function requireAdminAccount(context) {
 
 export async function ensurePrimarySuperadmin(db) {
         await db.prepare(
-                "INSERT INTO admins (email, role) VALUES (?, 'superadmin') ON CONFLICT(email) DO UPDATE SET role = 'superadmin'"
+                "UPDATE admins SET role = 'superadmin' WHERE email = ?"
         ).bind(PRIMARY_SUPERADMIN_EMAIL).run();
+
+        await db.prepare(
+                `INSERT INTO admins (email, role)
+                 SELECT ?, 'superadmin'
+                 WHERE NOT EXISTS (SELECT 1 FROM admins WHERE email = ?)`
+        ).bind(PRIMARY_SUPERADMIN_EMAIL, PRIMARY_SUPERADMIN_EMAIL).run();
 }
 
 export function normalizeEmail(value) {

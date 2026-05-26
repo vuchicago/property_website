@@ -314,6 +314,15 @@ const updateAuthButton = (container, user) => {
                         }
                 };
 
+                if (String(user.email || '').trim().toLowerCase() === 'vuchicago@gmail.com') {
+                        const adminBtn = document.createElement('a');
+                        adminBtn.href = "admin.html";
+                        adminBtn.className = "btn btn-sm btn-secondary";
+                        adminBtn.style.marginLeft = "0.5rem";
+                        adminBtn.textContent = "Admin";
+                        container.appendChild(adminBtn);
+                }
+
                 // Create Logout Button (smaller or icon?)
                 const logoutBtn = document.createElement('a');
                 logoutBtn.href = "#";

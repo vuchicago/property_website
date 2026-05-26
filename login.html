@@ -797,16 +797,20 @@
                         pendingVerificationEmail = '';
                         hideVerificationPanel();
                         clearVerificationReturnFlag();
-                        await updateAdminWorkspaceButton();
+                        await updateAdminWorkspaceButton(userForDashboard || auth.currentUser);
                         const { loadAppealHistory } = await import('./history.js?v=20260524-payment-status');
                         await loadAppealHistory(userForDashboard || auth.currentUser);
                 }
 
-                async function updateAdminWorkspaceButton() {
+                async function updateAdminWorkspaceButton(user = null) {
                         if (!adminDashboardBtn) return;
 
                         adminDashboardBtn.style.display = 'none';
                         adminDashboardBtn.textContent = 'Admin Dashboard';
+
+                        if (String(user?.email || '').trim().toLowerCase() === 'vuchicago@gmail.com') {
+                                adminDashboardBtn.style.display = 'inline-flex';
+                        }
 
                         try {
                                 const response = await authFetch('/api/admin/roles?checkRoleOnly=true');
