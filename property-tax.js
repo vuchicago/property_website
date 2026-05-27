@@ -385,17 +385,21 @@ async function searchLongerRadius(options = {}) {
     const radiusValue = document.getElementById('radius-value');
     const button = document.getElementById('increase-radius-search');
     const originalText = button?.textContent || '';
+    const maxRadius = 2;
     let radius = Number(searchResults?.radius || radiusSlider?.value || 0.5);
     let latestResult = searchResults;
 
     if (button) {
         button.disabled = true;
-        button.textContent = 'Searching up to 5.0 mi';
+        button.textContent = 'Searching up to 2.0 mi';
     }
 
     try {
-        while (radius < 5 && (latestResult?.summary?.comparableCount || 0) < 5) {
-            radius = Math.min(5, Number((radius + 0.5).toFixed(1)));
+        while (
+            radius < maxRadius &&
+            latestResult?.appeal?.decision !== 'Yes, Appeal'
+        ) {
+            radius = Math.min(maxRadius, Number((radius + 0.5).toFixed(1)));
             if (radiusSlider && radiusValue) {
                 radiusSlider.value = String(radius);
                 radiusValue.textContent = radius.toFixed(1);
@@ -414,17 +418,20 @@ async function searchLongerRadius(options = {}) {
 
         if (latestResult) {
             const count = latestResult.summary?.comparableCount || 0;
+            const appealRecommended = latestResult.appeal?.decision === 'Yes, Appeal';
             showNotification(
-                count >= 5
-                    ? `Found ${count} comparable properties at ${latestResult.radius.toFixed(1)} miles`
-                    : `Reached 5.0 miles with ${count} comparable properties`,
-                count >= 5 ? 'success' : 'info'
+                appealRecommended
+                    ? `Appeal recommended at ${latestResult.radius.toFixed(1)} miles`
+                    : `Reached 2.0 miles with ${count} comparable properties`,
+                appealRecommended ? 'success' : 'info'
             );
         }
     } finally {
         if (button) {
             button.disabled = false;
-            button.textContent = originalText || 'Try Wider Radius';
+            if (button.dataset.action === 'widen') {
+                button.textContent = originalText || 'Try Wider Radius';
+            }
         }
     }
 }
@@ -570,7 +577,7 @@ function updateWiderRadiusButton(data) {
     }
 
     const decision = String(data.appeal?.decision || '').toLowerCase();
-    const canWiden = decision.includes('not enough comps') && data.summary.comparableCount < 5 && data.radius < 5;
+    const canWiden = decision.includes('not enough comps') && data.summary.comparableCount < 5 && data.radius < 2;
     button.hidden = !canWiden;
     button.dataset.action = 'widen';
     button.classList.remove('btn-primary', 'appeal-cta-btn');

@@ -578,7 +578,6 @@ function selectHomeAddressSuggestion(button) {
     addressInput.value = selectedHomeProperty.address;
     analyzeBtn.hidden = false;
     hideHomeAddressSuggestions();
-    openHomePropertyAnalysis(selectedHomeProperty);
 }
 
 function openHomePropertyAnalysis(property) {
