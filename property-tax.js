@@ -198,10 +198,50 @@ function hydratePropertyFromQuery() {
     }
     setSelectedPropertyText(selectedProperty ? selectedPropertyLabel(selectedProperty) : 'Choose the closest match from the suggestions.');
 
-    if (selectedProperty && params.get('auto') === '1') {
-        requestAnimationFrame(() => searchProperty(radius, { scrollToResults: true }));
+    if (params.get('auto') === '1') {
+        requestAnimationFrame(() => autoSearchHydratedProperty(address, radius));
     } else if (!selectedProperty) {
         requestAnimationFrame(() => fetchAddressSuggestions(address));
+    }
+}
+
+async function autoSearchHydratedProperty(address, radius) {
+    if (!selectedProperty) {
+        selectedProperty = await resolvePropertyFromAddress(address);
+        const searchBtn = document.getElementById('search-property');
+        if (selectedProperty) {
+            if (searchBtn) searchBtn.disabled = false;
+            setSelectedPropertyText(selectedPropertyLabel(selectedProperty));
+        }
+    }
+
+    if (selectedProperty) {
+        await searchProperty(radius, { scrollToResults: true });
+    } else {
+        await fetchAddressSuggestions(address);
+        showNotification('Choose the closest property match to run the analysis.', 'info');
+    }
+}
+
+async function resolvePropertyFromAddress(address) {
+    if (!address) return null;
+
+    try {
+        const response = await fetch(`/api/property/suggest?q=${encodeURIComponent(address)}&limit=1`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Unable to resolve address');
+
+        const match = data.suggestions?.[0];
+        if (!match?.id) return null;
+
+        return {
+            id: Number(match.id),
+            pin: match.pin || '',
+            address: match.address || address
+        };
+    } catch (error) {
+        console.warn('Could not resolve property from address:', error);
+        return null;
     }
 }
 
@@ -529,16 +569,13 @@ function updateWiderRadiusButton(data) {
         return;
     }
 
-    const canWiden = data.summary.comparableCount < 5 && data.radius < 5;
+    const decision = String(data.appeal?.decision || '').toLowerCase();
+    const canWiden = decision.includes('not enough comps') && data.summary.comparableCount < 5 && data.radius < 5;
     button.hidden = !canWiden;
     button.dataset.action = 'widen';
     button.classList.remove('btn-primary', 'appeal-cta-btn');
     button.classList.add('btn-secondary');
-    if (canWiden) {
-        button.textContent = 'Try Wider Radius';
-    } else {
-        button.textContent = 'Try Wider Radius';
-    }
+    button.textContent = 'Try Wider Radius';
 }
 
 function buildCreateAccountUrl() {
@@ -571,7 +608,7 @@ async function openAppealHelp() {
             return;
         }
 
-        const { openAppealModal } = await import('./appeal.js?v=20260524-checkout-address');
+        const { openAppealModal } = await import('./appeal.js?v=20260527-checkout-identity');
         openAppealModal(selectedProperty.address, {
             propertyKey: searchResults?.target?.propertyKey || searchResults?.target?.property_key || '',
             pin: selectedProperty.pin || searchResults?.target?.pin || '',

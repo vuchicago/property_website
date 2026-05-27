@@ -503,14 +503,7 @@ function initHomePropertySearch() {
             return;
         }
 
-        const property = selectedHomeProperty || { id: '', pin: '', address: typedAddress };
-        const params = new URLSearchParams({
-            address: property.address,
-            auto: '1'
-        });
-        if (property.id) params.set('propertyId', String(property.id));
-        if (property.pin) params.set('pin', property.pin);
-        window.location.href = `property-tax.html?${params.toString()}`;
+        openHomePropertyAnalysis(selectedHomeProperty || { id: '', pin: '', address: typedAddress });
     });
 
     document.addEventListener('click', event => {
@@ -585,6 +578,17 @@ function selectHomeAddressSuggestion(button) {
     addressInput.value = selectedHomeProperty.address;
     analyzeBtn.hidden = false;
     hideHomeAddressSuggestions();
+    openHomePropertyAnalysis(selectedHomeProperty);
+}
+
+function openHomePropertyAnalysis(property) {
+    const params = new URLSearchParams({
+        address: property.address || '',
+        auto: '1'
+    });
+    if (property.id) params.set('propertyId', String(property.id));
+    if (property.pin) params.set('pin', property.pin);
+    window.location.href = `property-tax.html?${params.toString()}`;
 }
 
 function hideHomeAddressSuggestions() {
