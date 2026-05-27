@@ -284,6 +284,7 @@ async function loadPartnerInbox() {
                 `;
 
                 document.getElementById('mark-notifications-read')?.addEventListener('click', markPartnerNotificationsRead);
+                document.querySelectorAll('.partner-request-btn').forEach(button => button.addEventListener('click', handlePartnerDocumentRequest));
         } catch (error) {
                 console.error('Error loading partner inbox:', error);
                 container.innerHTML = '<p style="color: var(--error);">Partner inbox could not be loaded.</p>';
@@ -312,8 +313,55 @@ function renderPartnerAppeal(appeal) {
                                 <strong>Supporting Documents</strong>
                                 ${documents.length ? documents.map(doc => renderDocumentLink(doc)).join('') : '<span class="text-sm text-muted">No optional supporting documents uploaded.</span>'}
                         </div>
+                        <div class="partner-request-actions">
+                                <strong>Request Missing Documents</strong>
+                                <div class="partner-request-buttons">
+                                        <button type="button" class="btn btn-secondary btn-sm partner-request-btn" data-id="${escapeHtml(appeal.transaction_id)}" data-type="property_image">Request Property Image</button>
+                                        <button type="button" class="btn btn-secondary btn-sm partner-request-btn" data-id="${escapeHtml(appeal.transaction_id)}" data-type="government_id">Request Government ID</button>
+                                </div>
+                                <div class="partner-supporting-request">
+                                        <textarea id="supporting-request-${escapeHtml(appeal.transaction_id)}" placeholder="Describe the supporting materials needed from the user."></textarea>
+                                        <button type="button" class="btn btn-primary btn-sm partner-request-btn" data-id="${escapeHtml(appeal.transaction_id)}" data-type="supporting_materials" data-message-id="supporting-request-${escapeHtml(appeal.transaction_id)}">Send Supporting Materials Request</button>
+                                </div>
+                        </div>
                 </article>
         `;
+}
+
+async function handlePartnerDocumentRequest(event) {
+        const button = event.currentTarget;
+        const transactionId = button.dataset.id;
+        const requestType = button.dataset.type;
+        const messageEl = button.dataset.messageId ? document.getElementById(button.dataset.messageId) : null;
+        const message = messageEl?.value.trim() || '';
+
+        button.disabled = true;
+        const originalText = button.textContent;
+        button.textContent = 'Sending...';
+
+        try {
+                const response = await authFetch('/api/partner/appeals', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ transactionId, requestType, message })
+                });
+
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                        throw new Error(data.error || 'Failed to send request.');
+                }
+
+                if (messageEl) messageEl.value = '';
+                button.textContent = data.emailStatus?.startsWith('error') ? 'Inbox Sent' : 'Sent';
+                window.setTimeout(() => {
+                        button.textContent = originalText;
+                        button.disabled = false;
+                }, 1600);
+        } catch (error) {
+                alert(error.message);
+                button.textContent = originalText;
+                button.disabled = false;
+        }
 }
 
 function renderFilePreview(label, file, missing) {
@@ -407,11 +455,14 @@ async function loadRoles() {
                 tbody.innerHTML = roles.map(r => {
                         const isSelf = normalizeEmail(r.email) === currentUserEmail;
                         const isPrimary = normalizeEmail(r.email) === PRIMARY_SUPERADMIN_EMAIL;
+                        const actionHtml = isPrimary
+                                ? '<span class="text-muted">Primary owner</span>'
+                                : `<button class="btn-sm btn-secondary delete-role-btn" data-email="${escapeHtml(r.email)}">Revoke Access</button>`;
                         return `
                                 <tr>
                                         <td><strong>${escapeHtml(r.email)}</strong> ${isSelf ? '<span class="text-muted">(You)</span>' : ''}</td>
                                         <td><span class="status-badge role-badge-${escapeHtml(r.role)}">${escapeHtml(roleLabel(r.role))}</span></td>
-                                        <td><button class="btn-sm btn-secondary delete-role-btn" data-email="${escapeHtml(r.email)}" ${isPrimary ? 'disabled' : ''}>Revoke Access</button></td>
+                                        <td>${actionHtml}</td>
                                 </tr>
                         `;
                 }).join('');

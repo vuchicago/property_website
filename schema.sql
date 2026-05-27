@@ -18,6 +18,7 @@ CREATE TABLE appeals (
   assigned_partner_at DATETIME,
   assigned_by_admin_email TEXT,
   partner_status TEXT DEFAULT 'Assigned',
+  completed_by_email TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

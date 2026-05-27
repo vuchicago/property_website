@@ -71,6 +71,7 @@ function buildAppealSelectList(columns) {
                 appealColumn(columns, 'assigned_partner_email'),
                 appealColumn(columns, 'assigned_partner_at'),
                 appealColumn(columns, 'partner_status'),
+                appealColumn(columns, 'completed_by_email'),
                 appealColumn(columns, 'created_at')
         ].join(', ');
 }
@@ -104,12 +105,21 @@ export const onRequestPut = async (context) => {
                         return jsonResponse({ error: 'Invalid status' }, 400);
                 }
 
-                const result = await context.env.DB.prepare(
-                        `UPDATE appeals
-                         SET appeal_status = ?,
-                             appeal_date = CASE WHEN ? = 'Finished' THEN CURRENT_TIMESTAMP ELSE appeal_date END
-                         WHERE transaction_id = ?`
-                ).bind(newStatus, newStatus, transactionId).run();
+                const columns = await getAppealsColumns(context.env.DB);
+                const result = columns.has('completed_by_email')
+                        ? await context.env.DB.prepare(
+                                `UPDATE appeals
+                                 SET appeal_status = ?,
+                                     appeal_date = CASE WHEN ? = 'Finished' THEN CURRENT_TIMESTAMP ELSE appeal_date END,
+                                     completed_by_email = CASE WHEN ? = 'Finished' THEN ? ELSE completed_by_email END
+                                 WHERE transaction_id = ?`
+                        ).bind(newStatus, newStatus, newStatus, user.email, transactionId).run()
+                        : await context.env.DB.prepare(
+                                `UPDATE appeals
+                                 SET appeal_status = ?,
+                                     appeal_date = CASE WHEN ? = 'Finished' THEN CURRENT_TIMESTAMP ELSE appeal_date END
+                                 WHERE transaction_id = ?`
+                        ).bind(newStatus, newStatus, transactionId).run();
 
                 if (result.meta.changes === 0) {
                         return jsonResponse({ error: 'Appeal not found' }, 404);

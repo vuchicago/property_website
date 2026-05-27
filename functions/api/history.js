@@ -28,6 +28,9 @@ export const onRequestGet = async (context) => {
                         paymentDate: row.payment_date,
                         appealStatus: row.appeal_status,
                         appealDate: row.appeal_date,
+                        completedByEmail: row.completed_by_email,
+                        assignedPartnerEmail: row.assigned_partner_email,
+                        assignedByAdminEmail: row.assigned_by_admin_email,
                         createdAt: row.created_at,
                         amount: row.payment_amount
                 }));
@@ -49,6 +52,9 @@ export const onRequestGet = async (context) => {
                         paymentDate: row.payment_date,
                         appealStatus: row.appeal_status,
                         appealDate: row.appeal_date,
+                        completedByEmail: null,
+                        assignedPartnerEmail: null,
+                        assignedByAdminEmail: null,
                         createdAt: row.created_at,
                         amount: row.payment_amount
                 })));

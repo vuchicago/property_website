@@ -56,6 +56,44 @@ export async function sendPaymentNotification(env, payment) {
         });
 }
 
+export async function sendCustomerDocumentRequestEmail(env, request) {
+        const from = getDefaultFrom(env);
+        const to = request.customerEmail;
+        const subject = `Documents requested for ${request.propertyAddress || 'your property appeal'}`;
+        const html = `
+                <h2>Documents requested for your property appeal</h2>
+                <p>Your assigned appeal partner requested more information for your appeal.</p>
+                <table cellpadding="8" cellspacing="0" style="border-collapse: collapse;">
+                        <tr><td><strong>Property</strong></td><td>${escapeHtml(request.propertyAddress || 'Not provided')}</td></tr>
+                        <tr><td><strong>Requested item</strong></td><td>${escapeHtml(request.requestLabel || 'Supporting materials')}</td></tr>
+                        <tr><td><strong>Partner</strong></td><td>${escapeHtml(request.partnerEmail || 'Your assigned partner')}</td></tr>
+                </table>
+                ${request.message ? `<p>${escapeHtml(request.message).replace(/\n/g, '<br>')}</p>` : ''}
+                <p>Please sign in to your Cook County Tax Compare account and upload the requested materials.</p>
+        `;
+        const text = [
+                'Documents requested for your property appeal',
+                '',
+                'Your assigned appeal partner requested more information for your appeal.',
+                '',
+                `Property: ${request.propertyAddress || 'Not provided'}`,
+                `Requested item: ${request.requestLabel || 'Supporting materials'}`,
+                `Partner: ${request.partnerEmail || 'Your assigned partner'}`,
+                request.message ? `Message: ${request.message}` : '',
+                '',
+                'Please sign in to your Cook County Tax Compare account and upload the requested materials.'
+        ].filter(Boolean).join('\n');
+
+        return sendNotificationEmail(env, {
+                from,
+                to,
+                subject,
+                html,
+                text,
+                replyTo: request.partnerEmail || undefined
+        });
+}
+
 export async function sendNotificationEmail(env, email) {
         if (env.RESEND_API_KEY) {
                 return sendWithResend(env.RESEND_API_KEY, email);

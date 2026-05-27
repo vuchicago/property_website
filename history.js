@@ -9,6 +9,7 @@ let currentSuggestions = [];
 let selectedAddressForImage = '';
 let selectedPinForImage = '';
 let dashboardUser = null;
+let accountNotifications = [];
 const CURRENT_TAX_YEAR = 2024;
 const CURRENT_STATE_EQUALIZER = 3.0355;
 const ASSESSED_VALUE_DISPLAY_MULTIPLIER = 10;
@@ -25,6 +26,8 @@ export async function loadAppealHistory(userOverride = null) {
         setupPropertyImageUpload();
         setupGovernmentIdUpload();
         setupSupportingDocumentsUpload();
+        setupCompletedAppealsPanel();
+        setupAccountInbox();
         renderAccountSummary(user);
 
         const hadCache = loadDashboardCache(user.uid);
@@ -41,9 +44,12 @@ export async function loadAppealHistory(userOverride = null) {
         renderAddressList();
 
         await fetchAppeals();
+        await fetchAccountNotifications();
         saveDashboardCache(user.uid);
 
         renderAccountSummary(user);
+        renderAccountInbox();
+        renderCompletedAppealsPanel();
         renderAddressList();
 }
 
@@ -119,6 +125,18 @@ async function fetchAppeals() {
         }
 }
 
+async function fetchAccountNotifications() {
+        try {
+                const response = await dashboardAuthFetch('/api/notifications');
+                if (!response.ok) throw new Error('Failed to fetch notifications');
+                const data = await response.json();
+                accountNotifications = Array.isArray(data.notifications) ? data.notifications : [];
+        } catch (error) {
+                console.error('Error fetching account notifications:', error);
+                accountNotifications = [];
+        }
+}
+
 function renderAccountSummary(user) {
         const emailEl = document.getElementById('account-email');
         const propertyCountEl = document.getElementById('property-count');
@@ -129,14 +147,106 @@ function renderAccountSummary(user) {
         if (emailEl) emailEl.textContent = email;
         if (propertyCountEl) propertyCountEl.textContent = userAddresses.length;
         if (appealCountEl) {
-                appealCountEl.textContent = allAppeals.filter(appeal => {
-                        const status = (appeal.appealStatus || appeal.status || '').toLowerCase();
-                        return status === 'finished' || status === 'completed' || status === 'complete';
-                }).length;
+                appealCountEl.textContent = completedAppeals().length;
         }
         if (pendingCountEl) {
                 pendingCountEl.textContent = allAppeals.filter(appeal => (appeal.appealStatus || appeal.status || '').toLowerCase() === 'pending').length;
         }
+}
+
+function setupAccountInbox() {
+        const markReadBtn = document.getElementById('account-inbox-mark-read');
+        if (!markReadBtn || markReadBtn.dataset.bound === 'true') return;
+        markReadBtn.dataset.bound = 'true';
+        markReadBtn.addEventListener('click', async () => {
+                await dashboardAuthFetch('/api/notifications', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({})
+                });
+                await fetchAccountNotifications();
+                renderAccountInbox();
+        });
+}
+
+function renderAccountInbox() {
+        const panel = document.getElementById('account-inbox-panel');
+        const list = document.getElementById('account-inbox-list');
+        if (!panel || !list) return;
+
+        if (!accountNotifications.length) {
+                panel.style.display = 'none';
+                list.innerHTML = '';
+                return;
+        }
+
+        panel.style.display = 'block';
+        list.innerHTML = accountNotifications.map(item => `
+                <article class="account-inbox-item ${item.is_read ? '' : 'unread'}">
+                        <strong>${escapeHtml(item.title || 'Message')}</strong>
+                        <span class="text-sm text-muted">${escapeHtml(item.created_at ? new Date(item.created_at).toLocaleString() : '')}</span>
+                        <p class="text-sm">${escapeHtml(item.message || '')}</p>
+                </article>
+        `).join('');
+}
+
+function setupCompletedAppealsPanel() {
+        const tile = document.getElementById('completed-appeals-tile');
+        const panel = document.getElementById('completed-appeals-panel');
+        const closeBtn = document.getElementById('completed-appeals-close');
+        if (!tile || !panel || tile.dataset.bound === 'true') return;
+        tile.dataset.bound = 'true';
+
+        const openPanel = () => {
+                renderCompletedAppealsPanel();
+                panel.classList.add('active');
+                panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+
+        tile.addEventListener('click', openPanel);
+        tile.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openPanel();
+                }
+        });
+
+        closeBtn?.addEventListener('click', () => {
+                panel.classList.remove('active');
+        });
+}
+
+function completedAppeals() {
+        return allAppeals.filter(appeal => {
+                const status = String(appeal.appealStatus || appeal.status || '').toLowerCase();
+                return status === 'finished' || status === 'completed' || status === 'complete';
+        });
+}
+
+function renderCompletedAppealsPanel() {
+        const list = document.getElementById('completed-appeals-list');
+        if (!list) return;
+
+        const appeals = completedAppeals();
+        if (!appeals.length) {
+                list.innerHTML = '<p class="text-sm text-muted">No completed appeals yet.</p>';
+                return;
+        }
+
+        list.innerHTML = appeals.map(appeal => {
+                const paidAt = appeal.paymentDate ? new Date(appeal.paymentDate).toLocaleDateString() : 'N/A';
+                const appealedAt = appeal.appealDate ? new Date(appeal.appealDate).toLocaleDateString() : 'N/A';
+                const handledBy = appeal.completedByEmail || appeal.assignedPartnerEmail || appeal.assignedByAdminEmail || 'Not assigned';
+                const amount = appeal.amount ? `$${(appeal.amount / 100).toFixed(2)}` : 'N/A';
+
+                return `
+                        <article class="completed-appeal-row">
+                                <strong>${escapeHtml(appeal.propertyAddress || 'Property')}</strong>
+                                <span class="text-sm text-muted">Paid ${escapeHtml(paidAt)} · ${escapeHtml(amount)}</span>
+                                <span class="text-sm text-muted">Appealed ${escapeHtml(appealedAt)} · By ${escapeHtml(handledBy)}</span>
+                        </article>
+                `;
+        }).join('');
 }
 
 function renderAddressList() {

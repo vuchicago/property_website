@@ -240,33 +240,6 @@
                         margin-bottom: var(--space-2);
                 }
 
-                .account-summary {
-                        display: grid;
-                        grid-template-columns: repeat(3, minmax(0, 1fr));
-                        gap: var(--space-4);
-                        margin-bottom: var(--space-6);
-                }
-
-                .summary-tile {
-                        background: var(--white);
-                        border: 1px solid var(--border-color);
-                        border-radius: var(--radius-md);
-                        padding: var(--space-5);
-                        box-shadow: var(--shadow-sm);
-                }
-
-                .summary-tile span {
-                        color: var(--text-muted);
-                        display: block;
-                        font-size: var(--font-size-sm);
-                        margin-bottom: var(--space-2);
-                }
-
-                .summary-tile strong {
-                        color: var(--dark-900);
-                        font-size: var(--font-size-3xl);
-                }
-
                 .property-appeal-status {
                         align-items: center;
                         display: inline-flex;
@@ -377,10 +350,6 @@
                         .account-header {
                                 align-items: flex-start;
                                 flex-direction: column;
-                        }
-
-                        .account-summary {
-                                grid-template-columns: 1fr;
                         }
 
                         .account-actions {
@@ -500,7 +469,7 @@
                                         <span>Number of Properties</span>
                                         <strong id="property-count">0</strong>
                                 </div>
-                                <div class="summary-tile">
+                                <div class="summary-tile summary-tile-action" id="completed-appeals-tile" role="button" tabindex="0">
                                         <span>Appeal Completed</span>
                                         <strong id="appeal-count">0</strong>
                                 </div>
@@ -508,6 +477,28 @@
                                         <span>Pending Appeals</span>
                                         <strong id="pending-appeal-count">0</strong>
                                 </div>
+                        </div>
+
+                        <div class="dashboard-card account-inbox-panel" id="account-inbox-panel" style="display: none;">
+                                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;">
+                                        <div>
+                                                <h3>Inbox</h3>
+                                                <p class="text-sm text-muted">Messages from your appeal team.</p>
+                                        </div>
+                                        <button type="button" class="btn btn-secondary btn-sm" id="account-inbox-mark-read">Mark read</button>
+                                </div>
+                                <div id="account-inbox-list" class="account-inbox-list"></div>
+                        </div>
+
+                        <div class="dashboard-card completed-appeals-panel" id="completed-appeals-panel">
+                                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;">
+                                        <div>
+                                                <h3>Completed Appeals</h3>
+                                                <p class="text-sm text-muted">Past appeals with payment date, appeal date, and assigned representative.</p>
+                                        </div>
+                                        <button type="button" class="btn btn-secondary btn-sm" id="completed-appeals-close">Close</button>
+                                </div>
+                                <div id="completed-appeals-list" class="completed-appeals-list"></div>
                         </div>
 
                         <div class="dashboard-layout" style="display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap;">

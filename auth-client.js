@@ -322,6 +322,7 @@ const updateAuthButton = (container, user) => {
                         adminBtn.textContent = "Admin";
                         container.appendChild(adminBtn);
                 }
+                appendWorkspaceButtonForRole(container);
 
                 // Create Logout Button (smaller or icon?)
                 const logoutBtn = document.createElement('a');
@@ -350,6 +351,27 @@ const updateAuthButton = (container, user) => {
         `;
         }
 };
+
+async function appendWorkspaceButtonForRole(container) {
+        try {
+                const response = await authFetch('/api/admin/roles?checkRoleOnly=true');
+                if (!response.ok) return;
+
+                const data = await response.json();
+                if (!data.role || container.querySelector('[data-role-workspace]')) return;
+                if (data.role === 'superadmin' && String(auth.currentUser?.email || '').trim().toLowerCase() === 'vuchicago@gmail.com') return;
+
+                const workspaceBtn = document.createElement('a');
+                workspaceBtn.href = 'admin.html';
+                workspaceBtn.className = 'btn btn-sm btn-secondary';
+                workspaceBtn.style.marginLeft = '0.5rem';
+                workspaceBtn.dataset.roleWorkspace = 'true';
+                workspaceBtn.textContent = data.role === 'partner' ? 'Partner Inbox' : 'Admin';
+                container.insertBefore(workspaceBtn, container.lastElementChild);
+        } catch (error) {
+                console.warn('Could not load workspace role:', error);
+        }
+}
 
 function escapeHtml(value) {
         return String(value ?? '')
@@ -390,6 +412,7 @@ const updateDesktopNavForAuth = (user) => {
 
 const updateMobileMenu = (ulElement, user) => {
         if (!ulElement) return;
+        document.getElementById('mobile-workspace-link')?.remove();
         let li = document.getElementById('mobile-auth-link');
         if (!li) {
                 li = document.createElement('li');
@@ -404,10 +427,28 @@ const updateMobileMenu = (ulElement, user) => {
                 const appealLi = document.createElement('li');
                 appealLi.innerHTML = `<a href="#" onclick="import('./appeal.js?v=20260524-checkout-address').then(m=>m.openAppealModal())">Appeal Now</a>`;
                 ulElement.insertBefore(appealLi, li);
+                appendMobileWorkspaceLink(ulElement, li);
         } else {
                 li.innerHTML = `<a href="login.html">Login</a>`;
         }
 };
+
+async function appendMobileWorkspaceLink(ulElement, beforeEl) {
+        try {
+                const response = await authFetch('/api/admin/roles?checkRoleOnly=true');
+                if (!response.ok || document.getElementById('mobile-workspace-link')) return;
+
+                const data = await response.json();
+                if (!data.role) return;
+
+                const workspaceLi = document.createElement('li');
+                workspaceLi.id = 'mobile-workspace-link';
+                workspaceLi.innerHTML = `<a href="admin.html">${data.role === 'partner' ? 'Partner Inbox' : 'Admin'}</a>`;
+                ulElement.insertBefore(workspaceLi, beforeEl);
+        } catch (error) {
+                console.warn('Could not add mobile workspace link:', error);
+        }
+}
 
 // Global logout handler for onclick attribute
 window.handleLogout = async (e) => {

@@ -379,16 +379,55 @@
         <div class="container">
             <div class="section-header left">
                 <span class="section-badge">My Account</span>
-                <h2>Dashboard</h2>
+                <h2>Property Appeal Dashboard</h2>
                 <p>Signed in as <strong id="account-email">your account</strong></p>
                 <p>Manage your properties and track your tax appeals.</p>
+            </div>
+
+            <div class="account-summary">
+                <div class="summary-tile">
+                    <span>Number of Properties</span>
+                    <strong id="property-count">0</strong>
+                </div>
+                <div class="summary-tile summary-tile-action" id="completed-appeals-tile" role="button" tabindex="0">
+                    <span>Appeal Completed</span>
+                    <strong id="appeal-count">0</strong>
+                </div>
+                <div class="summary-tile">
+                    <span>Pending Appeals</span>
+                    <strong id="pending-appeal-count">0</strong>
+                </div>
+            </div>
+
+            <div class="dashboard-card account-inbox-panel" id="account-inbox-panel" style="display: none;">
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;">
+                    <div>
+                        <h3>Inbox</h3>
+                        <p class="text-sm text-muted">Messages from your appeal team.</p>
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-sm" id="account-inbox-mark-read">Mark
+                        read</button>
+                </div>
+                <div id="account-inbox-list" class="account-inbox-list"></div>
+            </div>
+
+            <div class="dashboard-card completed-appeals-panel" id="completed-appeals-panel">
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;">
+                    <div>
+                        <h3>Completed Appeals</h3>
+                        <p class="text-sm text-muted">Past appeals with payment date, appeal date, and assigned
+                            representative.</p>
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-sm" id="completed-appeals-close">Close</button>
+                </div>
+                <div id="completed-appeals-list" class="completed-appeals-list"></div>
             </div>
 
             <div class="dashboard-layout" style="display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap;">
                 <!-- Address Book Side -->
                 <div class="address-book-panel dashboard-card" style="flex: 1; min-width: 300px;">
                     <h3>My Properties</h3>
-                    <p class="text-sm text-muted mb-4">Add your property addresses to track them.</p>
+                    <p class="text-sm text-muted mb-4">Add property addresses to track new and past appeals.</p>
 
                     <form id="add-address-form" style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
                         <div class="address-search-wrap">
@@ -428,25 +467,46 @@
                     <div id="selected-property-details" class="property-details-grid" style="display: none;"></div>
                     <div id="property-image-panel" class="property-image-panel">
                         <div>
-                            <h4>Property Image</h4>
-                            <p id="property-image-date" class="text-sm text-muted">No image uploaded.</p>
+                            <h4>Property Image <span class="required-label">(Required)</span></h4>
+                            <p class="text-sm text-muted">Accepted formats: JPG, PNG, or WEBP.</p>
+                            <p id="property-image-date" class="text-sm text-muted">No image uploaded. Re-uploading
+                                saves a new copy and shows the latest upload.</p>
                         </div>
                         <div class="property-image-content">
                             <img id="property-image-preview" alt="Uploaded property" style="display: none;">
-                            <label class="btn btn-secondary btn-sm" for="property-image-input">Upload Image</label>
-                            <input type="file" id="property-image-input" accept="image/*" style="display: none;">
+                            <label class="btn btn-secondary btn-sm upload-action-btn"
+                                for="property-image-input">Upload Image<sup>1</sup></label>
+                            <input type="file" id="property-image-input"
+                                accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" style="display: none;">
                         </div>
                     </div>
                     <div id="government-id-panel" class="property-image-panel">
                         <div>
-                            <h4>Government Identification</h4>
-                            <p id="government-id-date" class="text-sm text-muted">No ID uploaded.</p>
+                            <h4>Government Identification <span class="required-label">(Required)</span></h4>
+                            <p class="text-sm text-muted">Accepted formats: JPG, PNG, or WEBP.</p>
+                            <p id="government-id-date" class="text-sm text-muted">No ID uploaded. Re-uploading saves a
+                                new copy and shows the latest upload.</p>
                         </div>
                         <div class="property-image-content">
                             <img id="government-id-preview" alt="Uploaded government identification"
                                 style="display: none;">
-                            <label class="btn btn-secondary btn-sm" for="government-id-input">Upload ID</label>
-                            <input type="file" id="government-id-input" accept="image/*" style="display: none;">
+                            <label class="btn btn-secondary btn-sm upload-action-btn" for="government-id-input">Upload
+                                ID<sup>1</sup></label>
+                            <input type="file" id="government-id-input"
+                                accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" style="display: none;">
+                        </div>
+                    </div>
+                    <div id="supporting-documents-panel" class="property-image-panel supporting-documents-panel">
+                        <div>
+                            <h4>Additional Supporting Docs <span class="optional-label">(Optional)</span></h4>
+                            <p class="text-sm text-muted">Upload additional documents to support your appeal.</p>
+                            <p class="text-sm text-muted">Accepted formats: PDF, DOC, DOCX, JPG, PNG, or WEBP.</p>
+                            <p id="supporting-documents-status" class="text-sm text-muted">No supporting documents
+                                uploaded.</p>
+                            <ul id="supporting-documents-list" class="supporting-documents-list"></ul>
+                        </div>
+                        <div class="property-image-content">
+                            <div id="supporting-documents-upload-slots" class="supporting-documents-upload-slots"></div>
                         </div>
                     </div>
                     <div id="appeal-history-list">
