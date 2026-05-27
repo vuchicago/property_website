@@ -65,7 +65,13 @@ export const onRequestPost = async (context) => {
 
                         const transactionId = session.id;
                         const customerId = session.client_reference_id; // userId passed during checkout
-                        const customerName = session.customer_details?.name || session.metadata?.userName || null;
+                        const customerName = session.metadata?.customerName || session.customer_details?.name || session.metadata?.userName || null;
+                        const customerFirstName = session.metadata?.customerFirstName || null;
+                        const customerLastName = session.metadata?.customerLastName || null;
+                        const customerPhone = session.metadata?.customerPhone || null;
+                        const contractNameConfirmedAt = session.metadata?.contractNameConfirmed === 'true'
+                                ? stripeTimestampToIso(session.created)
+                                : null;
                         const customerEmail = session.customer_details?.email || null;
                         const propertyAddress = session.metadata?.propertyAddress || null;
                         const propertyKey = session.metadata?.propertyKey || null;
@@ -82,6 +88,10 @@ export const onRequestPost = async (context) => {
                                         transactionId,
                                         customerId,
                                         customerName,
+                                        customerFirstName,
+                                        customerLastName,
+                                        customerPhone,
+                                        contractNameConfirmedAt,
                                         customerEmail,
                                         propertyAddress,
                                         propertyKey,
@@ -123,4 +133,11 @@ export const onRequestPost = async (context) => {
                         headers: { 'Content-Type': 'application/json' }
                 });
         }
+}
+
+function stripeTimestampToIso(timestamp) {
+        const seconds = Number(timestamp);
+        return Number.isFinite(seconds) && seconds > 0
+                ? new Date(seconds * 1000).toISOString()
+                : new Date().toISOString();
 }

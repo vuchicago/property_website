@@ -42,7 +42,13 @@ export const onRequestGet = async (context) => {
                                         const result = await recordPaidAppeal(context.env, {
                                                 transactionId: session.id,
                                                 customerId: session.client_reference_id,
-                                                customerName: session.customer_details?.name || session.metadata?.userName || null,
+                                                customerName: session.metadata?.customerName || session.customer_details?.name || session.metadata?.userName || null,
+                                                customerFirstName: session.metadata?.customerFirstName || null,
+                                                customerLastName: session.metadata?.customerLastName || null,
+                                                customerPhone: session.metadata?.customerPhone || null,
+                                                contractNameConfirmedAt: session.metadata?.contractNameConfirmed === 'true'
+                                                        ? stripeTimestampToIso(session.created)
+                                                        : null,
                                                 customerEmail: session.customer_details?.email || session.metadata?.userEmail || null,
                                                 propertyAddress: session.metadata?.propertyAddress || null,
                                                 propertyKey: session.metadata?.propertyKey || null,
@@ -82,4 +88,11 @@ export const onRequestGet = async (context) => {
                         headers: { 'Content-Type': 'application/json' }
                 });
         }
+}
+
+function stripeTimestampToIso(timestamp) {
+        const seconds = Number(timestamp);
+        return Number.isFinite(seconds) && seconds > 0
+                ? new Date(seconds * 1000).toISOString()
+                : new Date().toISOString();
 }

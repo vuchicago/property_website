@@ -28,10 +28,27 @@ export const onRequestPost = async (context) => {
         }
 
         try {
-                const { propertyAddress, propertyKey, propertyPin } = await context.request.json();
+                const {
+                        propertyAddress,
+                        propertyKey,
+                        propertyPin,
+                        customerFirstName,
+                        customerLastName,
+                        customerPhone,
+                        contractNameConfirmed
+                } = await context.request.json();
 
                 if (!propertyAddress) {
                         return jsonResponse({ error: 'Missing property address' }, 400);
+                }
+
+                const checkoutFirstName = normalizeNamePart(customerFirstName);
+                const checkoutLastName = normalizeNamePart(customerLastName);
+                const checkoutPhone = String(customerPhone || '').trim().slice(0, 40);
+                const checkoutCustomerName = [checkoutFirstName, checkoutLastName].filter(Boolean).join(' ');
+
+                if (!checkoutFirstName || !checkoutLastName || contractNameConfirmed !== true) {
+                        return jsonResponse({ error: 'Please enter and confirm your legal first and last name before checkout.' }, 400);
                 }
 
                 if (!context.env.DB) {
@@ -80,6 +97,13 @@ export const onRequestPost = async (context) => {
                 body.append('client_reference_id', user.uid);
                 body.append('metadata[propertyAddress]', checkoutPropertyAddress);
                 body.append('metadata[propertyKey]', checkoutPropertyKey);
+                body.append('metadata[customerFirstName]', checkoutFirstName);
+                body.append('metadata[customerLastName]', checkoutLastName);
+                body.append('metadata[customerName]', checkoutCustomerName);
+                body.append('metadata[contractNameConfirmed]', 'true');
+                if (checkoutPhone) {
+                        body.append('metadata[customerPhone]', checkoutPhone);
+                }
                 if (checkoutPropertyPin) {
                         body.append('metadata[propertyPin]', checkoutPropertyPin);
                 }
@@ -92,6 +116,13 @@ export const onRequestPost = async (context) => {
                 body.append('payment_intent_data[metadata][propertyKey]', checkoutPropertyKey);
                 body.append('payment_intent_data[metadata][propertyPin]', checkoutPropertyPin);
                 body.append('payment_intent_data[metadata][userEmail]', user.email || '');
+                body.append('payment_intent_data[metadata][customerFirstName]', checkoutFirstName);
+                body.append('payment_intent_data[metadata][customerLastName]', checkoutLastName);
+                body.append('payment_intent_data[metadata][customerName]', checkoutCustomerName);
+                body.append('payment_intent_data[metadata][contractNameConfirmed]', 'true');
+                if (checkoutPhone) {
+                        body.append('payment_intent_data[metadata][customerPhone]', checkoutPhone);
+                }
 
                 const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
                         method: 'POST',
@@ -113,7 +144,11 @@ export const onRequestPost = async (context) => {
                         const result = await recordCheckoutAppeal(context.env, {
                                 transactionId: session.id,
                                 customerId: user.uid,
-                                customerName: session.customer_details?.name || null,
+                                customerName: checkoutCustomerName,
+                                customerFirstName: checkoutFirstName,
+                                customerLastName: checkoutLastName,
+                                customerPhone: checkoutPhone,
+                                contractNameConfirmedAt: new Date().toISOString(),
                                 customerEmail: user.email || null,
                                 propertyAddress: checkoutPropertyAddress,
                                 propertyKey: checkoutPropertyKey,
@@ -201,4 +236,11 @@ function parseAmountCents(value, fallbackCents) {
         }
 
         return Math.round(numeric);
+}
+
+function normalizeNamePart(value) {
+        return String(value || '')
+                .trim()
+                .replace(/\s+/g, ' ')
+                .slice(0, 80);
 }

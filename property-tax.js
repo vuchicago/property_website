@@ -148,8 +148,8 @@ function initPropertyTaxTool() {
     });
     exportCsvBtn?.addEventListener('click', exportToCSV);
     increaseRadiusBtn?.addEventListener('click', async () => {
-        if (increaseRadiusBtn.dataset.action === 'create-account') {
-            window.location.href = buildCreateAccountUrl();
+        if (increaseRadiusBtn.dataset.action === 'appeal-help') {
+            await openAppealHelp();
             return;
         }
 
@@ -522,10 +522,10 @@ function updateWiderRadiusButton(data) {
 
     if (data.appeal?.decision === 'Yes, Appeal') {
         button.hidden = false;
-        button.dataset.action = 'create-account';
+        button.dataset.action = 'appeal-help';
         button.classList.remove('btn-secondary');
         button.classList.add('btn-primary', 'appeal-cta-btn');
-        button.textContent = 'Create Account to Continue';
+        button.textContent = 'Get Help With Your Appeal';
         return;
     }
 
@@ -556,6 +556,30 @@ function buildCreateAccountUrl() {
     }
 
     return `login.html?${params.toString()}`;
+}
+
+async function openAppealHelp() {
+    if (!selectedProperty?.address) {
+        window.location.href = buildCreateAccountUrl();
+        return;
+    }
+
+    try {
+        const { auth } = await import('./auth-client.js?v=20260524-auth-gate');
+        if (!auth.currentUser) {
+            window.location.href = buildCreateAccountUrl();
+            return;
+        }
+
+        const { openAppealModal } = await import('./appeal.js?v=20260524-checkout-address');
+        openAppealModal(selectedProperty.address, {
+            propertyKey: searchResults?.target?.propertyKey || searchResults?.target?.property_key || '',
+            pin: selectedProperty.pin || searchResults?.target?.pin || '',
+            propertyDetails: searchResults?.target || null
+        });
+    } catch (error) {
+        window.location.href = buildCreateAccountUrl();
+    }
 }
 
 function updateDecision(appeal) {

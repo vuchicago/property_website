@@ -113,7 +113,7 @@ async function loadPendingAppeals() {
                         return `
                                 <tr>
                                         <td><strong>${escapeHtml(appeal.property_address)}</strong>${appeal.property_pin ? `<br><small class="text-muted">PIN ${escapeHtml(appeal.property_pin)}</small>` : ''}</td>
-                                        <td>${escapeHtml(appeal.customer_name || 'N/A')}<br><small class="text-muted">${escapeHtml(appeal.customer_email || 'N/A')}</small></td>
+                                        <td>${formatCustomerIdentity(appeal)}</td>
                                         <td>${date}<br><small class="text-muted">${amount}</small></td>
                                         <td><span class="status-badge status-pending">${escapeHtml(appeal.appeal_status || 'Pending')}</span></td>
                                         <td>${renderPartnerSelect(appeal)}</td>
@@ -264,31 +264,59 @@ async function loadPartnerInbox() {
                 if (!response.ok) throw new Error('Failed to load partner inbox');
 
                 const data = await response.json();
-                const appeals = data.appeals || [];
-                const unread = (data.notifications || []).filter(item => !item.is_read).length;
+                const pendingAppeals = data.pendingAppeals || [];
+                const completedAppeals = data.completedAppeals || [];
+                const totalAppeals = pendingAppeals.length + completedAppeals.length;
 
-                if (!appeals.length) {
+                if (!totalAppeals) {
                         container.innerHTML = '<p class="text-muted">No assigned appeals yet.</p>';
                         return;
                 }
 
                 container.innerHTML = `
                         <div class="partner-inbox-header">
-                                <strong>${appeals.length} assigned appeal${appeals.length === 1 ? '' : 's'}</strong>
-                                <span class="text-muted">${unread} unread notification${unread === 1 ? '' : 's'}</span>
-                                <button type="button" class="btn btn-secondary btn-sm" id="mark-notifications-read">Mark read</button>
+                                <strong>${totalAppeals} assigned appeal${totalAppeals === 1 ? '' : 's'}</strong>
+                                <span class="text-muted">${pendingAppeals.length} pending · ${completedAppeals.length} completed</span>
                         </div>
-                        <div class="partner-appeal-list">
-                                ${appeals.map(renderPartnerAppeal).join('')}
-                        </div>
+                        <section class="partner-inbox-section">
+                                <h3>Pending Inbox</h3>
+                                <div class="partner-appeal-list">
+                                        ${pendingAppeals.length ? pendingAppeals.map(renderPartnerAppeal).join('') : '<p class="text-muted">No pending assigned appeals.</p>'}
+                                </div>
+                        </section>
+                        <section class="partner-inbox-section">
+                                <h3>Completed Inbox</h3>
+                                <div class="partner-appeal-list">
+                                        ${completedAppeals.length ? completedAppeals.map(renderCompletedPartnerAppeal).join('') : '<p class="text-muted">No completed assigned appeals.</p>'}
+                                </div>
+                        </section>
                 `;
 
-                document.getElementById('mark-notifications-read')?.addEventListener('click', markPartnerNotificationsRead);
-                document.querySelectorAll('.partner-request-btn').forEach(button => button.addEventListener('click', handlePartnerDocumentRequest));
+                document.querySelectorAll('.partner-request-form').forEach(form => form.addEventListener('submit', handlePartnerDocumentRequest));
+                document.querySelectorAll('.partner-reopen-btn').forEach(button => button.addEventListener('click', handlePartnerReopenAppeal));
         } catch (error) {
                 console.error('Error loading partner inbox:', error);
                 container.innerHTML = '<p style="color: var(--error);">Partner inbox could not be loaded.</p>';
         }
+}
+
+function renderCompletedPartnerAppeal(appeal) {
+        const amount = appeal.payment_amount ? `$${(appeal.payment_amount / 100).toFixed(2)}` : 'N/A';
+        const paidAt = appeal.payment_date ? new Date(appeal.payment_date).toLocaleDateString() : 'N/A';
+        const appealedAt = appeal.appeal_date ? new Date(appeal.appeal_date).toLocaleDateString() : 'N/A';
+        const status = appeal.appeal_status || 'Completed';
+        const unsuccessful = ['denied', 'unsuccessful'].includes(String(status).toLowerCase());
+
+        return `
+                <article class="partner-appeal-card">
+                        <div>
+                                <h4>${escapeHtml(appeal.property_address || 'Property')}</h4>
+                                <p class="text-sm text-muted">Paid ${escapeHtml(paidAt)} · ${escapeHtml(amount)}</p>
+                                <p class="text-sm text-muted">Appealed ${escapeHtml(appealedAt)} · Result ${escapeHtml(status)}</p>
+                        </div>
+                        ${unsuccessful ? `<button type="button" class="btn btn-secondary btn-sm partner-reopen-btn" data-id="${escapeHtml(appeal.transaction_id)}">Move Back to Pending</button>` : ''}
+                </article>
+        `;
 }
 
 function renderPartnerAppeal(appeal) {
@@ -301,7 +329,7 @@ function renderPartnerAppeal(appeal) {
                 <article class="partner-appeal-card">
                         <div>
                                 <h4>${escapeHtml(appeal.property_address || 'Property')}</h4>
-                                <p class="text-sm text-muted">${escapeHtml(appeal.customer_name || 'Customer')} · ${escapeHtml(appeal.customer_email || 'No email')}</p>
+                                <p class="text-sm text-muted">${formatCustomerIdentity(appeal, true)}</p>
                                 <p class="text-sm text-muted">Assigned ${date} · Payment ${amount} · Status ${escapeHtml(appeal.appeal_status || 'Pending')}</p>
                                 ${appeal.property_pin ? `<p class="text-sm text-muted">PIN ${escapeHtml(appeal.property_pin)}</p>` : ''}
                         </div>
@@ -315,25 +343,31 @@ function renderPartnerAppeal(appeal) {
                         </div>
                         <div class="partner-request-actions">
                                 <strong>Request Missing Documents</strong>
-                                <div class="partner-request-buttons">
-                                        <button type="button" class="btn btn-secondary btn-sm partner-request-btn" data-id="${escapeHtml(appeal.transaction_id)}" data-type="property_image">Request Property Image</button>
-                                        <button type="button" class="btn btn-secondary btn-sm partner-request-btn" data-id="${escapeHtml(appeal.transaction_id)}" data-type="government_id">Request Government ID</button>
-                                </div>
-                                <div class="partner-supporting-request">
-                                        <textarea id="supporting-request-${escapeHtml(appeal.transaction_id)}" placeholder="Describe the supporting materials needed from the user."></textarea>
-                                        <button type="button" class="btn btn-primary btn-sm partner-request-btn" data-id="${escapeHtml(appeal.transaction_id)}" data-type="supporting_materials" data-message-id="supporting-request-${escapeHtml(appeal.transaction_id)}">Send Supporting Materials Request</button>
-                                </div>
+                                <form class="partner-request-form" data-id="${escapeHtml(appeal.transaction_id)}">
+                                        <label><input type="checkbox" name="requestType" value="property_image"> Property Image</label>
+                                        <label><input type="checkbox" name="requestType" value="government_id"> Government ID</label>
+                                        <label><input type="checkbox" name="requestType" value="supporting_materials"> Supporting Materials</label>
+                                        <textarea name="message" placeholder="Optional message to include with the request."></textarea>
+                                        <button type="submit" class="btn btn-primary btn-sm">Send Document Request</button>
+                                </form>
                         </div>
                 </article>
         `;
 }
 
 async function handlePartnerDocumentRequest(event) {
-        const button = event.currentTarget;
-        const transactionId = button.dataset.id;
-        const requestType = button.dataset.type;
-        const messageEl = button.dataset.messageId ? document.getElementById(button.dataset.messageId) : null;
+        event.preventDefault();
+        const form = event.currentTarget;
+        const button = form.querySelector('button[type="submit"]');
+        const transactionId = form.dataset.id;
+        const requestTypes = Array.from(form.querySelectorAll('input[name="requestType"]:checked')).map(input => input.value);
+        const messageEl = form.querySelector('textarea[name="message"]');
         const message = messageEl?.value.trim() || '';
+
+        if (!requestTypes.length) {
+                alert('Select at least one missing item.');
+                return;
+        }
 
         button.disabled = true;
         const originalText = button.textContent;
@@ -343,7 +377,7 @@ async function handlePartnerDocumentRequest(event) {
                 const response = await authFetch('/api/partner/appeals', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ transactionId, requestType, message })
+                        body: JSON.stringify({ transactionId, requestTypes, message })
                 });
 
                 const data = await response.json().catch(() => ({}));
@@ -351,7 +385,7 @@ async function handlePartnerDocumentRequest(event) {
                         throw new Error(data.error || 'Failed to send request.');
                 }
 
-                if (messageEl) messageEl.value = '';
+                form.reset();
                 button.textContent = data.emailStatus?.startsWith('error') ? 'Inbox Sent' : 'Sent';
                 window.setTimeout(() => {
                         button.textContent = originalText;
@@ -389,13 +423,28 @@ function renderDocumentLink(doc) {
         `;
 }
 
-async function markPartnerNotificationsRead() {
-        await authFetch('/api/partner/appeals', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({})
-        });
-        await loadPartnerInbox();
+async function handlePartnerReopenAppeal(event) {
+        const button = event.currentTarget;
+        button.disabled = true;
+        const originalText = button.textContent;
+        button.textContent = 'Moving...';
+
+        try {
+                const response = await authFetch('/api/partner/appeals', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ transactionId: button.dataset.id, action: 'reopen' })
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                        throw new Error(data.error || 'Failed to reopen appeal.');
+                }
+                await loadPartnerInbox();
+        } catch (error) {
+                alert(error.message);
+                button.disabled = false;
+                button.textContent = originalText;
+        }
 }
 
 function setupHistorySearch() {
@@ -568,6 +617,25 @@ function roleLabel(role) {
 
 function normalizeEmail(value) {
         return String(value || '').trim().toLowerCase();
+}
+
+function formatCustomerIdentity(appeal, inline = false) {
+        const legalName = [appeal.customer_first_name, appeal.customer_last_name]
+                .map(value => String(value || '').trim())
+                .filter(Boolean)
+                .join(' ');
+        const name = legalName || appeal.customer_name || 'N/A';
+        const email = appeal.customer_email || 'N/A';
+        const phone = appeal.customer_phone ? ` · ${appeal.customer_phone}` : '';
+
+        if (inline) {
+                return `${escapeHtml(name)} · ${escapeHtml(email)}${escapeHtml(phone)}`;
+        }
+
+        const confirmed = appeal.contract_name_confirmed_at
+                ? '<br><small class="text-muted">Legal name confirmed at checkout</small>'
+                : '';
+        return `${escapeHtml(name)}<br><small class="text-muted">${escapeHtml(email)}${escapeHtml(phone)}</small>${confirmed}`;
 }
 
 function escapeHtml(value) {

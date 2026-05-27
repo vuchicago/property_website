@@ -11,7 +11,8 @@ export const onRequestGet = async (context) => {
 
         try {
                 const appealsResult = await context.env.DB.prepare(
-                        `SELECT id, transaction_id, customer_id, customer_name, customer_email, property_address, property_key, property_pin,
+                        `SELECT id, transaction_id, customer_id, customer_name, customer_first_name, customer_last_name,
+                                customer_phone, contract_name_confirmed_at, customer_email, property_address, property_key, property_pin,
                                 payment_amount, payment_status, payment_date, appeal_status, assigned_partner_at, partner_status
                          FROM appeals
                          WHERE assigned_partner_email = ?
@@ -26,17 +27,13 @@ export const onRequestGet = async (context) => {
                         });
                 }
 
-                const notifications = await context.env.DB.prepare(
-                        `SELECT id, appeal_id, notification_type, title, message, is_read, created_at
-                         FROM account_notifications
-                         WHERE recipient_email = ?
-                         ORDER BY created_at DESC
-                         LIMIT 50`
-                ).bind(user.email).all();
+                const pendingAppeals = appeals.filter(appeal => String(appeal.appeal_status || 'Pending').toLowerCase() === 'pending');
+                const completedAppeals = appeals.filter(appeal => String(appeal.appeal_status || '').toLowerCase() !== 'pending');
 
                 return jsonResponse({
                         appeals,
-                        notifications: notifications.results || []
+                        pendingAppeals,
+                        completedAppeals
                 });
         } catch (err) {
                 return jsonResponse({ error: err.message }, 500);
@@ -52,16 +49,24 @@ export const onRequestPut = async (context) => {
         }
 
         try {
-                const { notificationId } = await context.request.json();
+                const { transactionId, action } = await context.request.json();
 
-                if (!notificationId) {
-                        await context.env.DB.prepare(
-                                "UPDATE account_notifications SET is_read = 1 WHERE recipient_email = ?"
-                        ).bind(user.email).run();
-                } else {
-                        await context.env.DB.prepare(
-                                "UPDATE account_notifications SET is_read = 1 WHERE id = ? AND recipient_email = ?"
-                        ).bind(notificationId, user.email).run();
+                if (action !== 'reopen' || !transactionId) {
+                        return jsonResponse({ error: 'Missing reopen action or transaction ID.' }, 400);
+                }
+
+                const result = await context.env.DB.prepare(
+                        `UPDATE appeals
+                         SET appeal_status = 'Pending',
+                             appeal_date = NULL,
+                             partner_status = 'Assigned'
+                         WHERE transaction_id = ?
+                           AND assigned_partner_email = ?
+                           AND appeal_status IN ('Denied', 'Unsuccessful')`
+                ).bind(transactionId, user.email).run();
+
+                if (!result.meta?.changes) {
+                        return jsonResponse({ error: 'Only unsuccessful assigned appeals can be reopened.' }, 400);
                 }
 
                 return jsonResponse({ success: true });
@@ -79,16 +84,16 @@ export const onRequestPost = async (context) => {
         }
 
         try {
-                const { transactionId, requestType, message } = await context.request.json();
-                const normalizedType = String(requestType || '').trim();
+                const { transactionId, requestType, requestTypes, message } = await context.request.json();
+                const normalizedTypes = Array.isArray(requestTypes)
+                        ? requestTypes.map(type => String(type || '').trim()).filter(Boolean)
+                        : [String(requestType || '').trim()].filter(Boolean);
+                const uniqueTypes = [...new Set(normalizedTypes)];
                 const cleanMessage = String(message || '').trim().slice(0, 1200);
+                const allowedTypes = new Set(['property_image', 'government_id', 'supporting_materials']);
 
-                if (!transactionId || !['property_image', 'government_id', 'supporting_materials'].includes(normalizedType)) {
+                if (!transactionId || uniqueTypes.length === 0 || uniqueTypes.some(type => !allowedTypes.has(type))) {
                         return jsonResponse({ error: 'Missing or invalid document request.' }, 400);
-                }
-
-                if (normalizedType === 'supporting_materials' && !cleanMessage) {
-                        return jsonResponse({ error: 'Add a message describing the supporting materials needed.' }, 400);
                 }
 
                 const appeal = await context.env.DB.prepare(
@@ -108,8 +113,8 @@ export const onRequestPost = async (context) => {
                 }
 
                 const customerEmail = String(appeal.customer_email || '').trim().toLowerCase();
-                const requestLabel = documentRequestLabel(normalizedType);
-                const notificationMessage = cleanMessage || defaultDocumentRequestMessage(requestLabel, appeal.property_address);
+                const requestLabels = uniqueTypes.map(documentRequestLabel);
+                const notificationMessage = buildDocumentRequestMessage(requestLabels, appeal.property_address, cleanMessage);
 
                 await context.env.DB.prepare(
                         `INSERT INTO account_notifications (recipient_email, recipient_role, appeal_id, notification_type, title, message)
@@ -117,7 +122,7 @@ export const onRequestPost = async (context) => {
                 ).bind(
                         customerEmail,
                         appeal.id,
-                        `Documents requested: ${requestLabel}`,
+                        `Documents requested: ${requestLabels.join(', ')}`,
                         notificationMessage
                 ).run();
 
@@ -127,7 +132,7 @@ export const onRequestPost = async (context) => {
                                 customerEmail,
                                 propertyAddress: appeal.property_address,
                                 partnerEmail: user.email,
-                                requestLabel,
+                                requestLabel: requestLabels.join(', '),
                                 message: notificationMessage
                         });
                         emailStatus = result?.skipped ? `skipped: ${result.reason}` : 'sent';
@@ -195,4 +200,10 @@ function documentRequestLabel(type) {
 
 function defaultDocumentRequestMessage(label, propertyAddress) {
         return `Please upload the missing ${label.toLowerCase()} for ${propertyAddress || 'your property appeal'}.`;
+}
+
+function buildDocumentRequestMessage(labels, propertyAddress, customMessage) {
+        const intro = `Please upload the following missing item${labels.length === 1 ? '' : 's'} for ${propertyAddress || 'your property appeal'}:`;
+        const numbered = labels.map((label, index) => `${index + 1}. ${label}`).join('\n');
+        return [intro, numbered, customMessage ? `\nMessage from your partner:\n${customMessage}` : ''].filter(Boolean).join('\n');
 }

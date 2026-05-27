@@ -72,6 +72,26 @@ function createAppealModalHTML() {
                         <div id="appeal-address-suggestions" class="address-suggestions" role="listbox"></div>
                     </div>
                 </div>
+                <div class="appeal-checkout-fields" id="appeal-checkout-fields" hidden>
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label for="appeal-first-name">Legal First Name</label>
+                            <input type="text" id="appeal-first-name" autocomplete="given-name" maxlength="80">
+                        </div>
+                        <div class="input-group">
+                            <label for="appeal-last-name">Legal Last Name</label>
+                            <input type="text" id="appeal-last-name" autocomplete="family-name" maxlength="80">
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="appeal-phone">Phone Number <span class="optional-label">Optional</span></label>
+                        <input type="tel" id="appeal-phone" autocomplete="tel" maxlength="40">
+                    </div>
+                    <label class="appeal-confirmation">
+                        <input type="checkbox" id="appeal-name-confirmed">
+                        <span>This is my legal name for the appeal paperwork and signature request.</span>
+                    </label>
+                </div>
                 <div class="modal-actions">
                     <button type="submit" class="btn btn-primary btn-full" id="pay-appeal-btn">
                         Join the Waitlist
@@ -157,6 +177,10 @@ async function refreshAppealModeText(propertyAddress = '') {
         const subtitle = document.getElementById('appeal-modal-subtitle');
         const note = document.querySelector('#appeal-form .secure-note');
         const button = document.getElementById('pay-appeal-btn');
+        const checkoutFields = document.getElementById('appeal-checkout-fields');
+        const firstNameInput = document.getElementById('appeal-first-name');
+        const lastNameInput = document.getElementById('appeal-last-name');
+        const confirmationInput = document.getElementById('appeal-name-confirmed');
 
         if (config.deploymentReady) {
                 if (title) title.textContent = 'Appeal Your Property Tax';
@@ -181,6 +205,11 @@ async function refreshAppealModeText(propertyAddress = '') {
                                 ${paymentModeText}
                         `;
                 }
+                if (checkoutFields) checkoutFields.hidden = false;
+                firstNameInput?.setAttribute('required', 'required');
+                lastNameInput?.setAttribute('required', 'required');
+                confirmationInput?.setAttribute('required', 'required');
+                await prefillCheckoutIdentity();
                 return;
         }
 
@@ -202,6 +231,10 @@ async function refreshAppealModeText(propertyAddress = '') {
                         No payment today. We will use your saved account and property information for the waitlist request.
                 `;
         }
+        if (checkoutFields) checkoutFields.hidden = true;
+        firstNameInput?.removeAttribute('required');
+        lastNameInput?.removeAttribute('required');
+        confirmationInput?.removeAttribute('required');
 }
 
 function closeAppealModal() {
@@ -315,6 +348,9 @@ async function handleAppealPayment(config = {}) {
         const authContext = await getCurrentAppealUser();
         if (!authContext) return;
 
+        const identity = getCheckoutIdentity();
+        if (!identity) return;
+
         const { authFetch } = authContext;
         const btn = document.getElementById('pay-appeal-btn');
         const originalText = btn.innerHTML;
@@ -328,7 +364,11 @@ async function handleAppealPayment(config = {}) {
                         body: JSON.stringify({
                                 propertyAddress: address,
                                 propertyKey: selectedAppealPropertyContext?.property_key || selectedAppealPropertyContext?.propertyKey || '',
-                                propertyPin: selectedAppealPropertyContext?.pin || selectedAppealPropertyContext?.propertyDetails?.pin || ''
+                                propertyPin: selectedAppealPropertyContext?.pin || selectedAppealPropertyContext?.propertyDetails?.pin || '',
+                                customerFirstName: identity.firstName,
+                                customerLastName: identity.lastName,
+                                customerPhone: identity.phone,
+                                contractNameConfirmed: true
                         })
                 });
 
@@ -356,6 +396,56 @@ async function handleAppealPayment(config = {}) {
                 btn.innerHTML = originalText || `Pay ${formatPaymentAmount(config.appealHelpAmountCents)} & Submit Appeal`;
                 btn.disabled = false;
         }
+}
+
+async function prefillCheckoutIdentity() {
+        try {
+                const firstNameInput = document.getElementById('appeal-first-name');
+                const lastNameInput = document.getElementById('appeal-last-name');
+                if (!firstNameInput || !lastNameInput || (firstNameInput.value.trim() && lastNameInput.value.trim())) {
+                        return;
+                }
+
+                const { auth } = await import('./auth-client.js?v=20260524-auth-gate');
+                const displayName = String(auth.currentUser?.displayName || '').trim();
+                const parts = displayName.split(/\s+/).filter(Boolean);
+                if (parts.length >= 2) {
+                        firstNameInput.value = parts[0];
+                        lastNameInput.value = parts.slice(1).join(' ');
+                }
+        } catch (error) {
+                console.warn('Could not prefill appeal identity:', error);
+        }
+}
+
+function getCheckoutIdentity() {
+        const firstNameInput = document.getElementById('appeal-first-name');
+        const lastNameInput = document.getElementById('appeal-last-name');
+        const phoneInput = document.getElementById('appeal-phone');
+        const confirmationInput = document.getElementById('appeal-name-confirmed');
+        const firstName = firstNameInput?.value.trim() || '';
+        const lastName = lastNameInput?.value.trim() || '';
+        const phone = phoneInput?.value.trim() || '';
+
+        if (!firstName) {
+                alert('Please enter your legal first name.');
+                firstNameInput?.focus();
+                return null;
+        }
+
+        if (!lastName) {
+                alert('Please enter your legal last name.');
+                lastNameInput?.focus();
+                return null;
+        }
+
+        if (!confirmationInput?.checked) {
+                alert('Please confirm this is your legal name for the appeal paperwork.');
+                confirmationInput?.focus();
+                return null;
+        }
+
+        return { firstName, lastName, phone };
 }
 
 async function getAppealConfig() {

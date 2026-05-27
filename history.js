@@ -155,14 +155,18 @@ function renderAccountSummary(user) {
 }
 
 function setupAccountInbox() {
-        const markReadBtn = document.getElementById('account-inbox-mark-read');
-        if (!markReadBtn || markReadBtn.dataset.bound === 'true') return;
-        markReadBtn.dataset.bound = 'true';
-        markReadBtn.addEventListener('click', async () => {
+        const list = document.getElementById('account-inbox-list');
+        if (!list || list.dataset.bound === 'true') return;
+        list.dataset.bound = 'true';
+        list.addEventListener('click', async (event) => {
+                const button = event.target.closest('.account-inbox-mark-one');
+                if (!button) return;
+
+                button.disabled = true;
                 await dashboardAuthFetch('/api/notifications', {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({})
+                        body: JSON.stringify({ notificationId: button.dataset.id })
                 });
                 await fetchAccountNotifications();
                 renderAccountInbox();
@@ -181,13 +185,31 @@ function renderAccountInbox() {
         }
 
         panel.style.display = 'block';
-        list.innerHTML = accountNotifications.map(item => `
+        const unread = accountNotifications.filter(item => !item.is_read);
+        const old = accountNotifications.filter(item => item.is_read);
+        list.innerHTML = `
+                <div class="account-inbox-section">
+                        <h4>New Messages</h4>
+                        ${unread.length ? unread.map(renderInboxItem).join('') : '<p class="text-sm text-muted">No new messages.</p>'}
+                </div>
+                <div class="account-inbox-section">
+                        <h4>Old Messages</h4>
+                        ${old.length ? old.map(renderInboxItem).join('') : '<p class="text-sm text-muted">No old messages.</p>'}
+                </div>
+        `;
+}
+
+function renderInboxItem(item) {
+        return `
                 <article class="account-inbox-item ${item.is_read ? '' : 'unread'}">
-                        <strong>${escapeHtml(item.title || 'Message')}</strong>
+                        <div class="account-inbox-title-row">
+                                <strong>${item.is_read ? '' : '<span class="account-inbox-alert">New</span>'}${escapeHtml(item.title || 'Message')}</strong>
+                                ${item.is_read ? '' : `<button type="button" class="btn btn-secondary btn-sm account-inbox-mark-one" data-id="${escapeHtml(item.id)}">Mark read</button>`}
+                        </div>
                         <span class="text-sm text-muted">${escapeHtml(item.created_at ? new Date(item.created_at).toLocaleString() : '')}</span>
                         <p class="text-sm">${escapeHtml(item.message || '')}</p>
                 </article>
-        `).join('');
+        `;
 }
 
 function setupCompletedAppealsPanel() {
@@ -414,6 +436,7 @@ async function deleteAddress(address, propertyKey) {
 function showEmptyDetailsPanel() {
         const detailsPanel = document.getElementById('appeal-details-container');
         const emptyPanel = document.getElementById('no-address-selected-msg');
+        setAppealPaperworkVisibility(false);
 
         if (detailsPanel) detailsPanel.style.display = 'none';
         if (emptyPanel) {
@@ -469,13 +492,28 @@ function selectAddress(propertyKey) {
         }
 
         renderPropertyDetails(details);
-        renderPropertyImage(selectedPinForImage);
-        renderGovernmentIdImage();
-        renderSupportingDocuments(selectedPinForImage);
+        const hasPaidAppeal = filteredAppeals.some(appeal => String(appeal.paymentStatus || '').toLowerCase() === 'paid');
+        setAppealPaperworkVisibility(hasPaidAppeal);
+        if (hasPaidAppeal) {
+                renderPropertyImage(selectedPinForImage);
+                renderGovernmentIdImage();
+                renderSupportingDocuments(selectedPinForImage);
+        }
 
         document.getElementById('total-appeals-count').textContent = filteredAppeals.length;
 
         renderAppeals(filteredAppeals, address);
+}
+
+function setAppealPaperworkVisibility(show) {
+        [
+                'property-image-panel',
+                'government-id-panel',
+                'supporting-documents-panel'
+        ].forEach(id => {
+                const panel = document.getElementById(id);
+                if (panel) panel.style.display = show ? '' : 'none';
+        });
 }
 
 async function renderPropertyImage(pin) {

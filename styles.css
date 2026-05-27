@@ -494,6 +494,36 @@ ol {
     box-shadow: var(--shadow-sm);
 }
 
+.account-inbox-section {
+    display: grid;
+    gap: var(--space-3);
+}
+
+.account-inbox-section h4 {
+    color: var(--dark-900);
+    margin: var(--space-2) 0 0;
+}
+
+.account-inbox-title-row {
+    align-items: flex-start;
+    display: flex;
+    gap: var(--space-3);
+    justify-content: space-between;
+}
+
+.account-inbox-alert {
+    background: var(--danger);
+    border-radius: var(--radius-full);
+    color: var(--white);
+    display: inline-flex;
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    line-height: 1;
+    margin-right: var(--space-2);
+    padding: 0.35rem 0.55rem;
+    text-transform: uppercase;
+}
+
 @media (max-width: 760px) {
     .account-summary {
         grid-template-columns: 1fr;
@@ -2089,6 +2119,39 @@ ol {
     gap: var(--space-4);
 }
 
+.appeal-checkout-fields {
+    margin-top: var(--space-5);
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--dark-100);
+}
+
+.input-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+}
+
+.optional-label {
+    color: var(--dark-400);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+}
+
+.appeal-confirmation {
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    gap: var(--space-3);
+    align-items: start;
+    color: var(--dark-600);
+    font-size: var(--font-size-sm);
+    line-height: 1.45;
+    cursor: pointer;
+}
+
+.appeal-confirmation input {
+    margin-top: 3px;
+}
+
 .secure-note {
     text-align: center;
     color: var(--dark-400);
@@ -2097,6 +2160,13 @@ ol {
     align-items: center;
     justify-content: center;
     gap: var(--space-1);
+}
+
+@media (max-width: 640px) {
+    .input-row {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
 }
 
 .dashboard-header {

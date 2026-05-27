@@ -109,6 +109,12 @@
                         gap: 1rem;
                 }
 
+                .partner-inbox-section {
+                        display: grid;
+                        gap: 1rem;
+                        margin-top: 1.5rem;
+                }
+
                 .partner-appeal-card {
                         border: 1px solid var(--border-color);
                         border-radius: var(--radius-md);
@@ -164,18 +170,19 @@
                         padding-top: 1rem;
                 }
 
-                .partner-request-buttons {
-                        display: flex;
-                        flex-wrap: wrap;
-                        gap: 0.5rem;
-                }
-
-                .partner-supporting-request {
+                .partner-request-form {
                         display: grid;
                         gap: 0.5rem;
                 }
 
-                .partner-supporting-request textarea {
+                .partner-request-form label {
+                        align-items: center;
+                        display: flex;
+                        gap: 0.5rem;
+                        font-size: 0.95rem;
+                }
+
+                .partner-request-form textarea {
                         background: var(--bg-primary);
                         border: 1px solid var(--border-color);
                         border-radius: var(--radius-md);

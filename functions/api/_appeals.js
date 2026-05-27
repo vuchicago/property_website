@@ -100,12 +100,17 @@ async function notifyAdminsOfPaidAppeal(env, payment) {
 }
 
 async function insertAppeal(env, payment) {
+        const customerName = payment.customerName || [payment.customerFirstName, payment.customerLastName].filter(Boolean).join(' ') || null;
         try {
                 await env.DB.prepare(
-                        `INSERT INTO appeals (transaction_id, customer_id, customer_name, customer_email, property_address, property_key, property_pin, payment_intent_id, payment_amount, payment_status, payment_date, appeal_status, appeal_date)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'Pending', NULL)
+                        `INSERT INTO appeals (transaction_id, customer_id, customer_name, customer_first_name, customer_last_name, customer_phone, contract_name_confirmed_at, customer_email, property_address, property_key, property_pin, payment_intent_id, payment_amount, payment_status, payment_date, appeal_status, appeal_date)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'Pending', NULL)
                          ON CONFLICT(transaction_id) DO UPDATE SET
                          customer_name = excluded.customer_name,
+                         customer_first_name = excluded.customer_first_name,
+                         customer_last_name = excluded.customer_last_name,
+                         customer_phone = excluded.customer_phone,
+                         contract_name_confirmed_at = COALESCE(excluded.contract_name_confirmed_at, appeals.contract_name_confirmed_at),
                          customer_email = excluded.customer_email,
                          property_key = excluded.property_key,
                          property_pin = excluded.property_pin,
@@ -116,7 +121,11 @@ async function insertAppeal(env, payment) {
                         .bind(
                                 payment.transactionId,
                                 payment.customerId,
-                                payment.customerName,
+                                customerName,
+                                payment.customerFirstName || null,
+                                payment.customerLastName || null,
+                                payment.customerPhone || null,
+                                payment.contractNameConfirmedAt || null,
                                 payment.customerEmail,
                                 payment.propertyAddress,
                                 payment.propertyKey,
@@ -137,10 +146,12 @@ async function insertAppeal(env, payment) {
 
 async function insertAppealWithLegacySchema(env, payment) {
         try {
+                const customerName = payment.customerName || [payment.customerFirstName, payment.customerLastName].filter(Boolean).join(' ') || null;
                 await env.DB.prepare(
-                        `INSERT INTO appeals (transaction_id, customer_id, customer_email, property_address, payment_amount, payment_status, payment_date, appeal_status, appeal_date)
-                         VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'Pending', NULL)
+                        `INSERT INTO appeals (transaction_id, customer_id, customer_name, customer_email, property_address, payment_amount, payment_status, payment_date, appeal_status, appeal_date)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'Pending', NULL)
                          ON CONFLICT(transaction_id) DO UPDATE SET
+                         customer_name = excluded.customer_name,
                          customer_email = excluded.customer_email,
                          payment_status = excluded.payment_status,
                          payment_date = excluded.payment_date`
@@ -148,6 +159,7 @@ async function insertAppealWithLegacySchema(env, payment) {
                         .bind(
                                 payment.transactionId,
                                 payment.customerId,
+                                customerName,
                                 payment.customerEmail,
                                 payment.propertyAddress,
                                 payment.paymentAmount,
@@ -224,6 +236,6 @@ function propertyGroupKeySql() {
 
 function isLegacyAppealsSchemaError(error) {
         const message = String(error?.message || '');
-        return ['customer_name', 'property_key', 'payment_intent_id', 'payment_date', 'appeal_status', 'appeal_date']
+        return ['customer_name', 'customer_first_name', 'customer_last_name', 'customer_phone', 'contract_name_confirmed_at', 'property_key', 'payment_intent_id', 'payment_date', 'appeal_status', 'appeal_date']
                 .some(column => message.includes(column));
 }
