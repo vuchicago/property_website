@@ -1,5 +1,5 @@
 import { jsonResponse } from '../_auth.js';
-import { buildAnalysis, findComparableProperties, findTargetProperty } from './_compare.js';
+import { buildAnalysis, findComparableProperties, findCondoBuildingSales, findTargetProperty } from './_compare.js';
 
 const PROPERTY_SEARCH_LOG_EXCLUSIONS = new Set([
         '8141 TRIPP AVE SKOKIE IL 60076',
@@ -165,9 +165,15 @@ export const onRequestPost = async (context) => {
                 }
 
                 const target = applySimulationOverrides(originalTarget, payload.simulation);
-                const comparables = await findComparableProperties(context.env.DB, target, radius);
-                const analysis = buildAnalysis(target, comparables, radius, context.env);
-                const savePromise = target.isSimulated || isExcludedPropertySearch(payload, target)
+                const targetWithSales = target.classCode === '299'
+                        ? {
+                                ...target,
+                                condoBuildingSales: await findCondoBuildingSales(context.env.DB, target)
+                        }
+                        : target;
+                const comparables = await findComparableProperties(context.env.DB, targetWithSales, radius);
+                const analysis = buildAnalysis(targetWithSales, comparables, radius, context.env);
+                const savePromise = targetWithSales.isSimulated || isExcludedPropertySearch(payload, targetWithSales)
                         ? Promise.resolve()
                         : savePropertySearch(context.env.DB, context.request, payload, analysis)
                                 .catch(error => console.warn('Could not save property search:', error.message));
