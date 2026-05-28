@@ -10,6 +10,7 @@ const RESIDENTIAL_CLASS_CODES = new Set([
 const APPEAL_MODEL_APPLICABLE_CLASS_CODES = new Set([...RESIDENTIAL_CLASS_CODES, '299']);
 const DEFAULT_VALUE_PER_SQFT_SIGNAL_PERCENT = 3;
 const DEFAULT_TAXABLE_VALUE_SIGNAL_PERCENT = 5;
+const AGE_SCORE_YEAR = new Date().getFullYear();
 
 const PROPERTY_SELECT = `
         id,
@@ -275,6 +276,47 @@ function optionalNumericRange(value, center, lowerMult, upperMult, absoluteDelta
         return within(value, center * lowerMult, center * upperMult);
 }
 
+function propertyAge(yearBuilt, currentYear = AGE_SCORE_YEAR) {
+        if (yearBuilt === null || yearBuilt === undefined || yearBuilt <= 0) {
+                return null;
+        }
+
+        return Math.max(0, currentYear - yearBuilt);
+}
+
+function ageToleranceForSubject(subjectAge) {
+        if (subjectAge === null) {
+                return null;
+        }
+
+        if (subjectAge < 30) return 15;
+        if (subjectAge < 60) return 25;
+        if (subjectAge < 90) return 40;
+        return 60;
+}
+
+function ageSimilarityScore(candidate, target) {
+        const subjectAge = propertyAge(target?.yearBuilt);
+        const candidateAge = propertyAge(candidate?.yearBuilt);
+        const tolerance = ageToleranceForSubject(subjectAge);
+
+        if (subjectAge === null) {
+                return 1;
+        }
+
+        if (candidateAge === null || tolerance === null) {
+                return 0.5;
+        }
+
+        return Math.max(0, 1 - Math.abs(candidateAge - subjectAge) / tolerance);
+}
+
+function comparableSortScore(candidate, target, radius) {
+        const normalizedDistance = radius > 0 ? candidate.distanceMiles / radius : candidate.distanceMiles;
+        const agePenalty = 1 - ageSimilarityScore(candidate, target);
+        return normalizedDistance + agePenalty * 0.35;
+}
+
 function valuePerSqft(value, sqft) {
         if (value === null || value === undefined || sqft === null || sqft === undefined || sqft <= 0) {
                 return null;
@@ -399,7 +441,6 @@ function matchesComparableRules(candidate, target) {
                         within(candidate.bathroomCount, target.bathroomCount, target.bathroomCount + 1) &&
                         sameValue(candidate.masonryType, target.masonryType) &&
                         sameValue(candidate.singleVsMultiFamily, target.singleVsMultiFamily) &&
-                        optionalNumericRange(candidate.yearBuilt, target.yearBuilt, null, null, 15) &&
                         optionalSameValue(candidate.repairCondition, target.repairCondition)
                 );
         }
@@ -600,10 +641,6 @@ export async function findComparableProperties(db, target, radius) {
                         target.masonryType,
                         target.singleVsMultiFamily
                 );
-                if (target.yearBuilt !== null && target.yearBuilt > 0) {
-                        clauses.push('year_built BETWEEN ? AND ?');
-                        params.push(target.yearBuilt - 15, target.yearBuilt + 15);
-                }
                 if (validText(target.repairCondition)) {
                         clauses.push('repair_condition = ?');
                         params.push(target.repairCondition);
@@ -654,7 +691,13 @@ export async function findComparableProperties(db, target, radius) {
                 .filter(property => property.distanceMiles <= radius)
                 .filter(property => propertyGroupKey(property) !== propertyGroupKey(target))
                 .filter(property => matchesComparableRules(property, target))
-                .sort((a, b) => a.distanceMiles - b.distanceMiles || (a.taxableValue || 0) - (b.taxableValue || 0));
+                .map(property => ({
+                        ...property,
+                        ageSimilarityScore: ageSimilarityScore(property, target)
+                }))
+                .sort((a, b) => comparableSortScore(a, target, radius) - comparableSortScore(b, target, radius) ||
+                        a.distanceMiles - b.distanceMiles ||
+                        (a.taxableValue || 0) - (b.taxableValue || 0));
 }
 
 export function buildAnalysis(target, comparables, radius, env) {
