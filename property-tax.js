@@ -32,6 +32,11 @@ const COMPARABLE_COLUMNS = [
     { label: 'PIN', value: c => escapeHtml(c.pin || 'N/A'), sortValue: c => c.pin }
 ];
 
+function normalizePinInput(value) {
+    const pin = String(value || '').replace(/\D/g, '');
+    return pin.length === 10 || pin.length === 14 ? pin : '';
+}
+
 document.addEventListener('DOMContentLoaded', initPropertyTaxTool);
 
 function initPropertyTaxTool() {
@@ -58,13 +63,15 @@ function initPropertyTaxTool() {
     });
 
     addressInput?.addEventListener('input', debounce(() => {
+        const query = addressInput.value.trim();
+        const pin = normalizePinInput(query);
         selectedProperty = null;
         searchResults = null;
-        searchBtn.disabled = true;
+        searchBtn.disabled = !pin;
         simulateBtn.disabled = true;
         simulationForm.hidden = true;
-        setSelectedPropertyText('Choose a property from the suggestions.');
-        fetchAddressSuggestions(addressInput.value.trim());
+        setSelectedPropertyText(pin ? 'Searching for that Property PIN...' : 'Choose a property from the suggestions.');
+        fetchAddressSuggestions(query);
     }, 220));
 
     addressInput?.addEventListener('keydown', (event) => {
@@ -76,6 +83,9 @@ function initPropertyTaxTool() {
                 event.preventDefault();
                 selectSuggestion(firstSuggestion);
             }
+        } else if (event.key === 'Enter' && selectedProperty) {
+            event.preventDefault();
+            searchProperty(Number(radiusSlider.value));
         }
     });
 
@@ -107,12 +117,29 @@ function initPropertyTaxTool() {
     });
 
     searchBtn?.addEventListener('click', () => {
-        if (!selectedProperty) {
-            showNotification('Please choose a property from the suggestions', 'error');
+        if (selectedProperty) {
+            searchProperty(Number(radiusSlider.value));
             return;
         }
 
-        searchProperty(Number(radiusSlider.value));
+        const query = addressInput?.value.trim() || '';
+        const pin = normalizePinInput(query);
+        if (!pin) {
+            showNotification('Please choose a property from the suggestions or enter a 10- or 14-digit PIN', 'error');
+            return;
+        }
+
+        resolvePropertyFromInput(pin).then(property => {
+            if (!property) {
+                showNotification('No property found for that PIN', 'error');
+                return;
+            }
+
+            selectedProperty = property;
+            if (addressInput) addressInput.value = property.address;
+            setSelectedPropertyText(selectedPropertyLabel(property));
+            searchProperty(Number(radiusSlider.value));
+        });
     });
 
     resetBtn?.addEventListener('click', resetPropertyResults);
@@ -196,7 +223,7 @@ function hydratePropertyFromQuery() {
         radiusSlider.value = String(radius);
         radiusValue.textContent = radius.toFixed(1);
     }
-    setSelectedPropertyText(selectedProperty ? selectedPropertyLabel(selectedProperty) : 'Choose the closest match from the suggestions.');
+    setSelectedPropertyText(selectedProperty ? selectedPropertyLabel(selectedProperty) : 'Choose the closest match from the suggestions, or enter a Property PIN.');
 
     if (params.get('auto') === '1') {
         requestAnimationFrame(() => autoSearchHydratedProperty(address, radius));
@@ -207,7 +234,7 @@ function hydratePropertyFromQuery() {
 
 async function autoSearchHydratedProperty(address, radius) {
     if (!selectedProperty) {
-        selectedProperty = await resolvePropertyFromAddress(address);
+        selectedProperty = await resolvePropertyFromInput(address);
         const searchBtn = document.getElementById('search-property');
         if (selectedProperty) {
             if (searchBtn) searchBtn.disabled = false;
@@ -245,6 +272,11 @@ async function resolvePropertyFromAddress(address) {
     }
 }
 
+async function resolvePropertyFromInput(value) {
+    const pin = normalizePinInput(value);
+    return resolvePropertyFromAddress(pin || value);
+}
+
 function selectSuggestion(button) {
     const addressInput = document.getElementById('property-address');
     const searchBtn = document.getElementById('search-property');
@@ -270,21 +302,24 @@ function debounce(fn, wait) {
 
 async function fetchAddressSuggestions(query) {
     const suggestions = document.getElementById('property-address-suggestions');
+    const searchBtn = document.getElementById('search-property');
     if (!suggestions) return;
 
     if (suggestionAbort) {
         suggestionAbort.abort();
     }
 
+    const pin = normalizePinInput(query);
+
     if (query.length < 3) {
         suggestions.innerHTML = '';
         suggestions.classList.remove('is-visible');
-        setSelectedPropertyText('Start with the street number for best results.');
+        setSelectedPropertyText('Start with the street number, or enter a 10- or 14-digit Property PIN.');
         return;
     }
 
     suggestionAbort = new AbortController();
-    suggestions.innerHTML = '<div class="address-suggestion-helper">Searching Cook County addresses...</div>';
+    suggestions.innerHTML = `<div class="address-suggestion-helper">Searching Cook County ${pin ? 'PINs' : 'addresses'}...</div>`;
     suggestions.classList.add('is-visible');
 
     try {
@@ -294,19 +329,31 @@ async function fetchAddressSuggestions(query) {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Unable to load suggestions');
 
-        renderSuggestions(data.suggestions || []);
+        const items = data.suggestions || [];
+        renderSuggestions(items, { pinSearch: Boolean(pin) });
+
+        if (pin && items.length === 1) {
+            const item = items[0];
+            selectedProperty = {
+                id: Number(item.id),
+                pin: item.pin || pin,
+                address: item.address || query
+            };
+            if (searchBtn) searchBtn.disabled = false;
+            setSelectedPropertyText(selectedPropertyLabel(selectedProperty));
+        }
     } catch (error) {
         if (error.name === 'AbortError') return;
         suggestions.innerHTML = '<div class="address-suggestion-helper">Could not load suggestions.</div>';
     }
 }
 
-function renderSuggestions(items) {
+function renderSuggestions(items, options = {}) {
     const suggestions = document.getElementById('property-address-suggestions');
     if (!suggestions) return;
 
     if (!items.length) {
-        suggestions.innerHTML = '<div class="address-suggestion-helper">No close matches yet. Try the full street number, street name, city, or ZIP.</div>';
+        suggestions.innerHTML = `<div class="address-suggestion-helper">${options.pinSearch ? 'No property found for that PIN.' : 'No close matches yet. Try the full street number, street name, city, ZIP, or PIN.'}</div>`;
         suggestions.classList.add('is-visible');
         return;
     }
@@ -843,7 +890,7 @@ function resetPropertyResults() {
     document.getElementById('property-tax-results').hidden = true;
     document.getElementById('export-csv').disabled = true;
     resetResultActionButton();
-    setSelectedPropertyText('Enter an address and choose the closest match.');
+    setSelectedPropertyText('Enter a Cook County address or Property PIN.');
     hideSuggestions();
     clearMap();
     activateTab('chart');

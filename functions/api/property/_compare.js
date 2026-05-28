@@ -316,7 +316,10 @@ function ageSimilarityScore(candidate, target) {
 function comparableSortScore(candidate, target, radius) {
         const normalizedDistance = radius > 0 ? candidate.distanceMiles / radius : candidate.distanceMiles;
         const agePenalty = 1 - ageSimilarityScore(candidate, target);
-        return normalizedDistance + agePenalty * 0.35;
+        const landPenalty = target?.classCode === '211'
+                ? numericSimilarityPenalty(candidate.certifiedLand, target.certifiedLand, 0.8, 1.2)
+                : 0;
+        return normalizedDistance + agePenalty * 0.35 + landPenalty * 0.25;
 }
 
 function valuePerSqft(value, sqft) {
@@ -325,6 +328,25 @@ function valuePerSqft(value, sqft) {
         }
 
         return value / sqft;
+}
+
+function numericSimilarityPenalty(value, center, lowerMult, upperMult) {
+        if (center === null || center === undefined || center <= 0) {
+                return 0;
+        }
+
+        if (value === null || value === undefined) {
+                return 0.5;
+        }
+
+        const lower = center * lowerMult;
+        const upper = center * upperMult;
+        if (value >= lower && value <= upper) {
+                return 0;
+        }
+
+        const nearest = value < lower ? lower : upper;
+        return Math.min(1, Math.abs(value - nearest) / center);
 }
 
 function condoUnitSize(property) {
@@ -507,6 +529,19 @@ function matchesComparableRules(candidate, target) {
                         target.bathroomCount === null
                 ) {
                         return false;
+                }
+
+                if (classCode === '211') {
+                        return (
+                                candidate.homeSize !== null &&
+                                candidate.homeSize >= target.homeSize * 0.85 &&
+                                candidate.homeSize <= target.homeSize * 1.25 &&
+                                within(candidate.bedroomCount, Math.max(0, target.bedroomCount - 1), target.bedroomCount + 1) &&
+                                within(candidate.bathroomCount, Math.max(0, target.bathroomCount - 1), target.bathroomCount + 1) &&
+                                sameValue(candidate.masonryType, target.masonryType) &&
+                                sameValue(candidate.singleVsMultiFamily, target.singleVsMultiFamily) &&
+                                optionalSameValue(candidate.repairCondition, target.repairCondition)
+                        );
                 }
 
                 return (
@@ -760,6 +795,11 @@ export async function findComparableProperties(db, target, radius) {
                         return [];
                 }
 
+                const sizeLowerMult = target.classCode === '211' ? 0.85 : 0.9;
+                const sizeUpperMult = target.classCode === '211' ? 1.25 : 1.15;
+                const bedroomLower = target.classCode === '211' ? Math.max(0, target.bedroomCount - 1) : target.bedroomCount;
+                const bathroomLower = target.classCode === '211' ? Math.max(0, target.bathroomCount - 1) : target.bathroomCount;
+
                 clauses.push(
                         'neighborhood_code = ?',
                         'home_size >= ?',
@@ -771,11 +811,11 @@ export async function findComparableProperties(db, target, radius) {
                 );
                 params.push(
                         target.neighborhoodCode,
-                        target.homeSize * 0.9,
-                        target.homeSize * 1.15,
-                        target.bedroomCount,
+                        target.homeSize * sizeLowerMult,
+                        target.homeSize * sizeUpperMult,
+                        bedroomLower,
                         target.bedroomCount + 1,
-                        target.bathroomCount,
+                        bathroomLower,
                         target.bathroomCount + 1,
                         target.masonryType,
                         target.singleVsMultiFamily
