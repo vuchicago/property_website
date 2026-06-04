@@ -344,7 +344,13 @@ function comparableSortScore(candidate, target, radius) {
         const landPenalty = target?.classCode === '211'
                 ? numericSimilarityPenalty(candidate.certifiedLand, target.certifiedLand, 0.8, 1.2)
                 : 0;
-        return normalizedDistance + agePenalty * 0.35 + landPenalty * 0.25;
+        const bedroomPenalty = target?.classCode === '211'
+                ? absoluteSimilarityPenalty(candidate.bedroomCount, target.bedroomCount, 2)
+                : 0;
+        const bathroomPenalty = target?.classCode === '211'
+                ? absoluteSimilarityPenalty(candidate.bathroomCount, target.bathroomCount, 2)
+                : 0;
+        return normalizedDistance + agePenalty * 0.35 + landPenalty * 0.25 + bedroomPenalty * 0.15 + bathroomPenalty * 0.15;
 }
 
 function valuePerSqft(value, sqft) {
@@ -372,6 +378,18 @@ function numericSimilarityPenalty(value, center, lowerMult, upperMult) {
 
         const nearest = value < lower ? lower : upper;
         return Math.min(1, Math.abs(value - nearest) / center);
+}
+
+function absoluteSimilarityPenalty(value, center, tolerance) {
+        if (center === null || center === undefined || tolerance <= 0) {
+                return 0;
+        }
+
+        if (value === null || value === undefined) {
+                return 0.5;
+        }
+
+        return Math.min(1, Math.abs(value - center) / tolerance);
 }
 
 function condoUnitSize(property) {
@@ -580,9 +598,15 @@ function hasLimitedUniformityAppealSignal(stats, comparableCount, thresholds = u
 }
 
 function compContext(target) {
-        return target?.classCode === '299'
-                ? 'same condo building or closely similar condo units'
-                : 'similar nearby properties matched on class, neighborhood, size, bedrooms, baths, construction, and available age/condition fields';
+        if (target?.classCode === '299') {
+                return 'same condo building or closely similar condo units';
+        }
+
+        if (target?.classCode === '211') {
+                return 'similar nearby multi-unit properties matched on class, neighborhood, building size, construction, and condition; bedroom and bathroom counts are weighted but not required';
+        }
+
+        return 'similar nearby properties matched on class, neighborhood, size, bedrooms, baths, construction, and available age/condition fields';
 }
 
 function residentialMatchConfig(target) {
@@ -592,10 +616,10 @@ function residentialMatchConfig(target) {
                         sizeUpperMult: 1.25,
                         landLowerMult: null,
                         landUpperMult: null,
-                        bedroomLower: Math.max(0, target.bedroomCount - 1),
-                        bedroomUpper: target.bedroomCount + 1,
-                        bathroomLower: Math.max(0, target.bathroomCount - 1),
-                        bathroomUpper: target.bathroomCount + 1
+                        bedroomLower: null,
+                        bedroomUpper: null,
+                        bathroomLower: null,
+                        bathroomUpper: null
                 };
         }
 
@@ -623,11 +647,17 @@ function matchesComparableRules(candidate, target) {
         }
 
         if (RESIDENTIAL_CLASS_CODES.has(classCode)) {
+                if (target.homeSize === null) {
+                        return false;
+                }
+
                 if (
-                        target.homeSize === null ||
-                        target.certifiedLand === null ||
-                        target.bedroomCount === null ||
-                        target.bathroomCount === null
+                        classCode !== '211' &&
+                        (
+                                target.certifiedLand === null ||
+                                target.bedroomCount === null ||
+                                target.bathroomCount === null
+                        )
                 ) {
                         return false;
                 }
@@ -635,6 +665,10 @@ function matchesComparableRules(candidate, target) {
                 const config = residentialMatchConfig(target);
                 const landMatches = config.landLowerMult === null ||
                         within(candidate.certifiedLand, target.certifiedLand * config.landLowerMult, target.certifiedLand * config.landUpperMult);
+                const bedroomMatches = config.bedroomLower === null ||
+                        within(candidate.bedroomCount, config.bedroomLower, config.bedroomUpper);
+                const bathroomMatches = config.bathroomLower === null ||
+                        within(candidate.bathroomCount, config.bathroomLower, config.bathroomUpper);
 
                 return (
                         candidate.homeSize !== null &&
@@ -642,8 +676,8 @@ function matchesComparableRules(candidate, target) {
                         candidate.homeSize <= target.homeSize * config.sizeUpperMult &&
                         landMatches &&
                         matchesHardAgeGate(candidate, target) &&
-                        within(candidate.bedroomCount, config.bedroomLower, config.bedroomUpper) &&
-                        within(candidate.bathroomCount, config.bathroomLower, config.bathroomUpper) &&
+                        bedroomMatches &&
+                        bathroomMatches &&
                         sameValue(candidate.masonryType, target.masonryType) &&
                         sameValue(candidate.singleVsMultiFamily, target.singleVsMultiFamily) &&
                         optionalSameValue(candidate.repairCondition, target.repairCondition)
@@ -926,11 +960,17 @@ export async function findComparableProperties(db, target, radius) {
                         return [];
                 }
 
+                if (target.homeSize === null) {
+                        return [];
+                }
+
                 if (
-                        target.homeSize === null ||
-                        target.certifiedLand === null ||
-                        target.bedroomCount === null ||
-                        target.bathroomCount === null
+                        target.classCode !== '211' &&
+                        (
+                                target.certifiedLand === null ||
+                                target.bedroomCount === null ||
+                                target.bathroomCount === null
+                        )
                 ) {
                         return [];
                 }
@@ -941,8 +981,6 @@ export async function findComparableProperties(db, target, radius) {
                         'neighborhood_code = ?',
                         'home_size >= ?',
                         'home_size <= ?',
-                        'bedroom_count BETWEEN ? AND ?',
-                        'bathroom_count BETWEEN ? AND ?',
                         'masonry_type = ?',
                         'single_vs_multi_family = ?'
                 );
@@ -950,13 +988,17 @@ export async function findComparableProperties(db, target, radius) {
                         target.neighborhoodCode,
                         target.homeSize * config.sizeLowerMult,
                         target.homeSize * config.sizeUpperMult,
-                        config.bedroomLower,
-                        config.bedroomUpper,
-                        config.bathroomLower,
-                        config.bathroomUpper,
                         target.masonryType,
                         target.singleVsMultiFamily
                 );
+                if (config.bedroomLower !== null) {
+                        clauses.push('bedroom_count BETWEEN ? AND ?');
+                        params.push(config.bedroomLower, config.bedroomUpper);
+                }
+                if (config.bathroomLower !== null) {
+                        clauses.push('bathroom_count BETWEEN ? AND ?');
+                        params.push(config.bathroomLower, config.bathroomUpper);
+                }
                 if (config.landLowerMult !== null) {
                         clauses.push('certified_land BETWEEN ? AND ?');
                         params.push(target.certifiedLand * config.landLowerMult, target.certifiedLand * config.landUpperMult);
