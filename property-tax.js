@@ -37,6 +37,20 @@ function normalizePinInput(value) {
     return pin.length === 10 || pin.length === 14 ? pin : '';
 }
 
+function syncRadiusControl(radius) {
+    const number = Number(radius);
+    if (!Number.isFinite(number)) return;
+
+    const radiusSlider = document.getElementById('search-radius');
+    const radiusValue = document.getElementById('radius-value');
+    if (radiusSlider) {
+        radiusSlider.value = String(number);
+    }
+    if (radiusValue) {
+        radiusValue.textContent = number.toFixed(1);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', initPropertyTaxTool);
 
 function initPropertyTaxTool() {
@@ -402,14 +416,7 @@ async function searchProperty(radius, options = {}) {
         if (!response.ok) throw new Error(data.error || 'Property search failed');
 
         searchResults = data;
-        if (data.summary?.radiusAutoExpanded) {
-            const radiusSlider = document.getElementById('search-radius');
-            const radiusValue = document.getElementById('radius-value');
-            if (radiusSlider && radiusValue) {
-                radiusSlider.value = String(data.radius);
-                radiusValue.textContent = Number(data.radius).toFixed(1);
-            }
-        }
+        syncRadiusControl(data.radius);
         updatePropertyResults(data);
         if (!options.simulation) {
             populateSimulationForm(data.target);
@@ -440,7 +447,6 @@ async function searchProperty(radius, options = {}) {
 
 async function searchLongerRadius(options = {}) {
     const radiusSlider = document.getElementById('search-radius');
-    const radiusValue = document.getElementById('radius-value');
     const button = document.getElementById('increase-radius-search');
     const originalText = button?.textContent || '';
     const maxRadius = 5;
@@ -458,10 +464,7 @@ async function searchLongerRadius(options = {}) {
             latestResult?.appeal?.decision !== 'Yes, Appeal'
         ) {
             radius = Math.min(maxRadius, Number((radius + 0.5).toFixed(1)));
-            if (radiusSlider && radiusValue) {
-                radiusSlider.value = String(radius);
-                radiusValue.textContent = radius.toFixed(1);
-            }
+            syncRadiusControl(radius);
 
             latestResult = await searchProperty(radius, {
                 simulation: options.simulation,
