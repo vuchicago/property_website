@@ -19,16 +19,33 @@ function canonicalAddress(value) {
                 ['TERRACE', 'TER'],
                 ['CIRCLE', 'CIR'],
                 ['PARKWAY', 'PKWY'],
-                ['HIGHWAY', 'HWY'],
+                ['HIGHWAY', 'HWY']
+        ]);
+        const directions = new Map([
                 ['NORTH', 'N'],
                 ['SOUTH', 'S'],
                 ['EAST', 'E'],
                 ['WEST', 'W']
         ]);
+        const tokens = normalizeAddress(value).split(' ');
 
-        return normalizeAddress(value)
-                .split(' ')
-                .map(token => suffixes.get(token) || token)
+        return tokens
+                .map((token, index) => {
+                        if (suffixes.has(token)) {
+                                return suffixes.get(token);
+                        }
+
+                        if (directions.has(token)) {
+                                const previous = tokens[index - 1] || '';
+                                const afterHouseNumber = index === 1 && /^\d+$/.test(previous);
+                                const trailingDirection = index === tokens.length - 1 || suffixes.has(previous);
+                                if (afterHouseNumber || trailingDirection) {
+                                        return directions.get(token);
+                                }
+                        }
+
+                        return token;
+                })
                 .join(' ');
 }
 
