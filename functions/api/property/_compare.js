@@ -15,6 +15,7 @@ const DEFAULT_RECENT_SALE_VALUE_SIGNAL_PERCENT = 3;
 const CONDO_SALE_LOOKBACK_YEARS = 3;
 const RECENT_PROPERTY_SALE_LOOKBACK_YEARS = 3;
 const RESIDENTIAL_ASSESSMENT_LEVEL = 0.1;
+const NEWER_HOME_YEAR_BUILT_CUTOFF = 1990;
 const AGE_SCORE_YEAR = new Date().getFullYear();
 
 const PROPERTY_SELECT = `
@@ -317,12 +318,12 @@ function ageSimilarityScore(candidate, target) {
 }
 
 function hardAgeToleranceForSubject(target) {
-        const subjectAge = propertyAge(target?.yearBuilt);
-        if (subjectAge === null) {
+        const yearBuilt = toNumber(target?.yearBuilt);
+        if (yearBuilt === null) {
                 return null;
         }
 
-        return subjectAge < 30 ? 15 : null;
+        return yearBuilt >= NEWER_HOME_YEAR_BUILT_CUTOFF ? 15 : null;
 }
 
 function matchesHardAgeGate(candidate, target) {
