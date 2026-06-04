@@ -1,5 +1,5 @@
 import { jsonResponse } from '../_auth.js';
-import { buildAnalysis, findComparableProperties, findCondoBuildingSales, findTargetProperty } from './_compare.js';
+import { buildAnalysis, findComparableProperties, findCondoBuildingSales, findRecentPropertySales, findTargetProperty } from './_compare.js';
 
 const PROPERTY_SEARCH_LOG_EXCLUSIONS = new Set([
         '8141 TRIPP AVE SKOKIE IL 60076',
@@ -18,6 +18,8 @@ const TEXT_SIMULATION_FIELDS = new Set([
         'repairCondition',
         'singleVsMultiFamily'
 ]);
+const TARGET_COMPARABLE_COUNT = 5;
+const AUTO_RADIUS_STEPS = [0.5, 1, 2, 5];
 
 function deviceFromUserAgent(userAgent) {
         const value = String(userAgent || '').toLowerCase();
@@ -58,6 +60,42 @@ function isExcludedPropertySearch(payload, target) {
         return [payload?.address, target?.address].some(value =>
                 PROPERTY_SEARCH_LOG_EXCLUSIONS.has(normalizeAddressForExclusion(value))
         );
+}
+
+function radiusExpansionPlan(startRadius) {
+        const normalizedStart = Math.max(0.1, Math.min(5, Number(startRadius || 0.5)));
+        return Array.from(new Set([
+                normalizedStart,
+                ...AUTO_RADIUS_STEPS.filter(radius => radius > normalizedStart)
+        ])).sort((a, b) => a - b);
+}
+
+async function findComparablesWithAutoRadius(db, target, requestedRadius) {
+        const plan = radiusExpansionPlan(requestedRadius);
+        let comparables = [];
+        let radius = plan[0] || requestedRadius;
+        const attempts = [];
+
+        for (const candidateRadius of plan) {
+                radius = candidateRadius;
+                comparables = await findComparableProperties(db, target, candidateRadius);
+                attempts.push({
+                        radius: candidateRadius,
+                        comparableCount: comparables.length
+                });
+
+                if (comparables.length >= TARGET_COMPARABLE_COUNT) {
+                        break;
+                }
+        }
+
+        return {
+                comparables,
+                radius,
+                requestedRadius,
+                attempts,
+                autoExpanded: radius > requestedRadius
+        };
 }
 
 function applySimulationOverrides(target, simulation) {
@@ -170,9 +208,22 @@ export const onRequestPost = async (context) => {
                                 ...target,
                                 condoBuildingSales: await findCondoBuildingSales(context.env.DB, target)
                         }
-                        : target;
-                const comparables = await findComparableProperties(context.env.DB, targetWithSales, radius);
-                const analysis = buildAnalysis(targetWithSales, comparables, radius, context.env);
+                        : {
+                                ...target,
+                                recentPropertySales: await findRecentPropertySales(context.env.DB, target)
+                        };
+                const comparableSearch = await findComparablesWithAutoRadius(context.env.DB, targetWithSales, radius);
+                const analysis = buildAnalysis(
+                        targetWithSales,
+                        comparableSearch.comparables,
+                        comparableSearch.radius,
+                        context.env,
+                        {
+                                requestedRadius: comparableSearch.requestedRadius,
+                                radiusAutoExpanded: comparableSearch.autoExpanded,
+                                radiusExpansionAttempts: comparableSearch.attempts
+                        }
+                );
                 const savePromise = targetWithSales.isSimulated || isExcludedPropertySearch(payload, targetWithSales)
                         ? Promise.resolve()
                         : savePropertySearch(context.env.DB, context.request, payload, analysis)

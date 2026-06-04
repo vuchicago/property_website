@@ -402,6 +402,14 @@ async function searchProperty(radius, options = {}) {
         if (!response.ok) throw new Error(data.error || 'Property search failed');
 
         searchResults = data;
+        if (data.summary?.radiusAutoExpanded) {
+            const radiusSlider = document.getElementById('search-radius');
+            const radiusValue = document.getElementById('radius-value');
+            if (radiusSlider && radiusValue) {
+                radiusSlider.value = String(data.radius);
+                radiusValue.textContent = Number(data.radius).toFixed(1);
+            }
+        }
         updatePropertyResults(data);
         if (!options.simulation) {
             populateSimulationForm(data.target);
@@ -415,7 +423,10 @@ async function searchProperty(radius, options = {}) {
             clearMap();
         }
         if (!options.quiet) {
-            showNotification(`Found ${data.comparables.length} comparable properties`, 'success');
+            const expandedMessage = data.summary?.radiusAutoExpanded
+                ? ` after expanding to ${Number(data.radius).toFixed(1)} miles`
+                : '';
+            showNotification(`Found ${data.comparables.length} comparable properties${expandedMessage}`, 'success');
         }
         return data;
     } catch (error) {
@@ -432,13 +443,13 @@ async function searchLongerRadius(options = {}) {
     const radiusValue = document.getElementById('radius-value');
     const button = document.getElementById('increase-radius-search');
     const originalText = button?.textContent || '';
-    const maxRadius = 2;
+    const maxRadius = 5;
     let radius = Number(searchResults?.radius || radiusSlider?.value || 0.5);
     let latestResult = searchResults;
 
     if (button) {
         button.disabled = true;
-        button.textContent = 'Searching up to 2.0 mi';
+        button.textContent = 'Searching up to 5.0 mi';
     }
 
     try {
@@ -469,7 +480,7 @@ async function searchLongerRadius(options = {}) {
             showNotification(
                 appealRecommended
                     ? `Appeal recommended at ${latestResult.radius.toFixed(1)} miles`
-                    : `Reached 2.0 miles with ${count} comparable properties`,
+                    : `Reached 5.0 miles with ${count} comparable properties`,
                 appealRecommended ? 'success' : 'info'
             );
         }
@@ -624,7 +635,7 @@ function updateWiderRadiusButton(data) {
     }
 
     const decision = String(data.appeal?.decision || '').toLowerCase();
-    const canWiden = decision.includes('not enough comps') && data.summary.comparableCount < 5 && data.radius < 2;
+    const canWiden = decision.includes('not enough comps') && data.summary.comparableCount < 5 && data.radius < 5;
     button.hidden = !canWiden;
     button.dataset.action = 'widen';
     button.classList.remove('btn-primary', 'appeal-cta-btn');

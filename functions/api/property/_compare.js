@@ -11,7 +11,10 @@ const APPEAL_MODEL_APPLICABLE_CLASS_CODES = new Set([...RESIDENTIAL_CLASS_CODES,
 const DEFAULT_VALUE_PER_SQFT_SIGNAL_PERCENT = 3;
 const DEFAULT_TAXABLE_VALUE_SIGNAL_PERCENT = 5;
 const DEFAULT_CONDO_SALE_VALUE_SIGNAL_PERCENT = 3;
+const DEFAULT_RECENT_SALE_VALUE_SIGNAL_PERCENT = 3;
 const CONDO_SALE_LOOKBACK_YEARS = 3;
+const RECENT_PROPERTY_SALE_LOOKBACK_YEARS = 3;
+const RESIDENTIAL_ASSESSMENT_LEVEL = 0.1;
 const AGE_SCORE_YEAR = new Date().getFullYear();
 
 const PROPERTY_SELECT = `
@@ -313,6 +316,28 @@ function ageSimilarityScore(candidate, target) {
         return Math.max(0, 1 - Math.abs(candidateAge - subjectAge) / tolerance);
 }
 
+function hardAgeToleranceForSubject(target) {
+        const subjectAge = propertyAge(target?.yearBuilt);
+        if (subjectAge === null) {
+                return null;
+        }
+
+        return subjectAge < 30 ? 15 : null;
+}
+
+function matchesHardAgeGate(candidate, target) {
+        const tolerance = hardAgeToleranceForSubject(target);
+        if (tolerance === null) {
+                return true;
+        }
+
+        if (target?.yearBuilt === null || target?.yearBuilt === undefined || candidate?.yearBuilt === null || candidate?.yearBuilt === undefined) {
+                return false;
+        }
+
+        return Math.abs(candidate.yearBuilt - target.yearBuilt) <= tolerance;
+}
+
 function comparableSortScore(candidate, target, radius) {
         const normalizedDistance = radius > 0 ? candidate.distanceMiles / radius : candidate.distanceMiles;
         const agePenalty = 1 - ageSimilarityScore(candidate, target);
@@ -386,6 +411,14 @@ function condoSaleThreshold(env) {
                 env,
                 'CONDO_SALE_VALUE_SIGNAL_PERCENT',
                 DEFAULT_CONDO_SALE_VALUE_SIGNAL_PERCENT
+        );
+}
+
+function recentSaleThreshold(env) {
+        return percentageThreshold(
+                env,
+                'RECENT_SALE_VALUE_SIGNAL_PERCENT',
+                DEFAULT_RECENT_SALE_VALUE_SIGNAL_PERCENT
         );
 }
 
@@ -486,6 +519,33 @@ function recentCondoSaleStats(target) {
         };
 }
 
+function recentPropertySaleStats(target) {
+        const latestSale = (target?.recentPropertySales || [])
+                .filter(sale => sale.salePrice !== null && sale.salePrice !== undefined && sale.salePrice > 0)
+                .sort((a, b) => String(b.saleDate || '').localeCompare(String(a.saleDate || '')))[0] || null;
+
+        if (!latestSale || target?.taxableValue === null || target?.taxableValue === undefined) {
+                return {
+                        sale: latestSale,
+                        assessmentToSaleRatio: null,
+                        assessedEquivalentValue: null,
+                        pctAboveAssessedEquivalent: null
+                };
+        }
+
+        const assessedEquivalentValue = latestSale.salePrice * RESIDENTIAL_ASSESSMENT_LEVEL;
+        const assessmentToSaleRatio = assessedEquivalentValue > 0
+                ? target.taxableValue / assessedEquivalentValue
+                : null;
+
+        return {
+                sale: latestSale,
+                assessmentToSaleRatio,
+                assessedEquivalentValue,
+                pctAboveAssessedEquivalent: assessmentToSaleRatio === null ? null : assessmentToSaleRatio - 1
+        };
+}
+
 function hasUniformityAppealSignal(stats, thresholds = uniformityThresholds()) {
         if (
                 stats.validValuePerSqftComparables >= 5 &&
@@ -504,10 +564,51 @@ function hasUniformityAppealSignal(stats, thresholds = uniformityThresholds()) {
         return false;
 }
 
+function hasLimitedUniformityAppealSignal(stats, comparableCount, thresholds = uniformityThresholds()) {
+        if (
+                comparableCount < 2 ||
+                comparableCount >= 5 ||
+                stats.validValuePerSqftComparables < 2 ||
+                stats.subjectValuePerSqft === null ||
+                stats.medianValuePerSqft === null
+        ) {
+                return false;
+        }
+
+        return stats.subjectValuePerSqft > stats.medianValuePerSqft * (1 + thresholds.valuePerSqft) &&
+                stats.lowerValuePerSqftCount >= Math.max(1, comparableCount - 1);
+}
+
 function compContext(target) {
         return target?.classCode === '299'
                 ? 'same condo building or closely similar condo units'
                 : 'similar nearby properties matched on class, neighborhood, size, bedrooms, baths, construction, and available age/condition fields';
+}
+
+function residentialMatchConfig(target) {
+        if (target.classCode === '211') {
+                return {
+                        sizeLowerMult: 0.85,
+                        sizeUpperMult: 1.25,
+                        landLowerMult: null,
+                        landUpperMult: null,
+                        bedroomLower: Math.max(0, target.bedroomCount - 1),
+                        bedroomUpper: target.bedroomCount + 1,
+                        bathroomLower: Math.max(0, target.bathroomCount - 1),
+                        bathroomUpper: target.bathroomCount + 1
+                };
+        }
+
+        return {
+                sizeLowerMult: 0.9,
+                sizeUpperMult: 1.15,
+                landLowerMult: 0.8,
+                landUpperMult: 1.2,
+                bedroomLower: target.bedroomCount >= 4 ? target.bedroomCount - 1 : target.bedroomCount,
+                bedroomUpper: target.bedroomCount + 1,
+                bathroomLower: target.bathroomCount,
+                bathroomUpper: target.bathroomCount + 1
+        };
 }
 
 function matchesComparableRules(candidate, target) {
@@ -531,26 +632,18 @@ function matchesComparableRules(candidate, target) {
                         return false;
                 }
 
-                if (classCode === '211') {
-                        return (
-                                candidate.homeSize !== null &&
-                                candidate.homeSize >= target.homeSize * 0.85 &&
-                                candidate.homeSize <= target.homeSize * 1.25 &&
-                                within(candidate.bedroomCount, Math.max(0, target.bedroomCount - 1), target.bedroomCount + 1) &&
-                                within(candidate.bathroomCount, Math.max(0, target.bathroomCount - 1), target.bathroomCount + 1) &&
-                                sameValue(candidate.masonryType, target.masonryType) &&
-                                sameValue(candidate.singleVsMultiFamily, target.singleVsMultiFamily) &&
-                                optionalSameValue(candidate.repairCondition, target.repairCondition)
-                        );
-                }
+                const config = residentialMatchConfig(target);
+                const landMatches = config.landLowerMult === null ||
+                        within(candidate.certifiedLand, target.certifiedLand * config.landLowerMult, target.certifiedLand * config.landUpperMult);
 
                 return (
                         candidate.homeSize !== null &&
-                        candidate.homeSize >= target.homeSize * 0.9 &&
-                        candidate.homeSize <= target.homeSize * 1.15 &&
-                        within(candidate.certifiedLand, target.certifiedLand * 0.8, target.certifiedLand * 1.2) &&
-                        within(candidate.bedroomCount, target.bedroomCount, target.bedroomCount + 1) &&
-                        within(candidate.bathroomCount, target.bathroomCount, target.bathroomCount + 1) &&
+                        candidate.homeSize >= target.homeSize * config.sizeLowerMult &&
+                        candidate.homeSize <= target.homeSize * config.sizeUpperMult &&
+                        landMatches &&
+                        matchesHardAgeGate(candidate, target) &&
+                        within(candidate.bedroomCount, config.bedroomLower, config.bedroomUpper) &&
+                        within(candidate.bathroomCount, config.bathroomLower, config.bathroomUpper) &&
                         sameValue(candidate.masonryType, target.masonryType) &&
                         sameValue(candidate.singleVsMultiFamily, target.singleVsMultiFamily) &&
                         optionalSameValue(candidate.repairCondition, target.repairCondition)
@@ -659,7 +752,54 @@ function decisionFor(target, comparables, radius, env, now = new Date()) {
                 }
         }
 
+        if (!isCondo && RESIDENTIAL_CLASS_CODES.has(target.classCode)) {
+                const saleStats = recentPropertySaleStats(target);
+                if (
+                        saleStats.sale &&
+                        saleStats.assessmentToSaleRatio !== null &&
+                        saleStats.pctAboveAssessedEquivalent !== null
+                ) {
+                        const saleDate = saleStats.sale.saleDate || 'recent sale';
+                        const salePrice = saleStats.sale.salePrice;
+                        const ratioPercent = saleStats.assessmentToSaleRatio * RESIDENTIAL_ASSESSMENT_LEVEL * 100;
+                        const limitedStats = comparables.length < 5 ? compUniformityStats(target, comparables) : null;
+                        const limitedSignal = limitedStats
+                                ? hasLimitedUniformityAppealSignal(limitedStats, comparables.length, uniformityThresholds(env))
+                                : false;
+
+                        if (saleStats.pctAboveAssessedEquivalent > recentSaleThreshold(env)) {
+                                const limitedReason = limitedSignal
+                                        ? ` The limited uniformity set also points the same way: ${limitedStats.lowerValuePerSqftCount} of ${comparables.length} strong comps have lower assessed value per sqft.`
+                                        : '';
+                                return {
+                                        decision: 'Yes, Appeal',
+                                        label: 'Appeal recommended',
+                                        reason: `Recent sale signal: the property sold on ${saleDate} for $${Math.round(salePrice).toLocaleString()}, and its assessed value is ${ratioPercent.toFixed(1)}% of sale price, above the expected 10.0% residential assessment level.${limitedReason}`
+                                };
+                        }
+
+                        if (comparables.length < 5) {
+                                return {
+                                        decision: 'No Appeal',
+                                        label: 'Appeal likely not needed',
+                                        reason: `Recent sale signal: the property sold on ${saleDate} for $${Math.round(salePrice).toLocaleString()}, and its assessed value is ${ratioPercent.toFixed(1)}% of sale price. The uniformity search found only ${comparables.length} age-appropriate comparable properties, so there is not a strong appeal signal.`
+                                };
+                        }
+                }
+        }
+
         if (comparables.length < 5) {
+                const stats = compUniformityStats(target, comparables);
+                const thresholds = uniformityThresholds(env);
+                if (hasLimitedUniformityAppealSignal(stats, comparables.length, thresholds)) {
+                        const pctHigher = (stats.subjectValuePerSqft - stats.medianValuePerSqft) / stats.medianValuePerSqft;
+                        return {
+                                decision: 'Limited comps, possible appeal',
+                                label: 'Limited comparable signal',
+                                reason: `Only ${comparables.length} strong comparable properties were found within ${radius.toFixed(1)} miles, below the usual 5-comp target. Still, your assessed value per sqft is ${(pctHigher * 100).toFixed(1)}% above their median, and ${stats.lowerValuePerSqftCount} of them have lower assessed value per sqft.`
+                        };
+                }
+
                 if (radius >= 5) {
                         return {
                                 decision: 'Not enough comps',
@@ -795,10 +935,7 @@ export async function findComparableProperties(db, target, radius) {
                         return [];
                 }
 
-                const sizeLowerMult = target.classCode === '211' ? 0.85 : 0.9;
-                const sizeUpperMult = target.classCode === '211' ? 1.25 : 1.15;
-                const bedroomLower = target.classCode === '211' ? Math.max(0, target.bedroomCount - 1) : target.bedroomCount;
-                const bathroomLower = target.classCode === '211' ? Math.max(0, target.bathroomCount - 1) : target.bathroomCount;
+                const config = residentialMatchConfig(target);
 
                 clauses.push(
                         'neighborhood_code = ?',
@@ -811,15 +948,24 @@ export async function findComparableProperties(db, target, radius) {
                 );
                 params.push(
                         target.neighborhoodCode,
-                        target.homeSize * sizeLowerMult,
-                        target.homeSize * sizeUpperMult,
-                        bedroomLower,
-                        target.bedroomCount + 1,
-                        bathroomLower,
-                        target.bathroomCount + 1,
+                        target.homeSize * config.sizeLowerMult,
+                        target.homeSize * config.sizeUpperMult,
+                        config.bedroomLower,
+                        config.bedroomUpper,
+                        config.bathroomLower,
+                        config.bathroomUpper,
                         target.masonryType,
                         target.singleVsMultiFamily
                 );
+                if (config.landLowerMult !== null) {
+                        clauses.push('certified_land BETWEEN ? AND ?');
+                        params.push(target.certifiedLand * config.landLowerMult, target.certifiedLand * config.landUpperMult);
+                }
+                const hardAgeTolerance = hardAgeToleranceForSubject(target);
+                if (hardAgeTolerance !== null) {
+                        clauses.push('year_built BETWEEN ? AND ?');
+                        params.push(target.yearBuilt - hardAgeTolerance, target.yearBuilt + hardAgeTolerance);
+                }
                 if (validText(target.repairCondition)) {
                         clauses.push('repair_condition = ?');
                         params.push(target.repairCondition);
@@ -954,7 +1100,38 @@ export async function findCondoBuildingSales(db, target, now = new Date()) {
         return (results || []).map(rowToSale);
 }
 
-export function buildAnalysis(target, comparables, radius, env) {
+export async function findRecentPropertySales(db, target, now = new Date()) {
+        if (!db || !target || target.classCode === '299') {
+                return [];
+        }
+
+        const pins = pinValuesForProperty(target);
+        if (!pins.length) {
+                return [];
+        }
+
+        const lookbackDate = new Date(Date.UTC(now.getFullYear() - RECENT_PROPERTY_SALE_LOOKBACK_YEARS, 0, 1))
+                .toISOString()
+                .slice(0, 10);
+        const placeholders = pins.map(() => '?').join(', ');
+
+        const { results } = await db.prepare(
+                `SELECT *
+                 FROM property_sales
+                 WHERE pin IN (${placeholders})
+                   AND sale_date >= ?
+                   AND sale_price IS NOT NULL
+                   AND sale_price >= 10000
+                   AND COALESCE(is_multisale, 0) = 0
+                   AND COALESCE(num_parcels_sale, 1) = 1
+                 ORDER BY sale_date DESC, sale_price DESC
+                 LIMIT 10`
+        ).bind(...pins, lookbackDate).all();
+
+        return (results || []).map(rowToSale);
+}
+
+export function buildAnalysis(target, comparables, radius, env, options = {}) {
         const targetWithCalendar = target ? {
                 ...target,
                 appealCalendar: getAppealCalendarForProperty(target),
@@ -974,7 +1151,11 @@ export function buildAnalysis(target, comparables, radius, env) {
                 radius,
                 summary: {
                         comparableCount: comparables.length,
+                        requestedRadius: options.requestedRadius ?? radius,
+                        radiusAutoExpanded: Boolean(options.radiusAutoExpanded),
+                        radiusExpansionAttempts: options.radiusExpansionAttempts || [],
                         condoBuildingSaleCount: targetWithCalendar?.condoBuildingSales?.length || 0,
+                        recentPropertySaleCount: targetWithCalendar?.recentPropertySales?.length || 0,
                         averageComparableValue,
                         lowerValueCount,
                         subjectValuePerSqft: stats?.subjectValuePerSqft ?? null,
