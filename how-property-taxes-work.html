@@ -151,7 +151,8 @@
     <section class="tax-tutorial-section">
         <div class="container">
             <div class="tax-flow" aria-label="Property tax calculation flow">
-                <div><span>1</span><strong>Market Value</strong><small>What the Assessor thinks the property is worth</small></div>
+                <div><span>1</span><strong>Market Value</strong><small>What the Assessor thinks the property is worth</small><a
+                        href="#market-value-model">How this is modeled</a></div>
                 <div><span>2</span><strong>10% Level</strong><small>Assessed value in our data</small></div>
                 <div><span>3</span><strong>Equalizer</strong><small>State multiplier</small></div>
                 <div><span>4</span><strong>Tax Rate</strong><small>Local taxing districts</small></div>
@@ -168,6 +169,7 @@
                     <h2>Start With The Property Value</h2>
                     <p>The Cook County Assessor estimates your property's value. For many homeowners, this is the
                         number that matters most in an appeal because it affects the rest of the calculation.</p>
+                    <p class="tax-step-link"><a href="#market-value-model">See how Cook County models market value</a></p>
                     <div class="tax-house-visual">
                         <div class="tax-house-roof"></div>
                         <div class="tax-house-body">
@@ -246,6 +248,79 @@
                     </div>
                 </article>
             </div>
+
+            <article class="dashboard-card tax-model-card" id="market-value-model">
+                <div class="tax-model-intro">
+                    <span class="section-badge">Step 1 Deep Dive</span>
+                    <h2>How Cook County Creates The Market Value</h2>
+                    <p>The Assessor's Office publishes open-source code for its automated valuation models. In plain
+                        English, the model studies recent sale prices and property characteristics, learns which
+                        patterns tend to explain prices, and estimates what each property would likely sell for on the
+                        assessment date.</p>
+                </div>
+
+                <div class="model-pipeline" aria-label="Cook County market value modeling process">
+                    <div>
+                        <span>1</span>
+                        <strong>Collect Sales</strong>
+                        <small>Recent sales become examples of what buyers paid in the market.</small>
+                    </div>
+                    <div>
+                        <span>2</span>
+                        <strong>Add Features</strong>
+                        <small>Inputs include location, class, building size, age, baths, garages, and other
+                            characteristics.</small>
+                    </div>
+                    <div>
+                        <span>3</span>
+                        <strong>Train The Model</strong>
+                        <small>LightGBM builds many decision trees that learn price patterns from the sales data.</small>
+                    </div>
+                    <div>
+                        <span>4</span>
+                        <strong>Predict Values</strong>
+                        <small>The trained model estimates fair market value for properties that did not sell.</small>
+                    </div>
+                    <div>
+                        <span>5</span>
+                        <strong>Review Results</strong>
+                        <small>CCAO evaluates accuracy, checks assessment ratios, interprets feature effects, and
+                            finalizes values.</small>
+                    </div>
+                </div>
+
+                <div class="model-concepts-grid">
+                    <div>
+                        <h3>What "Machine Learning" Means Here</h3>
+                        <p>The model is not guessing from one nearby sale. It is trained on many sales, then learns a
+                            mathematical relationship between sale price and property signals. A "feature" is one of
+                            those signals, like square footage or location. "Training" means updating the model until
+                            its price predictions fit known sales reasonably well.</p>
+                    </div>
+                    <div>
+                        <h3>Why The Model Still Needs Review</h3>
+                        <p>Cook County uses validation and ratio-study metrics to test performance, but the model is
+                            still a mass appraisal tool. It depends on the data it receives. If a property's
+                            characteristics, condition, classification, or comparable sales look wrong, that is where
+                            an appeal can matter.</p>
+                    </div>
+                    <div>
+                        <h3>Condos Are Modeled Separately</h3>
+                        <p>CCAO has a separate condominium AVM. Its documentation says condos are often evaluated with
+                            building-level context because units in the same building usually move together in price.
+                            That is why in-building sales can be especially important for condo appeals.</p>
+                    </div>
+                </div>
+
+                <div class="tax-model-sources">
+                    <span>Official model sources</span>
+                    <a href="https://github.com/ccao-data" target="_blank" rel="noopener">CCAO Data Department</a>
+                    <a href="https://github.com/ccao-data/model-res-avm" target="_blank" rel="noopener">Residential AVM</a>
+                    <a href="https://github.com/ccao-data/model-condo-avm" target="_blank" rel="noopener">Condo AVM</a>
+                    <a href="https://www.cookcountyassessoril.gov/news/cook-county-assessors-office-publicly-releases-residential-assessment-code-and-models"
+                        target="_blank" rel="noopener">Public code release</a>
+                </div>
+            </article>
         </div>
     </section>
 

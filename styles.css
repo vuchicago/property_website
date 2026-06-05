@@ -4045,7 +4045,8 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .tax-flow strong,
-.tax-flow small {
+.tax-flow small,
+.tax-flow a {
     display: block;
 }
 
@@ -4058,6 +4059,18 @@ input[type="range"]::-webkit-slider-thumb {
 .tax-flow small {
     color: var(--dark-500);
     line-height: 1.45;
+}
+
+.tax-flow a {
+    color: var(--primary);
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    margin-top: var(--space-3);
+    text-decoration: none;
+}
+
+.tax-flow a:hover {
+    text-decoration: underline;
 }
 
 .tax-flow-actions {
@@ -4087,6 +4100,20 @@ input[type="range"]::-webkit-slider-thumb {
 .tax-takeaway-grid p {
     color: var(--dark-500);
     line-height: 1.7;
+}
+
+.tax-step-link {
+    margin-top: calc(-1 * var(--space-2));
+}
+
+.tax-step-link a {
+    color: var(--primary);
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.tax-step-link a:hover {
+    text-decoration: underline;
 }
 
 .tax-house-visual {
@@ -4247,6 +4274,135 @@ input[type="range"]::-webkit-slider-thumb {
     background: var(--primary);
     border-color: var(--primary);
     color: var(--white);
+}
+
+.tax-model-card {
+    display: grid;
+    gap: var(--space-7);
+    margin-top: var(--space-8);
+}
+
+.tax-model-intro {
+    max-width: 860px;
+}
+
+.tax-model-intro h2,
+.model-concepts-grid h3 {
+    color: var(--dark-900);
+}
+
+.tax-model-intro h2 {
+    font-size: var(--font-size-3xl);
+    margin: var(--space-3) 0;
+}
+
+.tax-model-intro p,
+.model-concepts-grid p {
+    color: var(--dark-500);
+    line-height: 1.7;
+}
+
+.model-pipeline {
+    counter-reset: model-step;
+    display: grid;
+    gap: var(--space-3);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.model-pipeline div {
+    background: linear-gradient(180deg, var(--white), var(--dark-50));
+    border: 1px solid var(--dark-100);
+    border-radius: var(--radius-lg);
+    min-height: 180px;
+    padding: var(--space-4);
+    position: relative;
+}
+
+.model-pipeline div:not(:last-child)::after {
+    background: var(--accent);
+    content: "";
+    height: 2px;
+    position: absolute;
+    right: calc(-1 * var(--space-3));
+    top: 32px;
+    width: var(--space-3);
+}
+
+.model-pipeline span {
+    align-items: center;
+    background: var(--accent);
+    border-radius: 999px;
+    color: var(--white);
+    display: inline-flex;
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    height: 30px;
+    justify-content: center;
+    margin-bottom: var(--space-3);
+    width: 30px;
+}
+
+.model-pipeline strong,
+.model-pipeline small {
+    display: block;
+}
+
+.model-pipeline strong {
+    color: var(--dark-900);
+    font-size: var(--font-size-base);
+    margin-bottom: var(--space-2);
+}
+
+.model-pipeline small {
+    color: var(--dark-500);
+    line-height: 1.45;
+}
+
+.model-concepts-grid {
+    display: grid;
+    gap: var(--space-5);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.model-concepts-grid div {
+    border-left: 4px solid var(--accent);
+    padding-left: var(--space-4);
+}
+
+.model-concepts-grid h3 {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--space-2);
+}
+
+.tax-model-sources {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+}
+
+.tax-model-sources span {
+    color: var(--dark-600);
+    font-size: var(--font-size-sm);
+    font-weight: 800;
+}
+
+.tax-model-sources a {
+    align-items: center;
+    background: var(--white);
+    border: 1px solid var(--dark-200);
+    border-radius: var(--radius-md);
+    color: var(--primary);
+    display: inline-flex;
+    font-size: var(--font-size-sm);
+    font-weight: 800;
+    min-height: 38px;
+    padding: 0 var(--space-3);
+    text-decoration: none;
+}
+
+.tax-model-sources a:hover {
+    border-color: var(--primary);
 }
 
 .tax-calculator-layout {
@@ -5011,7 +5167,9 @@ textarea {
     }
 
     .tax-flow,
-    .tax-takeaway-grid {
+    .tax-takeaway-grid,
+    .model-pipeline,
+    .model-concepts-grid {
         grid-template-columns: 1fr;
     }
 
@@ -5044,6 +5202,23 @@ textarea {
     .tax-flow small {
         font-size: 0.74rem;
         line-height: 1.25;
+    }
+
+    .model-pipeline div {
+        min-height: auto;
+    }
+
+    .model-pipeline div:not(:last-child)::after {
+        bottom: calc(-1 * var(--space-3));
+        height: var(--space-3);
+        left: 28px;
+        right: auto;
+        top: auto;
+        width: 2px;
+    }
+
+    .tax-model-intro h2 {
+        font-size: var(--font-size-2xl);
     }
 
     .tax-tutorial-grid,
