@@ -16,6 +16,7 @@ const cameraAngleInput = document.querySelector("#cameraAngleInput");
 const cameraResetButton = document.querySelector("#cameraResetButton");
 const repVideo = document.querySelector("#repVideo");
 const cameraButton = document.querySelector("#cameraButton");
+const autoConversationButton = document.querySelector("#autoConversationButton");
 const listenButton = document.querySelector("#listenButton");
 const stopListenButton = document.querySelector("#stopListenButton");
 const roleplayButton = document.querySelector("#roleplayButton");
@@ -143,6 +144,21 @@ let voiceChoices = {};
 let activeAudio = null;
 let speechRunId = 0;
 let salesRoleGuide = "";
+let salesSettings = {
+  language: "en-US",
+  preferredVoice: "britishMale",
+  ttsProvider: "cloudflare",
+  ttsModel: "@cf/deepgram/aura-2-en",
+  ttsSpeaker: "apollo",
+  doneProbability: 0.45,
+  autoPauseMs: 400,
+  autoLocalPauseMinWords: 3,
+  autoRecorderSilenceMs: 550,
+  autoRecorderMinSpeechMs: 350,
+  autoRecorderMaxSegmentMs: 7000,
+  autoRecorderRmsThreshold: 0.035,
+  avatarEchoCooldownMs: 900,
+};
 let recognition = null;
 let listening = false;
 let mediaRecorder = null;
@@ -150,9 +166,39 @@ let recordingStream = null;
 let recordingChunks = [];
 let recording = false;
 let repStream = null;
+let autoConversation = false;
+let autoRecognition = null;
+let autoTurnBusy = false;
+let autoTurnPending = false;
+let autoTranscriptBuffer = "";
+let autoFinalTranscript = "";
+let autoInterimTranscript = "";
+let autoPauseTimer = null;
+let autoRestartTimer = null;
+let autoRecorder = null;
+let autoRecorderStream = null;
+let autoRecorderChunks = [];
+let autoAudioContext = null;
+let autoAnalyser = null;
+let autoMonitorFrame = null;
+let autoSpeechStarted = false;
+let autoSilenceStartedAt = 0;
+let autoRecorderStartedAt = 0;
+let autoIgnoreMicUntil = 0;
+let userSelectedVoice = false;
 const conversationTurns = [];
 
+const AUTO_MIN_TRANSCRIPT_CHARS = 8;
+
 const VOICE_PROFILES = {
+  britishMale: {
+    label: "British Male",
+    lang: "en-GB",
+    rate: 0.93,
+    pitch: 0.86,
+    prefer: /google uk english male|google .*uk.*male|microsoft (ryan|george|thomas|oliver)|\b(daniel|arthur|jamie|liam|oliver|george|ryan|thomas)\b/i,
+    avoid: /samantha|ava|allison|victoria|karen|jenny|aria|emma|susan|zira|hazel|moira|tessa|fiona|compact|novelty/i,
+  },
   male: {
     label: "Male",
     rate: 0.92,
@@ -284,6 +330,61 @@ async function loadSalesRoleGuide() {
   }
 }
 
+function parseSimpleYaml(text) {
+  const output = {};
+  String(text || "")
+    .split(/\r?\n/)
+    .forEach((line) => {
+      const clean = line.replace(/\s+#.*$/, "").trim();
+      if (!clean || clean.startsWith("#")) return;
+      const match = clean.match(/^([A-Za-z0-9_-]+)\s*:\s*(.+)$/);
+      if (!match) return;
+
+      const key = match[1];
+      const rawValue = match[2].trim().replace(/^["']|["']$/g, "");
+      const numericValue = Number(rawValue);
+      output[key] = Number.isFinite(numericValue) ? numericValue : rawValue;
+    });
+  return output;
+}
+
+function clampProbability(value, fallback = 0.5) {
+  const number = Number(value);
+  return Number.isFinite(number) ? clamp(number, 0, 1) : fallback;
+}
+
+function clampNumber(value, fallback, min, max) {
+  const number = Number(value);
+  return Number.isFinite(number) ? clamp(number, min, max) : fallback;
+}
+
+async function loadSalesSettings() {
+  try {
+    const response = await fetch("./settings.yaml", { cache: "no-store" });
+    if (!response.ok) throw new Error(`settings.yaml ${response.status}`);
+    const settings = parseSimpleYaml(await response.text());
+    salesSettings = {
+      ...salesSettings,
+      ...settings,
+      language: String(settings.language || salesSettings.language || "en-US"),
+      preferredVoice: String(settings.preferredVoice || salesSettings.preferredVoice || "britishMale"),
+      ttsProvider: String(settings.ttsProvider || salesSettings.ttsProvider || "cloudflare"),
+      ttsModel: String(settings.ttsModel || salesSettings.ttsModel || "@cf/deepgram/aura-2-en"),
+      ttsSpeaker: String(settings.ttsSpeaker || salesSettings.ttsSpeaker || "apollo"),
+      doneProbability: clampProbability(settings.doneProbability, salesSettings.doneProbability),
+      autoPauseMs: clampNumber(settings.autoPauseMs, salesSettings.autoPauseMs, 150, 2000),
+      autoLocalPauseMinWords: clampNumber(settings.autoLocalPauseMinWords, salesSettings.autoLocalPauseMinWords, 2, 12),
+      autoRecorderSilenceMs: clampNumber(settings.autoRecorderSilenceMs, salesSettings.autoRecorderSilenceMs, 250, 3000),
+      autoRecorderMinSpeechMs: clampNumber(settings.autoRecorderMinSpeechMs, salesSettings.autoRecorderMinSpeechMs, 100, 2000),
+      autoRecorderMaxSegmentMs: clampNumber(settings.autoRecorderMaxSegmentMs, salesSettings.autoRecorderMaxSegmentMs, 2000, 20000),
+      autoRecorderRmsThreshold: clampNumber(settings.autoRecorderRmsThreshold, salesSettings.autoRecorderRmsThreshold, 0.005, 0.2),
+      avatarEchoCooldownMs: clampNumber(settings.avatarEchoCooldownMs, salesSettings.avatarEchoCooldownMs, 0, 3000),
+    };
+  } catch (error) {
+    setLog(`Settings unavailable, using defaults: ${error.message || error}`);
+  }
+}
+
 async function startRepCamera() {
   if (!navigator.mediaDevices?.getUserMedia) {
     setStatus("Camera unavailable", "warn");
@@ -317,7 +418,7 @@ function ensureRecognition() {
   if (recognition) return recognition;
 
   recognition = new Recognition();
-  recognition.lang = "en-US";
+  recognition.lang = salesSettings.language || "en-US";
   recognition.interimResults = true;
   recognition.continuous = false;
 
@@ -413,18 +514,7 @@ async function transcribeRecording(blob) {
   setLog("Sending audio to Cloudflare Whisper.");
 
   try {
-    const response = await fetch("/api/ai-sales/transcribe", {
-      method: "POST",
-      headers: { "Content-Type": blob.type || "application/octet-stream" },
-      body: blob,
-    });
-    const payload = await readJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(payload.error || `Transcription failed (${response.status})`);
-    }
-
-    const transcript = String(payload.text || "").trim();
+    const transcript = await transcribeBlob(blob);
     if (!transcript) {
       setStatus("No speech detected", "warn");
       setLog("Cloudflare Whisper did not return a transcript.");
@@ -440,7 +530,612 @@ async function transcribeRecording(blob) {
   }
 }
 
+async function transcribeBlob(blob) {
+  const response = await fetch("/api/ai-sales/transcribe", {
+    method: "POST",
+    headers: { "Content-Type": blob.type || "application/octet-stream" },
+    body: blob,
+  });
+  const payload = await readJsonResponse(response);
+
+  if (!response.ok) {
+    throw new Error(payload.error || `Transcription failed (${response.status})`);
+  }
+
+  return String(payload.text || "").trim();
+}
+
+/*
+VAD auto mode is intentionally paused, not removed. The previous flow loaded
+@ricky0123/vad-web, converted speech segments to WAV, sent them to Whisper, and
+then called DeepSeek. It worked, but waiting for audio endpointing plus Whisper
+made the turn feel slow. If we revisit VAD, restore the script tags in
+index.html and rebuild the MicVAD.new(...) segment handler around transcribeBlob.
+*/
+
+function clearAutoTimers() {
+  if (autoPauseTimer) {
+    window.clearTimeout(autoPauseTimer);
+    autoPauseTimer = null;
+  }
+  if (autoRestartTimer) {
+    window.clearTimeout(autoRestartTimer);
+    autoRestartTimer = null;
+  }
+}
+
+function stopAutoRecorderResources() {
+  if (autoMonitorFrame) {
+    cancelAnimationFrame(autoMonitorFrame);
+    autoMonitorFrame = null;
+  }
+
+  if (autoRecorder && autoRecorder.state !== "inactive") {
+    try {
+      autoRecorder.stop();
+    } catch {
+      // Recorder may already be stopped.
+    }
+  }
+
+  autoRecorderStream?.getTracks().forEach(track => track.stop());
+  autoRecorderStream = null;
+  autoRecorder = null;
+  autoRecorderChunks = [];
+  autoSpeechStarted = false;
+  autoSilenceStartedAt = 0;
+  autoRecorderStartedAt = 0;
+
+  if (autoAudioContext && autoAudioContext.state !== "closed") {
+    autoAudioContext.close().catch(() => {});
+  }
+  autoAudioContext = null;
+  autoAnalyser = null;
+}
+
+function compactTranscript(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function currentAutoTranscript() {
+  return compactTranscript([autoTranscriptBuffer, autoFinalTranscript, autoInterimTranscript]
+    .filter(Boolean)
+    .join(" "));
+}
+
+function hasTrailingContinuationCue(text) {
+  return /\b(and|but|or|so|because|if|when|while|with|for|to|then|also|like)$/i.test(String(text || "").trim());
+}
+
+function localTurnDecision(transcript, { finalSegment = false } = {}) {
+  const text = compactTranscript(transcript);
+  if (text.length < AUTO_MIN_TRANSCRIPT_CHARS || hasTrailingContinuationCue(text)) return null;
+
+  if (/[?.!]$/.test(text)) {
+    return {
+      doneProbability: 0.85,
+      doneProbabilityThreshold: salesSettings.doneProbability,
+      shouldRespond: 0.85 > salesSettings.doneProbability,
+      provider: "local-heuristic",
+      model: "punctuation cue",
+    };
+  }
+
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  const startsLikeQuestion = /^(who|what|when|where|why|how|can|could|would|will|do|does|did|is|are|should)\b/i.test(text);
+  const pausedCompleteTurn = finalSegment &&
+    (wordCount >= salesSettings.autoLocalPauseMinWords || (startsLikeQuestion && wordCount >= 3));
+  if (pausedCompleteTurn) {
+    return {
+      doneProbability: 0.65,
+      doneProbabilityThreshold: salesSettings.doneProbability,
+      shouldRespond: 0.65 > salesSettings.doneProbability,
+      provider: "local-heuristic",
+      model: "final speech segment",
+    };
+  }
+
+  return null;
+}
+
+function resetAutoUtteranceText() {
+  autoFinalTranscript = "";
+  autoInterimTranscript = "";
+}
+
+function setAutoControls(active) {
+  autoConversationButton.textContent = active ? "Auto On" : "Auto";
+  autoConversationButton.classList.toggle("active", active);
+  listenButton.disabled = active;
+  stopListenButton.disabled = true;
+  roleplayButton.disabled = active;
+}
+
+function scheduleAutoTurnCheck(delay = salesSettings.autoPauseMs) {
+  if (!autoConversation) return;
+  if (autoPauseTimer) window.clearTimeout(autoPauseTimer);
+  autoPauseTimer = window.setTimeout(() => {
+    autoPauseTimer = null;
+    requestAutoTurnDecision();
+  }, delay);
+}
+
+function isAvatarEchoGuardActive() {
+  return state.speaking || Date.now() < autoIgnoreMicUntil;
+}
+
+function autoEchoGuardDelayMs() {
+  if (state.speaking) return salesSettings.avatarEchoCooldownMs;
+  return Math.max(0, autoIgnoreMicUntil - Date.now());
+}
+
+function holdMicForAvatarSpeech(extraMs = salesSettings.avatarEchoCooldownMs) {
+  autoIgnoreMicUntil = Math.max(autoIgnoreMicUntil, Date.now() + extraMs);
+}
+
+function noteAutoSpeechActivity() {
+  if (!autoConversation) return;
+
+  if (isAvatarEchoGuardActive()) {
+    return;
+  }
+
+  if (!autoTurnBusy) {
+    setStatus("Listening", "busy");
+  }
+}
+
+function readAnalyserRms() {
+  if (!autoAnalyser) return 0;
+
+  const samples = new Float32Array(autoAnalyser.fftSize);
+  autoAnalyser.getFloatTimeDomainData(samples);
+  let sum = 0;
+  for (let index = 0; index < samples.length; index += 1) {
+    sum += samples[index] * samples[index];
+  }
+  return Math.sqrt(sum / samples.length);
+}
+
+function monitorAutoRecorder() {
+  if (!autoConversation || !autoRecorder || !autoAnalyser) return;
+
+  if (isAvatarEchoGuardActive()) {
+    autoRecorderChunks = [];
+    autoSpeechStarted = false;
+    autoSilenceStartedAt = 0;
+    autoRecorderStartedAt = performance.now();
+    autoMonitorFrame = requestAnimationFrame(monitorAutoRecorder);
+    return;
+  }
+
+  const now = performance.now();
+  const rms = readAnalyserRms();
+  const voiceActive = rms > salesSettings.autoRecorderRmsThreshold;
+
+  if (voiceActive) {
+    if (!autoSpeechStarted) {
+      autoSpeechStarted = true;
+      autoRecorderStartedAt = now;
+      noteAutoSpeechActivity();
+    }
+    autoSilenceStartedAt = 0;
+  } else if (autoSpeechStarted && !autoSilenceStartedAt) {
+    autoSilenceStartedAt = now;
+  }
+
+  const speechDuration = now - autoRecorderStartedAt;
+  const silenceDuration = autoSilenceStartedAt ? now - autoSilenceStartedAt : 0;
+  const shouldCloseSegment = autoSpeechStarted &&
+    speechDuration > salesSettings.autoRecorderMinSpeechMs &&
+    (silenceDuration > salesSettings.autoRecorderSilenceMs || speechDuration > salesSettings.autoRecorderMaxSegmentMs);
+
+  if (shouldCloseSegment && autoRecorder.state === "recording") {
+    autoRecorder.stop();
+    return;
+  }
+
+  autoMonitorFrame = requestAnimationFrame(monitorAutoRecorder);
+}
+
+async function processAutoRecordedSegment(blob) {
+  if (!autoConversation || !blob?.size) return;
+
+  if (autoTurnBusy) {
+    autoTurnPending = true;
+    window.setTimeout(() => processAutoRecordedSegment(blob), 250);
+    return;
+  }
+
+  autoTurnBusy = true;
+  autoTurnPending = false;
+  setStatus("Transcribing", "busy");
+  setLog("Auto recorder heard a pause. Sending the segment to Cloudflare Whisper.");
+
+  try {
+    const transcript = await transcribeBlob(blob);
+    if (!autoConversation) return;
+
+    if (!transcript) {
+      setStatus("Listening", "ready");
+      return;
+    }
+
+    const combinedTranscript = compactTranscript([autoTranscriptBuffer, transcript].filter(Boolean).join(" "));
+    userInput.value = combinedTranscript;
+    setLog(`transcript: ${combinedTranscript}\nChecking whether this is a complete turn.`);
+    const turn = localTurnDecision(combinedTranscript, { finalSegment: true }) ||
+      await requestFastTurnDecision(combinedTranscript);
+
+    if (!autoConversation) return;
+
+    if (!turn?.shouldRespond) {
+      autoTranscriptBuffer = combinedTranscript;
+      resetAutoUtteranceText();
+      setStatus("Listening", "ready");
+      setLog(
+        `turn detector: ${turn?.provider || "ai"}\n` +
+          `model: ${turn?.model || "DeepSeek"}\n` +
+          `done probability: ${((turn?.doneProbability || 0) * 100).toFixed(0)}%\n` +
+          `threshold: ${((turn?.doneProbabilityThreshold || salesSettings.doneProbability) * 100).toFixed(0)}%\n` +
+          "Keeping the mic open.",
+      );
+      return;
+    }
+
+    const result = await requestCustomerReply({ scenario: combinedTranscript, autoSpeak: true, forceRespond: true });
+
+    if (result?.shouldRespond) {
+      autoTranscriptBuffer = "";
+      resetAutoUtteranceText();
+      return;
+    }
+
+    autoTranscriptBuffer = combinedTranscript;
+    resetAutoUtteranceText();
+    setStatus("Listening", "ready");
+  } catch (error) {
+    if (autoConversation) {
+      setStatus("Auto recorder failed", "bad");
+      setLog(`Auto recorder failed: ${error.message || error}`);
+    }
+  } finally {
+    autoTurnBusy = false;
+    if (autoConversation) {
+      startAutoRecorderSegment();
+    }
+  }
+}
+
+function startAutoRecorderSegment() {
+  if (!autoConversation || !autoRecorder || autoRecorder.state !== "inactive") return;
+
+  autoRecorderChunks = [];
+  autoSpeechStarted = false;
+  autoSilenceStartedAt = 0;
+  autoRecorderStartedAt = performance.now();
+  autoRecorder.start(250);
+  setStatus("Listening", "ready");
+  autoMonitorFrame = requestAnimationFrame(monitorAutoRecorder);
+}
+
+function ensureAutoRecognition() {
+  const Recognition = speechRecognitionFactory();
+  if (!Recognition) {
+    return null;
+  }
+
+  if (autoRecognition) return autoRecognition;
+
+  autoRecognition = new Recognition();
+  autoRecognition.lang = salesSettings.language || "en-US";
+  autoRecognition.interimResults = true;
+  autoRecognition.continuous = true;
+
+  autoRecognition.onstart = () => {
+    listening = true;
+    setStatus("Listening", "ready");
+  };
+
+  autoRecognition.onresult = (event) => {
+    if (!autoConversation) return;
+
+    if (isAvatarEchoGuardActive()) {
+      autoInterimTranscript = "";
+      return;
+    }
+
+    let interim = "";
+    let heardSpeech = false;
+
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      const transcript = event.results[index][0]?.transcript || "";
+      if (!transcript.trim()) continue;
+      heardSpeech = true;
+      if (event.results[index].isFinal) {
+        autoFinalTranscript = compactTranscript(`${autoFinalTranscript} ${transcript}`);
+      } else {
+        interim = compactTranscript(`${interim} ${transcript}`);
+      }
+    }
+
+    autoInterimTranscript = interim;
+    const transcript = currentAutoTranscript();
+    if (transcript) {
+      userInput.value = transcript;
+    }
+
+    if (heardSpeech) {
+      noteAutoSpeechActivity();
+      scheduleAutoTurnCheck();
+    }
+  };
+
+  autoRecognition.onerror = (event) => {
+    if (!autoConversation) return;
+
+    const recoverable = ["aborted", "no-speech", "network"].includes(event.error);
+    setLog(`Auto speech recognition: ${event.error || "stopped"}`);
+    if (!recoverable) {
+      stopAutoConversation();
+      setStatus("Auto unavailable", "bad");
+    }
+  };
+
+  autoRecognition.onend = () => {
+    listening = false;
+    if (!autoConversation) return;
+
+    autoRestartTimer = window.setTimeout(() => {
+      autoRestartTimer = null;
+      if (!autoConversation) return;
+      try {
+        autoRecognition.start();
+      } catch {
+        scheduleAutoTurnCheck(300);
+      }
+    }, 160);
+  };
+
+  return autoRecognition;
+}
+
+async function requestAutoTurnDecision() {
+  if (!autoConversation) return;
+
+  if (isAvatarEchoGuardActive()) {
+    autoTurnPending = true;
+    scheduleAutoTurnCheck(autoEchoGuardDelayMs() + 80);
+    return;
+  }
+
+  const transcript = currentAutoTranscript();
+  if (transcript.length < AUTO_MIN_TRANSCRIPT_CHARS) {
+    if (!state.speaking) setStatus("Listening", "ready");
+    return;
+  }
+
+  if (autoTurnBusy) {
+    autoTurnPending = true;
+    return;
+  }
+
+  autoTurnBusy = true;
+  autoTurnPending = false;
+  setStatus("Thinking", "busy");
+  setLog(`live transcript: ${transcript}\nChecking whether this is a complete turn.`);
+
+  try {
+    const turn = localTurnDecision(transcript, { finalSegment: true }) ||
+      await requestFastTurnDecision(transcript);
+    if (!autoConversation) return;
+
+    if (!turn?.shouldRespond) {
+      autoTranscriptBuffer = transcript;
+      resetAutoUtteranceText();
+      setStatus("Listening", "ready");
+      setLog(
+        `turn detector: ${turn?.provider || "ai"}\n` +
+          `model: ${turn?.model || "DeepSeek"}\n` +
+          `done probability: ${((turn?.doneProbability || 0) * 100).toFixed(0)}%\n` +
+          `threshold: ${((turn?.doneProbabilityThreshold || salesSettings.doneProbability) * 100).toFixed(0)}%\n` +
+          "Keeping the mic open.",
+      );
+      return;
+    }
+
+    const result = await requestCustomerReply({ scenario: transcript, autoSpeak: true, forceRespond: true });
+    if (result?.shouldRespond) {
+      autoTranscriptBuffer = "";
+      resetAutoUtteranceText();
+      return;
+    }
+
+    autoTranscriptBuffer = transcript;
+    resetAutoUtteranceText();
+    setStatus("Listening", "ready");
+  } catch (error) {
+    if (autoConversation) {
+      setStatus("Auto conversation failed", "bad");
+      setLog(`Auto conversation failed: ${error.message || error}`);
+    }
+  } finally {
+    autoTurnBusy = false;
+    if (autoConversation && autoTurnPending) {
+      autoTurnPending = false;
+      scheduleAutoTurnCheck(120);
+    } else if (autoConversation && !state.speaking && statusDot.dataset.tone !== "bad") {
+      setStatus("Listening", "ready");
+    }
+  }
+}
+
+async function requestFastTurnDecision(transcript) {
+  const response = await fetch("/api/ai-sales/turn", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      scenario: transcript,
+      conversation: conversationTurns,
+      language: salesSettings.language,
+      doneProbabilityThreshold: salesSettings.doneProbability,
+    }),
+  });
+  const payload = await readJsonResponse(response);
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      return {
+        doneProbability: 1,
+        doneProbabilityThreshold: salesSettings.doneProbability,
+        shouldRespond: true,
+        provider: "coach-fallback",
+        model: "turn route unavailable",
+      };
+    }
+    throw new Error(payload.error || `Turn detection failed (${response.status})`);
+  }
+
+  const doneProbability = Number(payload.doneProbability ?? 0);
+  const doneProbabilityThreshold = clampProbability(payload.doneProbabilityThreshold, salesSettings.doneProbability);
+  return {
+    ...payload,
+    doneProbability,
+    doneProbabilityThreshold,
+    shouldRespond: payload.shouldRespond !== false && doneProbability > doneProbabilityThreshold,
+  };
+}
+
+async function startAutoConversation() {
+  if (autoConversation) return;
+
+  const activeRecognition = ensureAutoRecognition();
+  if (!activeRecognition) {
+    await startAutoRecorderConversation();
+    return;
+  }
+
+  try {
+    autoConversation = true;
+    autoTurnBusy = false;
+    autoTurnPending = false;
+    autoTranscriptBuffer = "";
+    resetAutoUtteranceText();
+    setAutoControls(true);
+    userInput.value = "";
+    activeRecognition.start();
+    setStatus("Listening", "ready");
+    setLog("Auto conversation is using live browser speech recognition. DeepSeek decides when the avatar should answer.");
+  } catch (error) {
+    autoConversation = false;
+    setAutoControls(false);
+    setStatus("Auto unavailable", "bad");
+    setLog(`Auto conversation unavailable: ${error.message || error}`);
+  }
+}
+
+async function startAutoRecorderConversation() {
+  if (autoConversation) return;
+
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    setStatus("Auto speech unavailable", "warn");
+    setLog("This browser cannot expose live SpeechRecognition or MediaRecorder microphone capture.");
+    return;
+  }
+
+  try {
+    setStatus("Starting recorder auto", "busy");
+    autoRecorderStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
+
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) {
+      throw new Error("AudioContext is unavailable.");
+    }
+
+    autoAudioContext = new AudioContextClass();
+    const source = autoAudioContext.createMediaStreamSource(autoRecorderStream);
+    autoAnalyser = autoAudioContext.createAnalyser();
+    autoAnalyser.fftSize = 1024;
+    autoAnalyser.smoothingTimeConstant = 0.08;
+    source.connect(autoAnalyser);
+
+    autoRecorder = new MediaRecorder(autoRecorderStream);
+    autoRecorder.ondataavailable = (event) => {
+      if (event.data?.size) autoRecorderChunks.push(event.data);
+    };
+    autoRecorder.onstop = () => {
+      if (autoMonitorFrame) {
+        cancelAnimationFrame(autoMonitorFrame);
+        autoMonitorFrame = null;
+      }
+
+      const chunks = autoRecorderChunks;
+      const mimeType = autoRecorder.mimeType || "audio/webm";
+      autoRecorderChunks = [];
+      autoSpeechStarted = false;
+      autoSilenceStartedAt = 0;
+
+      if (!autoConversation || !chunks.length) return;
+      processAutoRecordedSegment(new Blob(chunks, { type: mimeType }));
+    };
+
+    autoConversation = true;
+    autoTurnBusy = false;
+    autoTurnPending = false;
+    autoTranscriptBuffer = "";
+    resetAutoUtteranceText();
+    setAutoControls(true);
+    userInput.value = "";
+    startAutoRecorderSegment();
+    setLog("Auto conversation is using microphone recording plus Cloudflare Whisper because live SpeechRecognition is unavailable.");
+  } catch (error) {
+    autoConversation = false;
+    stopAutoRecorderResources();
+    setAutoControls(false);
+    setStatus("Auto unavailable", "bad");
+    setLog(`Auto recorder unavailable: ${error.message || error}`);
+  }
+}
+
+function stopAutoConversation() {
+  if (!autoConversation && !autoRecognition && !autoRecorder) return;
+
+  autoConversation = false;
+  autoTurnBusy = false;
+  autoTurnPending = false;
+  autoTranscriptBuffer = "";
+  resetAutoUtteranceText();
+  clearAutoTimers();
+
+  try {
+    autoRecognition?.stop?.();
+  } catch {
+    // Recognition may already be stopped.
+  }
+  stopAutoRecorderResources();
+
+  setAutoControls(false);
+  setStatus("Avatar ready", "ready");
+  setLog("Auto conversation stopped.");
+}
+
+function toggleAutoConversation() {
+  if (autoConversation) {
+    stopAutoConversation();
+    return;
+  }
+  startAutoConversation();
+}
+
 function startListening() {
+  if (autoConversation) return;
+
   const activeRecognition = ensureRecognition();
   if (!activeRecognition) {
     startAudioRecordingFallback();
@@ -1110,6 +1805,7 @@ function resizeRenderer() {
 function voiceScore(voice, profile) {
   const descriptor = `${voice.name} ${voice.voiceURI} ${voice.lang}`.toLowerCase();
   let score = voice.lang.toLowerCase().startsWith("en") ? 20 : 0;
+  if (profile.lang && voice.lang.toLowerCase().startsWith(profile.lang.toLowerCase())) score += 70;
 
   if (profile.prefer.test(descriptor)) score += 90;
   if (profile.avoid.test(descriptor)) score -= 75;
@@ -1152,7 +1848,9 @@ function populateVoices() {
   voices = window.speechSynthesis.getVoices();
   const englishVoices = voices.filter((voice) => voice.lang.toLowerCase().startsWith("en"));
   const displayVoices = englishVoices.length ? englishVoices : voices;
-  const selectedProfile = voiceSelect.value || "male";
+  const selectedProfile = userSelectedVoice
+    ? voiceSelect.value
+    : (salesSettings.preferredVoice || voiceSelect.value || "britishMale");
   voiceSelect.innerHTML = "";
   voiceChoices = {};
 
@@ -1171,7 +1869,16 @@ function populateVoices() {
   });
 
   applyVoiceProfileDefaults();
-  ttsStatus.value = displayVoices.length ? "browser voices" : "browser default";
+  const selectedVoice = voiceChoices[voiceSelect.value];
+  ttsStatus.value = selectedVoice ? selectedVoice.name : (displayVoices.length ? "browser voices" : "browser default");
+}
+
+async function refreshVoicesBeforeSpeech(selectedProfileKey) {
+  populateVoices();
+  if (voices.length && voiceChoices[selectedProfileKey]) return;
+
+  await new Promise((resolve) => window.setTimeout(resolve, 300));
+  populateVoices();
 }
 
 function tokenVisemes(word) {
@@ -1428,11 +2135,14 @@ function beginSpeechAnimation(statusLabel = "Speaking") {
   state.lastBoundaryChar = -1;
   state.sequenceStart = performance.now();
   state.speaking = true;
+  if (autoConversation) {
+    autoInterimTranscript = "";
+  }
   setStatus(statusLabel, "busy");
   syncStatus.value = "active";
 }
 
-async function requestCustomerReply({ scenario, autoSpeak = false }) {
+async function requestCustomerReply({ scenario, autoSpeak = false, forceRespond = false }) {
   const currentText = scenario.trim();
   generateButton.disabled = true;
   roleplayButton.disabled = true;
@@ -1449,6 +2159,9 @@ async function requestCustomerReply({ scenario, autoSpeak = false }) {
         conversation: conversationTurns,
         voice: voiceSelect.value || "male",
         expression: expressionSelect.value || "friendly",
+        language: salesSettings.language,
+        doneProbabilityThreshold: salesSettings.doneProbability,
+        forceRespond,
       }),
     });
     const payload = await readJsonResponse(response);
@@ -1463,39 +2176,44 @@ async function requestCustomerReply({ scenario, autoSpeak = false }) {
     }
 
     const doneProbability = Number(payload.doneProbability ?? 1);
-    const shouldRespond = payload.shouldRespond !== false && doneProbability > 0.5;
-    rememberTurn("salesperson", currentText);
+    const doneProbabilityThreshold = clampProbability(payload.doneProbabilityThreshold, salesSettings.doneProbability);
+    const shouldRespond = payload.shouldRespond !== false && doneProbability > doneProbabilityThreshold;
 
     if (!shouldRespond) {
       setStatus("Waiting for you", "ready");
       setLog(
-        `provider: ${payload.provider || "ai"}\n` +
+          `provider: ${payload.provider || "ai"}\n` +
           `model: ${payload.model || "DeepSeek"}\n` +
           `done probability: ${(doneProbability * 100).toFixed(0)}%\n` +
+          `threshold: ${(doneProbabilityThreshold * 100).toFixed(0)}%\n` +
           "DeepSeek thinks you may still be speaking.",
       );
-      return;
+      return { ...payload, doneProbability, shouldRespond: false };
     }
 
     scriptInput.value = payload.text || currentText;
     caption.textContent = scriptInput.value;
+    rememberTurn("salesperson", currentText);
     rememberTurn("customer", scriptInput.value);
     setStatus("Reply ready", "ready");
     setLog(
       `provider: ${payload.provider || "ai"}\n` +
         `model: ${payload.model || "DeepSeek"}\n` +
         `done probability: ${(doneProbability * 100).toFixed(0)}%\n` +
+        `threshold: ${(doneProbabilityThreshold * 100).toFixed(0)}%\n` +
         `${payload.text || ""}`,
     );
     if (autoSpeak) {
       await startSpeaking();
     }
+    return { ...payload, doneProbability, shouldRespond: true };
   } catch (error) {
     setStatus("Reply generation failed", "bad");
     setLog(`DeepSeek generation failed: ${error.message || error}`);
+    return { error, shouldRespond: false };
   } finally {
     generateButton.disabled = false;
-    roleplayButton.disabled = false;
+    roleplayButton.disabled = autoConversation;
   }
 }
 
@@ -1513,18 +2231,31 @@ async function generateRoleplayReply(transcript = userInput.value.trim(), autoSp
   await requestCustomerReply({ scenario: transcript, autoSpeak });
 }
 
-function speakWithBrowserTts(text, selectedProfileKey, voiceProfile, duration) {
+async function speakWithBrowserTts(text, selectedProfileKey, voiceProfile, duration) {
   if (!("speechSynthesis" in window)) {
     beginSpeechAnimation("Speaking");
     window.setTimeout(() => stopSpeaking(false), duration + 300);
     return;
   }
 
+  await refreshVoicesBeforeSpeech(selectedProfileKey);
+
   const utterance = new SpeechSynthesisUtterance(text);
   const selectedVoice = voiceChoices[selectedProfileKey] || null;
   if (selectedVoice) utterance.voice = selectedVoice;
+  utterance.lang = selectedVoice?.lang || voiceProfile.lang || salesSettings.language || "en-US";
+  ttsStatus.value = selectedVoice ? selectedVoice.name : "browser default";
   utterance.rate = voiceProfile.rate;
   utterance.pitch = voiceProfile.pitch;
+
+  let speechFinished = false;
+  let fallbackStopTimer = null;
+  const finishSpeech = (cancelSpeech = false) => {
+    if (speechFinished) return;
+    speechFinished = true;
+    if (fallbackStopTimer) window.clearTimeout(fallbackStopTimer);
+    stopSpeaking(cancelSpeech);
+  };
 
   utterance.onstart = () => {
     beginSpeechAnimation("Speaking");
@@ -1535,16 +2266,89 @@ function speakWithBrowserTts(text, selectedProfileKey, voiceProfile, duration) {
   };
 
   utterance.onend = () => {
-    stopSpeaking(false);
+    finishSpeech(false);
   };
 
   utterance.onerror = () => {
-    stopSpeaking(false);
+    finishSpeech(false);
     setStatus("Speech stopped", "warn");
   };
 
   state.utterance = utterance;
-  window.speechSynthesis.speak(utterance);
+  beginSpeechAnimation("Speaking");
+  fallbackStopTimer = window.setTimeout(() => finishSpeech(false), duration + 1200);
+
+  try {
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+    window.speechSynthesis.resume?.();
+  } catch (error) {
+    finishSpeech(false);
+    setStatus("Speech failed", "bad");
+    setLog(`Browser speech failed: ${error.message || error}`);
+  }
+}
+
+async function speakWithCloudflareTts(text, voiceProfile, duration) {
+  setStatus("Generating voice", "busy");
+  ttsStatus.value = "Cloudflare Aura-2";
+
+  const response = await fetch("/api/ai-sales/tts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text,
+      model: salesSettings.ttsModel,
+      speaker: salesSettings.ttsSpeaker,
+      encoding: "mp3",
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = await readJsonResponse(response);
+    throw new Error(payload.error || `Cloudflare TTS failed (${response.status})`);
+  }
+
+  const audioBlob = await response.blob();
+  if (!audioBlob.size) {
+    throw new Error("Cloudflare TTS returned empty audio.");
+  }
+
+  const audio = new Audio();
+  const objectUrl = URL.createObjectURL(audioBlob);
+  let speechFinished = false;
+  let fallbackStopTimer = null;
+
+  const finishSpeech = () => {
+    if (speechFinished) return;
+    speechFinished = true;
+    if (fallbackStopTimer) window.clearTimeout(fallbackStopTimer);
+    stopSpeaking(false);
+  };
+
+  activeAudio = audio;
+  audio.src = objectUrl;
+  audio.preload = "auto";
+  audio.onloadedmetadata = () => {
+    if (Number.isFinite(audio.duration) && audio.duration > 0) {
+      const audioDurationMs = audio.duration * 1000;
+      state.sequenceDuration = audioDurationMs;
+      fallbackStopTimer = window.setTimeout(finishSpeech, audioDurationMs + 1200);
+    }
+  };
+  audio.onplay = () => {
+    syncStatus.value = "cloudflare audio";
+  };
+  audio.onended = finishSpeech;
+  audio.onerror = () => {
+    finishSpeech();
+    setStatus("Cloudflare voice failed", "warn");
+  };
+
+  beginSpeechAnimation("Speaking");
+  fallbackStopTimer = window.setTimeout(finishSpeech, duration + 1800);
+  await audio.play();
+  ttsStatus.value = `${salesSettings.ttsSpeaker} via Aura-2`;
 }
 
 async function startSpeaking() {
@@ -1570,10 +2374,21 @@ async function startSpeaking() {
   setLog(`visemes: ${sequence.map((item) => item.viseme).join(" ")}`);
 
   if (runId !== speechRunId) return;
-  speakWithBrowserTts(text, selectedProfileKey, voiceProfile, duration);
+  if (salesSettings.ttsProvider.toLowerCase() === "cloudflare") {
+    try {
+      syncStatus.value = "cloudflare speech";
+      await speakWithCloudflareTts(text, voiceProfile, duration);
+      return;
+    } catch (error) {
+      setLog(`Cloudflare TTS failed, using browser fallback: ${error.message || error}`);
+      syncStatus.value = "browser fallback";
+    }
+  }
+
+  await speakWithBrowserTts(text, selectedProfileKey, voiceProfile, duration);
 }
 
-function stopSpeaking(cancelSpeech = true) {
+function stopSpeaking(cancelSpeech = true, nextStatus = autoConversation ? "Listening" : "Avatar ready") {
   speechRunId += 1;
   if (activeAudio) {
     const audio = activeAudio;
@@ -1588,6 +2403,10 @@ function stopSpeaking(cancelSpeech = true) {
   }
 
   state.speaking = false;
+  if (autoConversation) {
+    holdMicForAvatarSpeech(salesSettings.avatarEchoCooldownMs);
+    autoInterimTranscript = "";
+  }
   state.utterance = null;
   state.sequence = [];
   state.wordAnchors = [];
@@ -1601,7 +2420,7 @@ function stopSpeaking(cancelSpeech = true) {
   visemeStatus.value = "sil";
 
   if (statusDot.dataset.tone !== "bad") {
-    setStatus("Avatar ready", "ready");
+    setStatus(nextStatus, "ready");
   }
 }
 
@@ -1876,6 +2695,7 @@ async function init() {
   rendererStatus.value = "loading";
   setStatus("Loading 3D renderer", "busy");
   loadSalesRoleGuide();
+  await loadSalesSettings();
 
   try {
     THREE = await import("./vendor/three/three.module.js");
@@ -1899,16 +2719,16 @@ async function init() {
     input?.addEventListener("input", applyCameraControls);
   });
   cameraResetButton?.addEventListener("click", resetCameraControls);
-  buildAvatar();
-  fallbackAvatarRoot = avatarRoot;
   rendererStatus.value = "webgl loading";
   modelStatus.value = "loading John";
   modeLabel.value = "loading model";
-  setLog("Rendering local fallback while the high-detail John model loads.");
+  setLog("Loading the high-detail John model.");
   requestAnimationFrame(animate);
 
   const loadedModel = await loadRealisticAvatar();
   if (!loadedModel) {
+    buildAvatar();
+    fallbackAvatarRoot = avatarRoot;
     rendererStatus.value = "webgl fallback";
     modelStatus.value = "procedural fallback";
     modeLabel.value = "3d fallback";
@@ -1923,8 +2743,14 @@ async function init() {
   expressionSelect.addEventListener("change", () => {
     state.expression = expressionSelect.value;
   });
-  voiceSelect.addEventListener("change", applyVoiceProfileDefaults);
+  voiceSelect.addEventListener("change", () => {
+    userSelectedVoice = true;
+    applyVoiceProfileDefaults();
+    const selectedVoice = voiceChoices[voiceSelect.value];
+    if (selectedVoice) ttsStatus.value = selectedVoice.name;
+  });
   cameraButton.addEventListener("click", startRepCamera);
+  autoConversationButton.addEventListener("click", toggleAutoConversation);
   listenButton.addEventListener("click", startListening);
   stopListenButton.addEventListener("click", stopListening);
   roleplayButton.addEventListener("click", () => generateRoleplayReply(userInput.value.trim(), true));

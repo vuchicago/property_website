@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { onRequestPost as coachPost } from '../functions/api/ai-sales/coach.js';
 import { onRequestGet as healthGet } from '../functions/api/ai-sales/health.js';
 import { onRequestPost as transcribePost } from '../functions/api/ai-sales/transcribe.js';
+import { onRequestPost as turnPost } from '../functions/api/ai-sales/turn.js';
+import { onRequestPost as ttsPost } from '../functions/api/ai-sales/tts.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
@@ -52,6 +54,8 @@ const env = {
         CLOUDFLARE_DEEPSEEK_MODEL: process.env.CLOUDFLARE_DEEPSEEK_MODEL || 'deepseek/deepseek-v4-pro',
         DEEPSEEK_MODEL: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash',
         AI_SALES_TRANSCRIBE_MODEL: process.env.AI_SALES_TRANSCRIBE_MODEL || '@cf/openai/whisper',
+        AI_SALES_TTS_MODEL: process.env.AI_SALES_TTS_MODEL || '@cf/deepgram/aura-2-en',
+        AI_SALES_TTS_SPEAKER: process.env.AI_SALES_TTS_SPEAKER || 'apollo',
         AI_SALES_WORKERS_MODEL: process.env.AI_SALES_WORKERS_MODEL || '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
         ...process.env
 };
@@ -134,8 +138,18 @@ async function handleApi(req, res, url) {
                 return true;
         }
 
+        if (url.pathname === '/api/ai-sales/turn' && req.method === 'POST') {
+                await sendFetchResponse(res, await turnPost({ request, env }));
+                return true;
+        }
+
         if (url.pathname === '/api/ai-sales/transcribe' && req.method === 'POST') {
                 await sendFetchResponse(res, await transcribePost({ request, env }));
+                return true;
+        }
+
+        if (url.pathname === '/api/ai-sales/tts' && req.method === 'POST') {
+                await sendFetchResponse(res, await ttsPost({ request, env }));
                 return true;
         }
 

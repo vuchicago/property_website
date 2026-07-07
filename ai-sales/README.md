@@ -50,7 +50,7 @@ If `wrangler pages dev` fails while starting Cloudflare's remote edge preview se
 
 ```bash
 bash build.sh
-node scripts/dev_ai_sales_server.mjs 8788
+node scripts/restart_ai_sales_server.mjs
 ```
 
 Then open:
@@ -60,3 +60,4 @@ http://127.0.0.1:8788/ai-sales/
 ```
 
 This serves `dist/` and runs the local `/api/ai-sales/coach` route with `ai-sales/.env`.
+The restart script replaces any existing local AI Sales server on port `8788`, so use this command after each iteration instead of starting new ports.

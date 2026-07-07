@@ -1,0 +1,33 @@
+# AI Sales avatar settings.
+
+# English only. Browser speech recognition uses this locale.
+language: en-US
+
+# Default browser text-to-speech profile. Try: britishMale, male, female.
+preferredVoice: britishMale
+
+# TTS provider for avatar speech. Use cloudflare for consistent audio across
+# browsers; browser is the old local SpeechSynthesis fallback.
+ttsProvider: cloudflare
+ttsModel: "@cf/deepgram/aura-2-en"
+ttsSpeaker: apollo
+
+# Lower values make the avatar respond sooner; higher values make it wait longer.
+doneProbability: 0.45
+
+# Fast-path Auto mode pause timer for Chrome/Edge SpeechRecognition.
+autoPauseMs: 400
+
+# After a pause, respond locally without asking the turn model when the transcript
+# has at least this many words and does not end with a continuation word.
+autoLocalPauseMinWords: 3
+
+# Fallback Auto mode recorder settings for browsers without SpeechRecognition.
+autoRecorderSilenceMs: 550
+autoRecorderMinSpeechMs: 350
+autoRecorderMaxSegmentMs: 7000
+autoRecorderRmsThreshold: 0.035
+
+# Ignore mic input during avatar speech and briefly after, so speakers do not
+# trigger self-interruption.
+avatarEchoCooldownMs: 900

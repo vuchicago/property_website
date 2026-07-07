@@ -288,6 +288,12 @@ button.primary:hover {
   background: var(--accent-strong);
 }
 
+button.active {
+  color: #fff;
+  background: var(--busy);
+  border-color: var(--busy);
+}
+
 .engine-panel {
   display: grid;
   gap: 0;

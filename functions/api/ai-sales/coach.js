@@ -4,6 +4,7 @@ const DEFAULT_WORKERS_AI_MODEL = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b';
 const DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-flash';
 const DEFAULT_CLOUDFLARE_DEEPSEEK_MODEL = 'deepseek/deepseek-v4-pro';
 const DEFAULT_CLOUDFLARE_ACCOUNT_ID = '215a936bbe84f807d69a113fbbd125fe';
+const DEFAULT_DONE_PROBABILITY_THRESHOLD = 0.5;
 const MAX_SCENARIO_CHARS = 1600;
 const MAX_ROLE_GUIDE_CHARS = 6000;
 const MAX_CONVERSATION_TURNS = 8;
@@ -26,7 +27,12 @@ function stripReasoning(value) {
                 .trim();
 }
 
-function parseCoachResponse(rawText) {
+function clampProbability(value, fallback = DEFAULT_DONE_PROBABILITY_THRESHOLD) {
+        const number = Number(value);
+        return Number.isFinite(number) ? Math.max(0, Math.min(1, number)) : fallback;
+}
+
+function parseCoachResponse(rawText, doneProbabilityThreshold = DEFAULT_DONE_PROBABILITY_THRESHOLD) {
         const cleaned = stripReasoning(rawText);
         const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
 
@@ -34,14 +40,14 @@ function parseCoachResponse(rawText) {
                 try {
                         const parsed = JSON.parse(jsonMatch[0]);
                         const doneProbability = Number(parsed.doneProbability ?? parsed.done_probability ?? 1);
-                        const rawShouldRespond = parsed.shouldRespond ?? parsed.should_respond ?? doneProbability > 0.5;
+                        const rawShouldRespond = parsed.shouldRespond ?? parsed.should_respond ?? doneProbability > doneProbabilityThreshold;
                         const shouldRespond = typeof rawShouldRespond === 'string'
                                 ? rawShouldRespond.toLowerCase() === 'true'
                                 : Boolean(rawShouldRespond);
                         return {
                                 text: String(parsed.text || '').trim(),
                                 expression: String(parsed.expression || 'friendly').trim().toLowerCase(),
-                                doneProbability: Number.isFinite(doneProbability) ? Math.max(0, Math.min(1, doneProbability)) : 1,
+                                doneProbability: clampProbability(doneProbability, 1),
                                 shouldRespond: Boolean(shouldRespond)
                         };
                 } catch {
@@ -96,15 +102,20 @@ function cleanConversation(value) {
                 .filter(turn => turn.role && turn.text);
 }
 
-function coachMessages({ scenario, requestedExpression, voice, roleGuide, conversation }) {
+function coachMessages({ scenario, requestedExpression, voice, roleGuide, conversation, doneProbabilityThreshold, language, forceRespond }) {
         const systemContent = [
                 'You are the brain of a real-time sales roleplay avatar.',
+                `This roleplay is English-only. Expected language/locale: ${language}.`,
+                'If the salesperson transcript is not English, do not continue that language; respond in English asking them to continue in English.',
                 'You must understand the salesperson transcript, decide if they are done speaking, choose an emotional reaction, and respond as the buyer only when appropriate.',
+                forceRespond
+                        ? 'A turn detector has already decided the salesperson finished. Generate the buyer response now; set shouldRespond true.'
+                        : 'Use doneProbability to decide whether to respond now.',
                 'Return only compact JSON with keys "doneProbability", "shouldRespond", "text", and "expression".',
                 'Your entire response must start with "{" and end with "}".',
                 'Do not include reasoning, analysis, markdown, or <think> tags.',
                 'doneProbability is your estimate from 0 to 1 that the salesperson has finished their turn.',
-                'Set shouldRespond to true only when doneProbability is greater than 0.5.',
+                `Set shouldRespond to true only when doneProbability is greater than ${doneProbabilityThreshold}.`,
                 'If shouldRespond is false, set text to an empty string and still choose an expression.',
                 'The text must be one natural spoken line, 12 to 32 words, no markdown.',
                 'Use a realistic buyer tone. You are the customer, not the sales coach.',
@@ -250,23 +261,34 @@ export const onRequestPost = async (context) => {
                 const scenario = String(payload.scenario || payload.message || '').trim().slice(0, MAX_SCENARIO_CHARS);
                 const requestedExpression = String(payload.expression || 'friendly').trim().toLowerCase();
                 const voice = String(payload.voice || 'male').trim().toLowerCase();
+                const language = String(payload.language || payload.settings?.language || 'en-US').slice(0, 16);
                 const roleGuide = String(payload.roleGuide || '').trim().slice(0, MAX_ROLE_GUIDE_CHARS);
+                const forceRespond = Boolean(payload.forceRespond);
+                const doneProbabilityThreshold = clampProbability(
+                        payload.doneProbabilityThreshold ?? payload.settings?.doneProbability,
+                        DEFAULT_DONE_PROBABILITY_THRESHOLD
+                );
                 const messages = coachMessages({
                         scenario,
                         requestedExpression,
                         voice,
                         roleGuide,
-                        conversation: payload.conversation
+                        conversation: payload.conversation,
+                        doneProbabilityThreshold,
+                        language,
+                        forceRespond
                 });
                 const completion = deepSeekApiKey(context.env)
                         ? await runDeepSeekApi(context.env, messages)
                         : await runWorkersAi(context.env, messages);
                 const rawText = completion.rawText;
-                const parsed = parseCoachResponse(rawText);
+                const parsed = parseCoachResponse(rawText, doneProbabilityThreshold);
                 const text = limitSentence(parsed.text);
                 const expression = EXPRESSIONS.has(parsed.expression) ? parsed.expression : 'friendly';
                 const doneProbability = Number.isFinite(parsed.doneProbability) ? parsed.doneProbability : (text ? 1 : 0);
-                const shouldRespond = Boolean(parsed.shouldRespond && doneProbability > 0.5);
+                const shouldRespond = forceRespond
+                        ? Boolean(text)
+                        : Boolean(parsed.shouldRespond && doneProbability > doneProbabilityThreshold);
                 const responseText = shouldRespond ? text : '';
 
                 if (shouldRespond && !responseText) {
@@ -277,6 +299,7 @@ export const onRequestPost = async (context) => {
                         text: responseText,
                         expression,
                         doneProbability,
+                        doneProbabilityThreshold,
                         shouldRespond,
                         model: completion.model,
                         provider: completion.provider

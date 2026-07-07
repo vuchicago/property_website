@@ -24,9 +24,10 @@ export const onRequestGet = async (context) => {
                         model: 'John AvatarSDK male facial rig'
                 },
                 speech: {
-                        engine: 'Browser SpeechSynthesis',
+                        engine: context.env.AI_SALES_TTS_MODEL || '@cf/deepgram/aura-2-en',
                         available: true,
-                        fallback: null
+                        provider: context.env.AI || hasCloudflareApiKey ? 'Cloudflare Workers AI' : 'Browser SpeechSynthesis fallback',
+                        fallback: 'Browser SpeechSynthesis'
                 },
                 coach: {
                         engine: hasDeepSeekApiKey
