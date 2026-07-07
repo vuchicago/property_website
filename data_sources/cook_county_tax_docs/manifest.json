@@ -1,0 +1,102 @@
+{
+  "documents": [
+    {
+      "id": "local-2024-tax-rate-report",
+      "title": "2024 Cook County Tax Rate Report",
+      "agency": "Cook County Clerk",
+      "source_type": "tax-rates",
+      "path": "../property_tax_rates/2024-tax-rate-report.pdf"
+    },
+    {
+      "id": "assessor-online-appeals-guide",
+      "title": "Online Appeals Guide",
+      "agency": "Cook County Assessor",
+      "source_type": "appeals",
+      "url": "https://www.cookcountyassessor.com/form-document/online-appeals-guide"
+    },
+    {
+      "id": "assessor-appeal-documents-faq",
+      "title": "What documents are required to file an appeal?",
+      "agency": "Cook County Assessor",
+      "source_type": "appeals",
+      "url": "https://www.cookcountyassessor.com/faq/what-documents-are-required-file-appeal"
+    },
+    {
+      "id": "assessor-official-appeal-rules",
+      "title": "Official Appeal Rules of the Cook County Assessor",
+      "agency": "Cook County Assessor",
+      "source_type": "appeals",
+      "url": "https://rpie.cookcountyassessor.com/official-appeal-rules-cook-county-assessor"
+    },
+    {
+      "id": "assessor-property-tax-system",
+      "title": "The Cook County Property Tax System",
+      "agency": "Cook County Assessor",
+      "source_type": "property-tax-system",
+      "url": "https://rpie.cookcountyassessor.com/cook-county-property-tax-system"
+    },
+    {
+      "id": "assessor-how-properties-are-valued",
+      "title": "How Properties are Valued",
+      "agency": "Cook County Assessor",
+      "source_type": "assessments",
+      "url": "https://rpie.cookcountyassessor.com/index.php/how-properties-are-valued"
+    },
+    {
+      "id": "assessor-residential-appeals",
+      "title": "Residential Appeals",
+      "agency": "Cook County Assessor",
+      "source_type": "appeals",
+      "url": "https://rpie.cookcountyassessor.com/residential-appeals"
+    },
+    {
+      "id": "assessor-class-2-residential-questions",
+      "title": "Class 2 Residential Questions",
+      "agency": "Cook County Assessor",
+      "source_type": "residential",
+      "url": "https://rpie.cookcountyassessor.com/form-document/class-2-residential-questions"
+    },
+    {
+      "id": "bor-official-rules",
+      "title": "Board of Review Official Rules",
+      "agency": "Cook County Board of Review",
+      "source_type": "appeals",
+      "url": "https://www.cookcountyboardofreview.com/board-review-official-rules"
+    },
+    {
+      "id": "bor-assessment-appeals",
+      "title": "Assessment Appeals",
+      "agency": "Cook County Board of Review",
+      "source_type": "appeals",
+      "url": "https://www.cookcountyboardofreview.com/what-we-do/assessment-appeals"
+    },
+    {
+      "id": "bor-faq",
+      "title": "Frequently Asked Questions",
+      "agency": "Cook County Board of Review",
+      "source_type": "faq",
+      "url": "https://www.cookcountyboardofreview.com/about/frequently-asked-questions"
+    },
+    {
+      "id": "bor-exemption-policies",
+      "title": "Exemption Policies",
+      "agency": "Cook County Board of Review",
+      "source_type": "exemptions",
+      "url": "https://www.cookcountyboardofreview.com/rules/exemption-policies"
+    },
+    {
+      "id": "assessor-residential-appeal-filing-pdf",
+      "title": "Residential Appeal Filing",
+      "agency": "Cook County Assessor",
+      "source_type": "appeals",
+      "url": "https://prodassets.cookcountyassessor.com/s3fs-public/form_documents/ResidentialAppealFiling.pdf"
+    },
+    {
+      "id": "assessor-guide-to-appeals-pdf",
+      "title": "Guide to Appeals",
+      "agency": "Cook County Assessor",
+      "source_type": "appeals",
+      "url": "https://prodassets.cookcountyassessor.com/s3fs-public/form_documents/ccao_guide_to_appeals.pdf?VersionId=CwYY4sAP_2ZvIrq0_1BnhY2NDa1DJJev"
+    }
+  ]
+}

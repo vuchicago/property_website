@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Sales Trainer Avatar</title>
+    <meta http-equiv="Cache-Control" content="no-store" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="studio" aria-label="Real-time speaking avatar">
+        <div class="topbar">
+          <div>
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">Initializing avatar</span>
+          </div>
+          <output id="modeLabel">live rig</output>
+        </div>
+
+        <div class="avatar-stage">
+          <canvas id="avatarCanvas" width="960" height="1080" aria-label="Realistic 3D speaking avatar"></canvas>
+        </div>
+
+        <div class="caption" id="caption">
+          Hi, I’m John. Let’s practice your discovery call.
+        </div>
+      </section>
+
+      <section class="controls" aria-label="Avatar speech controls">
+        <div class="field">
+          <label for="userInput">Your line</label>
+          <textarea id="userInput" rows="4" placeholder="Ask the customer a discovery question."></textarea>
+        </div>
+
+        <div class="practice-panel" aria-label="Sales roleplay controls">
+          <video id="repVideo" playsinline muted></video>
+          <div class="practice-actions">
+            <button id="cameraButton" type="button">Camera</button>
+            <button id="listenButton" type="button">Listen</button>
+            <button id="stopListenButton" type="button" disabled>Stop</button>
+            <button id="roleplayButton" class="primary" type="button">Respond</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="scriptInput">Customer response</label>
+          <textarea id="scriptInput" rows="7">Hi, I’m John. Let’s practice your discovery call.</textarea>
+        </div>
+
+        <div class="control-grid">
+          <div class="field">
+            <label for="voiceSelect">Voice</label>
+            <select id="voiceSelect">
+              <option value="male" selected>Male</option>
+              <option value="female">Female</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="expressionSelect">Expression</label>
+            <select id="expressionSelect">
+              <option value="happy">Happy</option>
+              <option value="friendly">Friendly</option>
+              <option value="curious">Curious</option>
+              <option value="confident">Confident</option>
+              <option value="doubtful">Doubtful</option>
+              <option value="concerned">Concerned</option>
+              <option value="disappointed">Disappointed</option>
+              <option value="angry">Angry</option>
+              <option value="scornful">Scornful</option>
+              <option value="neutral">Neutral</option>
+            </select>
+          </div>
+        </div>
+
+        <input id="rateInput" type="hidden" value="0.92" />
+        <input id="pitchInput" type="hidden" value="0.82" />
+
+        <div class="camera-panel" aria-label="Camera controls">
+          <div class="camera-header">
+            <span>Camera</span>
+            <button id="cameraResetButton" type="button">Reset</button>
+          </div>
+          <div class="camera-grid">
+            <div class="field compact">
+              <label for="cameraXInput">Left / Right</label>
+              <input id="cameraXInput" type="range" min="-1.8" max="1.8" step="0.05" value="0" />
+            </div>
+            <div class="field compact">
+              <label for="cameraYInput">Up / Down</label>
+              <input id="cameraYInput" type="range" min="-8" max="8" step="0.05" value="0" />
+            </div>
+            <div class="field compact">
+              <label for="cameraDistanceInput">Distance</label>
+              <input id="cameraDistanceInput" type="range" min="0.45" max="2.6" step="0.05" value="1" />
+            </div>
+            <div class="field compact">
+              <label for="cameraAngleInput">Angle</label>
+              <input id="cameraAngleInput" type="range" min="-90" max="90" step="1" value="0" />
+            </div>
+          </div>
+        </div>
+
+        <div class="button-row">
+          <button id="generateButton" type="button">Generate Reply</button>
+          <button class="primary" id="speakButton" type="button">Speak</button>
+          <button id="stopButton" type="button">Stop</button>
+          <button id="demoButton" type="button">Load Demo</button>
+        </div>
+
+        <div class="engine-panel" aria-label="Runtime status">
+          <div class="engine-row">
+            <span>Renderer</span>
+            <output id="rendererStatus">webgl</output>
+          </div>
+          <div class="engine-row">
+            <span>Model</span>
+            <output id="modelStatus">loading</output>
+          </div>
+          <div class="engine-row">
+            <span>TTS</span>
+            <output id="ttsStatus">checking</output>
+          </div>
+          <div class="engine-row">
+            <span>Lip sync</span>
+            <output id="syncStatus">visemes</output>
+          </div>
+          <div class="engine-row">
+            <span>Viseme</span>
+            <output id="visemeStatus">sil</output>
+          </div>
+        </div>
+
+        <pre id="logPanel" class="log-panel" aria-live="polite"></pre>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js?v=deepseek-browser-speech-20260707a"></script>
+  </body>
+</html>

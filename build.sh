@@ -45,6 +45,10 @@ cp robots.txt sitemap.xml llms.txt _redirects favicon.ico favicon.svg favicon-16
 
 # Copy public assets used by social previews, favicons, and page images
 cp -r assets/ dist/assets/ 2>/dev/null || true
+rm -rf dist/ai-sales
+cp -r ai-sales/ dist/ai-sales/ 2>/dev/null || true
+find dist/ai-sales -type f \( -name ".env" -o -name ".env.*" \) -delete 2>/dev/null || true
+rm -rf dist/functions
 cp -r functions/ dist/functions/
 
 echo "Build complete. Output directory ready for Pages deploy."

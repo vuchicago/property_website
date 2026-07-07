@@ -1,12 +1,29 @@
 {
         "name": "cookcountytaxcomparev2",
+        "account_id": "215a936bbe84f807d69a113fbbd125fe",
         "compatibility_date": "2026-02-01",
         "pages_build_output_dir": "dist",
+        "vars": {
+                "CLOUDFLARE_ACCOUNT_ID": "215a936bbe84f807d69a113fbbd125fe",
+                "CLOUDFLARE_DEEPSEEK_MODEL": "deepseek/deepseek-v4-pro",
+                "DEEPSEEK_MODEL": "deepseek-v4-flash",
+                "AI_SALES_TRANSCRIBE_MODEL": "@cf/openai/whisper",
+                "AI_SALES_WORKERS_MODEL": "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b"
+        },
         "d1_databases": [
                 {
                         "binding": "DB",
                         "database_name": "appeal_db",
                         "database_id": "ccbba211-1c8b-46b6-94f5-12e1cf840609"
+                }
+        ],
+        "ai": {
+                "binding": "AI"
+        },
+        "vectorize": [
+                {
+                        "binding": "TAX_DOCS_VECTORIZE",
+                        "index_name": "cook-county-tax-docs"
                 }
         ],
         "observability": {

@@ -67,6 +67,34 @@ wrangler d1 execute appeal_db --local --file=migrations/0008_create_property_ima
 
 Do not run the full `schema.sql` against production unless you intend to reset data, because it drops and recreates the `appeals` table.
 
+## Cook County Tax RAG
+
+The Cook County document Q&A system uses Workers AI plus Vectorize. It does not write document chunks to D1.
+
+Create the Vectorize index before deploying the binding:
+
+```bash
+npx wrangler vectorize create cook-county-tax-docs --dimensions=768 --metric=cosine
+```
+
+Generate capped document embeddings from `data_sources/cook_county_tax_docs/manifest.json`:
+
+```bash
+CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id \
+CLOUDFLARE_API_TOKEN=your_workers_ai_token \
+python3 scripts/build_cook_county_tax_vectors.py --max-chunks 750
+```
+
+PDF sources require either `pdftotext` from Poppler or the Python `pypdf` package to be installed locally.
+
+Upload the generated vectors:
+
+```bash
+npx wrangler vectorize insert cook-county-tax-docs --file=import/cook_county_tax_doc_vectors.ndjson
+```
+
+The cap is intentional. Increase `--max-chunks` only after checking the monthly Vectorize and Workers AI usage. Your Workers/D1 billing period appears to renew on the 6th of each month.
+
 If you previously ran an older draft of `0003_create_property_addresses.sql` and see an error like `no such column: neighborhood_code`, rebuild the generated property lookup table before importing the Parquet data:
 
 ```bash

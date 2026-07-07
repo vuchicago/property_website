@@ -1,0 +1,360 @@
+:root {
+  color-scheme: light;
+  --ink: #18212b;
+  --muted: #667283;
+  --line: #d7dee8;
+  --surface: #eef3f4;
+  --panel: #ffffff;
+  --stage: #dce8e9;
+  --accent: #106853;
+  --accent-strong: #0b5242;
+  --busy: #2f6fed;
+  --warn: #b56b16;
+  --bad: #b42318;
+  --ready: #12805c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background:
+    linear-gradient(180deg, rgba(16, 104, 83, 0.07), rgba(255, 255, 255, 0) 42%),
+    var(--surface);
+}
+
+button,
+textarea,
+select,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: minmax(440px, 1fr) 430px;
+  gap: 24px;
+  width: min(1180px, calc(100vw - 32px));
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 28px 0;
+  align-items: start;
+}
+
+.studio,
+.controls {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 18px 50px rgba(24, 33, 43, 0.08);
+}
+
+.studio {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 720px;
+  overflow: hidden;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.topbar > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #8b98aa;
+}
+
+.status-dot[data-tone="ready"] {
+  background: var(--ready);
+  box-shadow: 0 0 0 5px rgba(18, 128, 92, 0.12);
+}
+
+.status-dot[data-tone="busy"] {
+  background: var(--busy);
+  box-shadow: 0 0 0 5px rgba(47, 111, 237, 0.12);
+}
+
+.status-dot[data-tone="warn"] {
+  background: var(--warn);
+  box-shadow: 0 0 0 5px rgba(181, 107, 22, 0.12);
+}
+
+.status-dot[data-tone="bad"] {
+  background: var(--bad);
+  box-shadow: 0 0 0 5px rgba(180, 35, 24, 0.12);
+}
+
+.avatar-stage {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.44), rgba(203, 220, 222, 0.42)),
+    var(--stage);
+}
+
+#avatarCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 592px;
+  background: #dce8e9;
+}
+
+.caption {
+  min-height: 76px;
+  display: grid;
+  place-items: center;
+  padding: 18px 28px;
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.controls {
+  padding: 22px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.field.compact {
+  margin-bottom: 14px;
+}
+
+label {
+  color: #263240;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+textarea,
+select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #fff;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 170px;
+  padding: 13px 14px;
+  line-height: 1.45;
+}
+
+#userInput {
+  min-height: 112px;
+}
+
+select {
+  height: 42px;
+  padding: 0 10px;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.control-grid,
+.slider-grid,
+.camera-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 16px;
+}
+
+.camera-panel {
+  margin: 4px 0 18px;
+  padding: 14px 14px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7faf9;
+}
+
+.camera-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  color: #263240;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.camera-header button {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.practice-panel {
+  display: grid;
+  grid-template-columns: 148px 1fr;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7faf9;
+}
+
+#repVideo {
+  display: block;
+  width: 148px;
+  aspect-ratio: 4 / 3;
+  border: 1px solid #cbd5df;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #d8e1e4;
+}
+
+.practice-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-content: start;
+}
+
+.practice-actions button {
+  min-height: 38px;
+  font-size: 13px;
+}
+
+.button-row {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 0.8fr 0.9fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+button {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #fff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+button:hover {
+  border-color: #aeb9c8;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+button.primary {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+button.primary:hover {
+  background: var(--accent-strong);
+}
+
+.engine-panel {
+  display: grid;
+  gap: 0;
+  margin-top: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.engine-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.engine-row:last-child {
+  border-bottom: 0;
+}
+
+.engine-row output {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.log-panel {
+  min-height: 108px;
+  max-height: 190px;
+  margin: 16px 0 0;
+  padding: 13px 14px;
+  overflow: auto;
+  border: 1px solid #cfd7e2;
+  border-radius: 8px;
+  background: #101820;
+  color: #dbe7ef;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    width: min(100vw - 24px, 680px);
+    padding: 12px 0;
+  }
+
+  .studio {
+    min-height: 640px;
+  }
+
+  #avatarCanvas {
+    min-height: 512px;
+  }
+
+  .control-grid,
+  .slider-grid,
+  .camera-grid,
+  .practice-panel,
+  .button-row {
+    grid-template-columns: 1fr;
+  }
+
+  #repVideo {
+    width: 100%;
+  }
+}
