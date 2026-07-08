@@ -16,6 +16,7 @@ const cameraAngleInput = document.querySelector("#cameraAngleInput");
 const cameraResetButton = document.querySelector("#cameraResetButton");
 const repVideo = document.querySelector("#repVideo");
 const cameraButton = document.querySelector("#cameraButton");
+const personalitySelect = document.querySelector("#personalitySelect");
 const autoConversationButton = document.querySelector("#autoConversationButton");
 const listenButton = document.querySelector("#listenButton");
 const stopListenButton = document.querySelector("#stopListenButton");
@@ -144,20 +145,23 @@ let voiceChoices = {};
 let activeAudio = null;
 let speechRunId = 0;
 let salesRoleGuide = "";
+let activePersonality = "sales";
 let salesSettings = {
   language: "en-US",
+  deepseekModel: "deepseek/deepseek-v4-flash",
+  deepseekTurnModel: "deepseek/deepseek-v4-flash",
   preferredVoice: "britishMale",
   ttsProvider: "cloudflare",
   ttsModel: "@cf/deepgram/aura-2-en",
   ttsSpeaker: "apollo",
   doneProbability: 0.45,
-  autoPauseMs: 400,
-  autoLocalPauseMinWords: 3,
-  autoRecorderSilenceMs: 550,
+  autoPauseMs: 250,
+  autoLocalPauseMinWords: 2,
+  autoRecorderSilenceMs: 350,
   autoRecorderMinSpeechMs: 350,
   autoRecorderMaxSegmentMs: 7000,
   autoRecorderRmsThreshold: 0.035,
-  avatarEchoCooldownMs: 900,
+  avatarEchoCooldownMs: 700,
 };
 let recognition = null;
 let listening = false;
@@ -188,7 +192,7 @@ let autoIgnoreMicUntil = 0;
 let userSelectedVoice = false;
 const conversationTurns = [];
 
-const AUTO_MIN_TRANSCRIPT_CHARS = 8;
+const AUTO_MIN_TRANSCRIPT_CHARS = 3;
 
 const VOICE_PROFILES = {
   britishMale: {
@@ -319,15 +323,48 @@ async function readJsonResponse(response) {
   );
 }
 
-async function loadSalesRoleGuide() {
+function personalityGuidePath(personality = activePersonality) {
+  return personality === "kids" ? "./kids-agent.md" : "./sales-agent.md";
+}
+
+function updatePersonalityLabels() {
+  if (activePersonality === "kids") {
+    scriptInput.value = "Hi, I am John. Want to count with me?";
+    caption.textContent = scriptInput.value;
+    userInput.placeholder = "Say hi to John, count, or ask about letters.";
+    roleplayButton.textContent = "Answer";
+    generateButton.textContent = "Generate Answer";
+    return;
+  }
+
+  scriptInput.value = "Hi, I’m John. Let’s practice your discovery call.";
+  caption.textContent = scriptInput.value;
+  userInput.placeholder = "Ask the customer a discovery question.";
+  roleplayButton.textContent = "Respond";
+  generateButton.textContent = "Generate Reply";
+}
+
+async function loadSalesRoleGuide(personality = activePersonality) {
   try {
-    const response = await fetch("./sales-agent.md", { cache: "no-store" });
-    if (!response.ok) throw new Error(`sales-agent.md ${response.status}`);
+    const path = personalityGuidePath(personality);
+    const response = await fetch(path, { cache: "no-store" });
+    if (!response.ok) throw new Error(`${path} ${response.status}`);
     salesRoleGuide = await response.text();
   } catch (error) {
     salesRoleGuide = "";
     setLog(`Role guide unavailable: ${error.message || error}`);
   }
+}
+
+async function setPersonality(personality) {
+  activePersonality = personality === "kids" ? "kids" : "sales";
+  if (personalitySelect) personalitySelect.value = activePersonality;
+  conversationTurns.length = 0;
+  autoTranscriptBuffer = "";
+  resetAutoUtteranceText();
+  updatePersonalityLabels();
+  await loadSalesRoleGuide(activePersonality);
+  setLog(`Personality: ${activePersonality === "kids" ? "Kids Friend" : "Sales Customer"}`);
 }
 
 function parseSimpleYaml(text) {
@@ -367,6 +404,8 @@ async function loadSalesSettings() {
       ...salesSettings,
       ...settings,
       language: String(settings.language || salesSettings.language || "en-US"),
+      deepseekModel: String(settings.deepseekModel || salesSettings.deepseekModel || "deepseek/deepseek-v4-flash"),
+      deepseekTurnModel: String(settings.deepseekTurnModel || salesSettings.deepseekTurnModel || settings.deepseekModel || "deepseek/deepseek-v4-flash"),
       preferredVoice: String(settings.preferredVoice || salesSettings.preferredVoice || "britishMale"),
       ttsProvider: String(settings.ttsProvider || salesSettings.ttsProvider || "cloudflare"),
       ttsModel: String(settings.ttsModel || salesSettings.ttsModel || "@cf/deepgram/aura-2-en"),
@@ -421,17 +460,19 @@ function ensureRecognition() {
   recognition.lang = salesSettings.language || "en-US";
   recognition.interimResults = true;
   recognition.continuous = false;
+  recognition.maxAlternatives = 1;
 
   recognition.onstart = () => {
     listening = true;
     listenButton.disabled = true;
     stopListenButton.disabled = false;
     setStatus("Listening", "busy");
+    setLog("Listening now.");
   };
 
   recognition.onresult = (event) => {
     let transcript = "";
-    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+    for (let index = 0; index < event.results.length; index += 1) {
       transcript += event.results[index][0]?.transcript || "";
     }
     if (transcript.trim()) {
@@ -627,9 +668,9 @@ function localTurnDecision(transcript, { finalSegment = false } = {}) {
     (wordCount >= salesSettings.autoLocalPauseMinWords || (startsLikeQuestion && wordCount >= 3));
   if (pausedCompleteTurn) {
     return {
-      doneProbability: 0.65,
+      doneProbability: 0.9,
       doneProbabilityThreshold: salesSettings.doneProbability,
-      shouldRespond: 0.65 > salesSettings.doneProbability,
+      shouldRespond: true,
       provider: "local-heuristic",
       model: "final speech segment",
     };
@@ -809,6 +850,10 @@ async function processAutoRecordedSegment(blob) {
 
 function startAutoRecorderSegment() {
   if (!autoConversation || !autoRecorder || autoRecorder.state !== "inactive") return;
+  if (isAvatarEchoGuardActive()) {
+    window.setTimeout(startAutoRecorderSegment, autoEchoGuardDelayMs() + 120);
+    return;
+  }
 
   autoRecorderChunks = [];
   autoSpeechStarted = false;
@@ -831,10 +876,20 @@ function ensureAutoRecognition() {
   autoRecognition.lang = salesSettings.language || "en-US";
   autoRecognition.interimResults = true;
   autoRecognition.continuous = true;
+  autoRecognition.maxAlternatives = 1;
 
   autoRecognition.onstart = () => {
     listening = true;
+    if (isAvatarEchoGuardActive()) {
+      try {
+        autoRecognition.stop();
+      } catch {
+        // Recognition may already be stopped.
+      }
+      return;
+    }
     setStatus("Listening", "ready");
+    setLog("Listening now.");
   };
 
   autoRecognition.onresult = (event) => {
@@ -854,6 +909,7 @@ function ensureAutoRecognition() {
       heardSpeech = true;
       if (event.results[index].isFinal) {
         autoFinalTranscript = compactTranscript(`${autoFinalTranscript} ${transcript}`);
+        interim = "";
       } else {
         interim = compactTranscript(`${interim} ${transcript}`);
       }
@@ -885,19 +941,29 @@ function ensureAutoRecognition() {
   autoRecognition.onend = () => {
     listening = false;
     if (!autoConversation) return;
-
     autoRestartTimer = window.setTimeout(() => {
       autoRestartTimer = null;
-      if (!autoConversation) return;
-      try {
-        autoRecognition.start();
-      } catch {
-        scheduleAutoTurnCheck(300);
-      }
-    }, 160);
+      startAutoRecognitionNow();
+    }, isAvatarEchoGuardActive() ? autoEchoGuardDelayMs() + 120 : 160);
   };
 
   return autoRecognition;
+}
+
+function startAutoRecognitionNow(delay = 0) {
+  if (!autoConversation || !autoRecognition) return;
+  window.setTimeout(() => {
+    if (!autoConversation || !autoRecognition || listening) return;
+    if (isAvatarEchoGuardActive()) {
+      startAutoRecognitionNow(autoEchoGuardDelayMs() + 120);
+      return;
+    }
+    try {
+      autoRecognition.start();
+    } catch {
+      scheduleAutoTurnCheck(250);
+    }
+  }, delay);
 }
 
 async function requestAutoTurnDecision() {
@@ -912,6 +978,7 @@ async function requestAutoTurnDecision() {
   const transcript = currentAutoTranscript();
   if (transcript.length < AUTO_MIN_TRANSCRIPT_CHARS) {
     if (!state.speaking) setStatus("Listening", "ready");
+    if (transcript) scheduleAutoTurnCheck(200);
     return;
   }
 
@@ -978,6 +1045,7 @@ async function requestFastTurnDecision(transcript) {
       scenario: transcript,
       conversation: conversationTurns,
       language: salesSettings.language,
+      model: salesSettings.deepseekTurnModel || salesSettings.deepseekModel,
       doneProbabilityThreshold: salesSettings.doneProbability,
     }),
   });
@@ -1023,9 +1091,9 @@ async function startAutoConversation() {
     resetAutoUtteranceText();
     setAutoControls(true);
     userInput.value = "";
-    activeRecognition.start();
-    setStatus("Listening", "ready");
-    setLog("Auto conversation is using live browser speech recognition. DeepSeek decides when the avatar should answer.");
+    setStatus("Starting mic", "busy");
+    setLog("Starting live speech recognition. Begin speaking after it says Listening.");
+    startAutoRecognitionNow();
   } catch (error) {
     autoConversation = false;
     setAutoControls(false);
@@ -1143,6 +1211,8 @@ function startListening() {
   }
   if (listening) return;
   userInput.value = "";
+  setStatus("Starting mic", "busy");
+  setLog("Starting speech recognition. Begin speaking after it says Listening.");
   activeRecognition.start();
 }
 
@@ -2136,7 +2206,14 @@ function beginSpeechAnimation(statusLabel = "Speaking") {
   state.sequenceStart = performance.now();
   state.speaking = true;
   if (autoConversation) {
+    holdMicForAvatarSpeech(salesSettings.avatarEchoCooldownMs + 250);
     autoInterimTranscript = "";
+    autoFinalTranscript = "";
+    try {
+      autoRecognition?.stop?.();
+    } catch {
+      // Recognition may already be stopped.
+    }
   }
   setStatus(statusLabel, "busy");
   syncStatus.value = "active";
@@ -2160,6 +2237,7 @@ async function requestCustomerReply({ scenario, autoSpeak = false, forceRespond 
         voice: voiceSelect.value || "male",
         expression: expressionSelect.value || "friendly",
         language: salesSettings.language,
+        model: salesSettings.deepseekModel,
         doneProbabilityThreshold: salesSettings.doneProbability,
         forceRespond,
       }),
@@ -2694,8 +2772,8 @@ async function checkHealth() {
 async function init() {
   rendererStatus.value = "loading";
   setStatus("Loading 3D renderer", "busy");
-  loadSalesRoleGuide();
   await loadSalesSettings();
+  await setPersonality(personalitySelect?.value || "sales");
 
   try {
     THREE = await import("./vendor/three/three.module.js");
@@ -2742,6 +2820,10 @@ async function init() {
 
   expressionSelect.addEventListener("change", () => {
     state.expression = expressionSelect.value;
+  });
+  personalitySelect?.addEventListener("change", () => {
+    if (autoConversation) stopAutoConversation();
+    setPersonality(personalitySelect.value);
   });
   voiceSelect.addEventListener("change", () => {
     userSelectedVoice = true;
