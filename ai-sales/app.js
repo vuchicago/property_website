@@ -1,4 +1,11 @@
+import { authFetch, getCurrentUserToken } from "../auth-client.js";
+
 const canvas = document.querySelector("#avatarCanvas");
+const avatarStage = document.querySelector(".avatar-stage");
+const kidsActivityCard = document.querySelector("#kidsActivityCard");
+const kidsActivityType = document.querySelector("#kidsActivityType");
+const kidsActivityPrompt = document.querySelector("#kidsActivityPrompt");
+const kidsActivityAnswer = document.querySelector("#kidsActivityAnswer");
 const statusDot = document.querySelector("#statusDot");
 const statusText = document.querySelector("#statusText");
 const modeLabel = document.querySelector("#modeLabel");
@@ -31,6 +38,15 @@ const ttsStatus = document.querySelector("#ttsStatus");
 const syncStatus = document.querySelector("#syncStatus");
 const visemeStatus = document.querySelector("#visemeStatus");
 const logPanel = document.querySelector("#logPanel");
+const nervousnessScoreOutput = document.querySelector("#nervousnessScore");
+const nervousnessMeter = document.querySelector("#nervousnessMeter");
+const confidenceScoreOutput = document.querySelector("#confidenceScore");
+const confidenceMeter = document.querySelector("#confidenceMeter");
+const eyeContactScoreOutput = document.querySelector("#eyeContactScore");
+const movementScoreOutput = document.querySelector("#movementScore");
+const paceScoreOutput = document.querySelector("#paceScore");
+const stutterScoreOutput = document.querySelector("#stutterScore");
+const nervousnessCue = document.querySelector("#nervousnessCue");
 
 const demos = [
   {
@@ -112,6 +128,7 @@ const state = {
   viseme: "sil",
   visemeMix: [{ viseme: "sil", weight: 1 }],
   speechEnergy: 0,
+  audioEnergy: 0,
   sequence: [],
   wordAnchors: [],
   sequenceStart: 0,
@@ -143,6 +160,9 @@ let rig = {};
 let voices = [];
 let voiceChoices = {};
 let activeAudio = null;
+let activeAudioContext = null;
+let activeAudioAnalyser = null;
+let activeAudioFrame = null;
 let speechRunId = 0;
 let salesRoleGuide = "";
 let activePersonality = "sales";
@@ -155,13 +175,33 @@ let salesSettings = {
   ttsModel: "@cf/deepgram/aura-2-en",
   ttsSpeaker: "apollo",
   doneProbability: 0.45,
-  autoPauseMs: 250,
+  maxCoachTokens: 80,
+  conversationTurns: 2,
+  kidsModeFastLocalReplies: "true",
+  autoPauseMs: 200,
+  autoForceTurnMs: 450,
   autoLocalPauseMinWords: 2,
   autoRecorderSilenceMs: 350,
   autoRecorderMinSpeechMs: 350,
   autoRecorderMaxSegmentMs: 7000,
   autoRecorderRmsThreshold: 0.035,
+  autoPreferRecorderMode: "false",
+  autoUseAdaptiveSpeechGate: "true",
+  autoNoiseFloorLearningMs: 1200,
+  autoSpeechRmsMultiplier: 2.6,
+  autoSpeechStartFrames: 3,
+  autoSpeechEndFrames: 10,
+  autoChromeEnergyGate: "false",
+  autoChromeEnergyGraceMs: 900,
+  autoMinMeaningfulWords: 2,
+  autoMinRecognitionConfidence: 0.45,
+  autoListenBeforeSpeechEndMs: 500,
   avatarEchoCooldownMs: 700,
+  fluxEnabled: "true",
+  fluxEotThreshold: 0.7,
+  fluxEagerEotThreshold: 0.55,
+  fluxEotTimeoutMs: 4000,
+  fluxTurnGraceMs: 550,
 };
 let recognition = null;
 let listening = false;
@@ -172,12 +212,16 @@ let recording = false;
 let repStream = null;
 let autoConversation = false;
 let autoRecognition = null;
+let autoUsingRecorderMode = false;
 let autoTurnBusy = false;
 let autoTurnPending = false;
+let autoSpeechStarting = false;
 let autoTranscriptBuffer = "";
 let autoFinalTranscript = "";
 let autoInterimTranscript = "";
 let autoPauseTimer = null;
+let autoForceTurnTimer = null;
+let autoEarlyListenTimer = null;
 let autoRestartTimer = null;
 let autoRecorder = null;
 let autoRecorderStream = null;
@@ -188,9 +232,65 @@ let autoMonitorFrame = null;
 let autoSpeechStarted = false;
 let autoSilenceStartedAt = 0;
 let autoRecorderStartedAt = 0;
+let autoNoiseFloorRms = 0;
+let autoNoiseSamples = 0;
+let autoNoiseLearningStartedAt = 0;
+let autoSpeechActiveFrames = 0;
+let autoSpeechSilentFrames = 0;
+let autoLastVoiceEnergyAt = 0;
 let autoIgnoreMicUntil = 0;
+let autoPreListening = false;
+let autoLastTranscriptAt = 0;
+let autoLastTranscriptText = "";
+let fluxSocket = null;
+let fluxStream = null;
+let fluxAudioContext = null;
+let fluxProcessor = null;
+let fluxSource = null;
+let fluxSilentGain = null;
+let fluxUsingLiveMode = false;
+let fluxEagerTranscript = "";
+let fluxTurnBuffer = "";
+let fluxResponseTimer = null;
 let userSelectedVoice = false;
+let coachingFrameId = null;
+let coachingCanvas = null;
+let coachingContext = null;
+let faceDetector = null;
+let faceDetectorBusy = false;
+let lastVideoSample = null;
+let speechMetrics = {
+  text: "",
+  startedAt: 0,
+  updatedAt: 0,
+  words: 0,
+  wpm: 0,
+  fillerRate: 0,
+  stutterRate: 0,
+  paceNervousness: 0,
+  stutterNervousness: 0,
+};
+let visualMetrics = {
+  eyeContact: 0,
+  movement: 0,
+  movementNervousness: 0,
+  gazeNervousness: 0,
+  frameCount: 0,
+  faceDetected: false,
+};
+let coachingSession = {
+  transcript: "",
+  lastRecordedTurn: "",
+  visualSamples: 0,
+  eyeContactTotal: 0,
+  movementTotal: 0,
+  movementNervousnessTotal: 0,
+  gazeNervousnessTotal: 0,
+};
 const conversationTurns = [];
+let pendingKidsActivity = null;
+let kidsMathGameActive = false;
+let kidsMathGameOffered = false;
 
 const AUTO_MIN_TRANSCRIPT_CHARS = 3;
 
@@ -304,6 +404,162 @@ function setLog(message) {
   logPanel.textContent = message || "";
 }
 
+function formatActivityType(type) {
+  const labels = {
+    addition: "Math",
+    subtraction: "Math",
+    counting: "Counting",
+    letter: "Letters",
+  };
+  return labels[type] || "Question";
+}
+
+function hideKidsActivity() {
+  pendingKidsActivity = null;
+  if (avatarStage) delete avatarStage.dataset.activityVisible;
+  if (kidsActivityCard) kidsActivityCard.hidden = true;
+  if (kidsActivityAnswer) kidsActivityAnswer.hidden = true;
+}
+
+function showKidsActivity(activity, reveal = false) {
+  if (activePersonality !== "kids" || !activity || !kidsActivityCard) return;
+
+  pendingKidsActivity = activity;
+  kidsActivityType.textContent = formatActivityType(activity.type);
+  kidsActivityPrompt.textContent = activity.prompt || "";
+  kidsActivityAnswer.textContent = activity.reveal || `${activity.prompt || ""} ${activity.answer || ""}`.trim();
+  kidsActivityAnswer.hidden = !reveal;
+  kidsActivityCard.hidden = false;
+  if (avatarStage) avatarStage.dataset.activityVisible = "true";
+}
+
+async function revealPendingKidsActivity() {
+  if (activePersonality !== "kids" || !pendingKidsActivity) return;
+
+  showKidsActivity(pendingKidsActivity, true);
+  setStatus("Showing answer", "ready");
+  await wait(1700);
+  hideKidsActivity();
+}
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function makeKidsMathActivity() {
+  const type = ["addition", "subtraction"][randomInt(0, 1)];
+
+  if (type === "addition") {
+    const left = randomInt(0, 5);
+    const right = randomInt(0, 10 - left);
+    const answer = left + right;
+    return {
+      type,
+      prompt: `${left} + ${right} =`,
+      answer: String(answer),
+      reveal: `${left} + ${right} = ${answer}`,
+      spokenQuestion: `What is ${left} plus ${right}?`,
+    };
+  }
+
+  if (type === "subtraction") {
+    const left = randomInt(1, 10);
+    const right = randomInt(0, left);
+    const answer = left - right;
+    return {
+      type,
+      prompt: `${left} - ${right} =`,
+      answer: String(answer),
+      reveal: `${left} - ${right} = ${answer}`,
+      spokenQuestion: `What is ${left} minus ${right}?`,
+    };
+  }
+
+}
+
+function parseChildNumber(text) {
+  const cleanText = compactTranscript(text).toLowerCase();
+  const digitMatch = cleanText.match(/\b([0-9]|[12][0-9]|30)\b/);
+  if (digitMatch) return Number(digitMatch[1]);
+
+  const numberWords = {
+    zero: 0,
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    for: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    ate: 8,
+    nine: 9,
+    ten: 10,
+    eleven: 11,
+    twelve: 12,
+    thirteen: 13,
+    fourteen: 14,
+    fifteen: 15,
+    sixteen: 16,
+    seventeen: 17,
+    eighteen: 18,
+    nineteen: 19,
+    twenty: 20,
+    thirty: 30,
+  };
+  if (/\btwenty one\b/.test(cleanText)) return 21;
+  if (/\btwenty two\b/.test(cleanText)) return 22;
+  if (/\btwenty three\b/.test(cleanText)) return 23;
+  if (/\btwenty four\b/.test(cleanText)) return 24;
+  if (/\btwenty five\b/.test(cleanText)) return 25;
+  if (/\btwenty six\b/.test(cleanText)) return 26;
+  if (/\btwenty seven\b/.test(cleanText)) return 27;
+  if (/\btwenty eight\b/.test(cleanText)) return 28;
+  if (/\btwenty nine\b/.test(cleanText)) return 29;
+
+  const word = cleanText.match(/\b(zero|one|two|three|four|for|five|six|seven|eight|ate|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty)\b/)?.[1];
+  return word ? numberWords[word] : null;
+}
+
+function childSaidYes(text) {
+  return /\b(yes|yeah|yep|ok|okay|sure|please|play|start|again|another|more)\b/i.test(text);
+}
+
+function childSaidNo(text) {
+  return /\b(no|nope|stop|done|finished|all done|not now)\b/i.test(text);
+}
+
+function childMentionedMath(text) {
+  return /\b(math|game|add|plus|subtract|minus|count|number|numbers)\b/i.test(text);
+}
+
+function startKidsMathQuestion() {
+  kidsMathGameActive = true;
+  kidsMathGameOffered = false;
+  const activity = makeKidsMathActivity();
+  showKidsActivity(activity, false);
+  return {
+    text: `${activity.spokenQuestion} Look at the card and tell me your answer.`,
+    activity,
+    provider: "local-kids-math",
+    model: "local-calculator",
+    shouldRespond: true,
+  };
+}
+
+function startKidsAbcLesson() {
+  kidsMathGameActive = false;
+  kidsMathGameOffered = false;
+  hideKidsActivity();
+  return {
+    text: "Okay, let's do ABCs. A, B, C. Can you say A with me?",
+    provider: "local-kids-abc",
+    model: "local",
+    shouldRespond: true,
+  };
+}
+
 async function readJsonResponse(response) {
   const text = await response.text();
   const contentType = response.headers.get("content-type") || "";
@@ -329,11 +585,12 @@ function personalityGuidePath(personality = activePersonality) {
 
 function updatePersonalityLabels() {
   if (activePersonality === "kids") {
-    scriptInput.value = "Hi, I am John. Want to count with me?";
+    scriptInput.value = "Hi, I am John. Do you want to play a math game?";
     caption.textContent = scriptInput.value;
     userInput.placeholder = "Say hi to John, count, or ask about letters.";
     roleplayButton.textContent = "Answer";
     generateButton.textContent = "Generate Answer";
+    kidsMathGameOffered = true;
     return;
   }
 
@@ -359,8 +616,12 @@ async function loadSalesRoleGuide(personality = activePersonality) {
 async function setPersonality(personality) {
   activePersonality = personality === "kids" ? "kids" : "sales";
   if (personalitySelect) personalitySelect.value = activePersonality;
+  hideKidsActivity();
+  kidsMathGameActive = false;
+  kidsMathGameOffered = false;
   conversationTurns.length = 0;
   autoTranscriptBuffer = "";
+  resetCoachingSession();
   resetAutoUtteranceText();
   updatePersonalityLabels();
   await loadSalesRoleGuide(activePersonality);
@@ -411,13 +672,33 @@ async function loadSalesSettings() {
       ttsModel: String(settings.ttsModel || salesSettings.ttsModel || "@cf/deepgram/aura-2-en"),
       ttsSpeaker: String(settings.ttsSpeaker || salesSettings.ttsSpeaker || "apollo"),
       doneProbability: clampProbability(settings.doneProbability, salesSettings.doneProbability),
+      maxCoachTokens: clampNumber(settings.maxCoachTokens, salesSettings.maxCoachTokens, 30, 300),
+      conversationTurns: clampNumber(settings.conversationTurns, salesSettings.conversationTurns, 0, 8),
+      kidsModeFastLocalReplies: String(settings.kidsModeFastLocalReplies ?? salesSettings.kidsModeFastLocalReplies),
       autoPauseMs: clampNumber(settings.autoPauseMs, salesSettings.autoPauseMs, 150, 2000),
+      autoForceTurnMs: clampNumber(settings.autoForceTurnMs, salesSettings.autoForceTurnMs, 400, 5000),
       autoLocalPauseMinWords: clampNumber(settings.autoLocalPauseMinWords, salesSettings.autoLocalPauseMinWords, 2, 12),
       autoRecorderSilenceMs: clampNumber(settings.autoRecorderSilenceMs, salesSettings.autoRecorderSilenceMs, 250, 3000),
       autoRecorderMinSpeechMs: clampNumber(settings.autoRecorderMinSpeechMs, salesSettings.autoRecorderMinSpeechMs, 100, 2000),
       autoRecorderMaxSegmentMs: clampNumber(settings.autoRecorderMaxSegmentMs, salesSettings.autoRecorderMaxSegmentMs, 2000, 20000),
       autoRecorderRmsThreshold: clampNumber(settings.autoRecorderRmsThreshold, salesSettings.autoRecorderRmsThreshold, 0.005, 0.2),
+      autoPreferRecorderMode: String(settings.autoPreferRecorderMode ?? salesSettings.autoPreferRecorderMode),
+      autoUseAdaptiveSpeechGate: String(settings.autoUseAdaptiveSpeechGate ?? salesSettings.autoUseAdaptiveSpeechGate),
+      autoNoiseFloorLearningMs: clampNumber(settings.autoNoiseFloorLearningMs, salesSettings.autoNoiseFloorLearningMs, 250, 5000),
+      autoSpeechRmsMultiplier: clampNumber(settings.autoSpeechRmsMultiplier, salesSettings.autoSpeechRmsMultiplier, 1.2, 8),
+      autoSpeechStartFrames: clampNumber(settings.autoSpeechStartFrames, salesSettings.autoSpeechStartFrames, 1, 12),
+      autoSpeechEndFrames: clampNumber(settings.autoSpeechEndFrames, salesSettings.autoSpeechEndFrames, 2, 30),
+      autoChromeEnergyGate: String(settings.autoChromeEnergyGate ?? salesSettings.autoChromeEnergyGate),
+      autoChromeEnergyGraceMs: clampNumber(settings.autoChromeEnergyGraceMs, salesSettings.autoChromeEnergyGraceMs, 100, 3000),
+      autoMinMeaningfulWords: clampNumber(settings.autoMinMeaningfulWords, salesSettings.autoMinMeaningfulWords, 1, 8),
+      autoMinRecognitionConfidence: clampNumber(settings.autoMinRecognitionConfidence, salesSettings.autoMinRecognitionConfidence, 0, 1),
+      autoListenBeforeSpeechEndMs: clampNumber(settings.autoListenBeforeSpeechEndMs, salesSettings.autoListenBeforeSpeechEndMs, 0, 2000),
       avatarEchoCooldownMs: clampNumber(settings.avatarEchoCooldownMs, salesSettings.avatarEchoCooldownMs, 0, 3000),
+      fluxEnabled: String(settings.fluxEnabled ?? salesSettings.fluxEnabled),
+      fluxEotThreshold: clampNumber(settings.fluxEotThreshold, salesSettings.fluxEotThreshold, 0.5, 0.9),
+      fluxEagerEotThreshold: clampNumber(settings.fluxEagerEotThreshold, salesSettings.fluxEagerEotThreshold, 0.3, 0.9),
+      fluxEotTimeoutMs: clampNumber(settings.fluxEotTimeoutMs, salesSettings.fluxEotTimeoutMs, 500, 60000),
+      fluxTurnGraceMs: clampNumber(settings.fluxTurnGraceMs, salesSettings.fluxTurnGraceMs, 0, 4000),
     };
   } catch (error) {
     setLog(`Settings unavailable, using defaults: ${error.message || error}`);
@@ -425,9 +706,18 @@ async function loadSalesSettings() {
 }
 
 async function startRepCamera() {
+  await ensureRepCamera();
+}
+
+async function ensureRepCamera() {
+  if (repStream?.active && repVideo.srcObject === repStream) {
+    if (repVideo.paused) await repVideo.play().catch(() => {});
+    return true;
+  }
+
   if (!navigator.mediaDevices?.getUserMedia) {
     setStatus("Camera unavailable", "warn");
-    return;
+    return false;
   }
 
   try {
@@ -437,10 +727,27 @@ async function startRepCamera() {
     });
     repVideo.srcObject = repStream;
     await repVideo.play();
+    visualMetrics = {
+      eyeContact: 0,
+      movement: 0,
+      movementNervousness: 0,
+      gazeNervousness: 0,
+      frameCount: 0,
+      faceDetected: false,
+    };
+    coachingSession.visualSamples = 0;
+    coachingSession.eyeContactTotal = 0;
+    coachingSession.movementTotal = 0;
+    coachingSession.movementNervousnessTotal = 0;
+    coachingSession.gazeNervousnessTotal = 0;
+    lastVideoSample = null;
+    if (!coachingFrameId) coachingFrameId = requestAnimationFrame(sampleCoachingFrame);
     setStatus("Camera ready", "ready");
+    return true;
   } catch (error) {
     setStatus("Camera blocked", "warn");
     setLog(`Camera blocked: ${error.message || error}`);
+    return false;
   }
 }
 
@@ -477,6 +784,7 @@ function ensureRecognition() {
     }
     if (transcript.trim()) {
       userInput.value = transcript.trim();
+      updateSpeechMetrics(userInput.value);
     }
   };
 
@@ -538,6 +846,7 @@ async function startAudioRecordingFallback() {
     listenButton.disabled = true;
     stopListenButton.disabled = false;
     userInput.value = "";
+    updateSpeechMetrics("");
     setStatus("Recording", "busy");
     setLog("Recording audio for Cloudflare Whisper transcription.");
     mediaRecorder.start();
@@ -563,6 +872,7 @@ async function transcribeRecording(blob) {
     }
 
     userInput.value = transcript;
+    updateSpeechMetrics(transcript);
     setLog(`transcript: ${transcript}`);
     await generateRoleplayReply(transcript, true);
   } catch (error) {
@@ -572,7 +882,7 @@ async function transcribeRecording(blob) {
 }
 
 async function transcribeBlob(blob) {
-  const response = await fetch("/api/ai-sales/transcribe", {
+  const response = await authFetch("/api/ai-sales/transcribe", {
     method: "POST",
     headers: { "Content-Type": blob.type || "application/octet-stream" },
     body: blob,
@@ -598,6 +908,14 @@ function clearAutoTimers() {
   if (autoPauseTimer) {
     window.clearTimeout(autoPauseTimer);
     autoPauseTimer = null;
+  }
+  if (autoForceTurnTimer) {
+    window.clearTimeout(autoForceTurnTimer);
+    autoForceTurnTimer = null;
+  }
+  if (autoEarlyListenTimer) {
+    window.clearTimeout(autoEarlyListenTimer);
+    autoEarlyListenTimer = null;
   }
   if (autoRestartTimer) {
     window.clearTimeout(autoRestartTimer);
@@ -626,6 +944,7 @@ function stopAutoRecorderResources() {
   autoSpeechStarted = false;
   autoSilenceStartedAt = 0;
   autoRecorderStartedAt = 0;
+  resetAutoSpeechGate();
 
   if (autoAudioContext && autoAudioContext.state !== "closed") {
     autoAudioContext.close().catch(() => {});
@@ -636,6 +955,598 @@ function stopAutoRecorderResources() {
 
 function compactTranscript(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function wordOverlapRatio(a, b) {
+  const leftWords = String(a || "").toLowerCase().match(/[a-z']+/g) || [];
+  const rightWords = String(b || "").toLowerCase().match(/[a-z']+/g) || [];
+  if (!leftWords.length || !rightWords.length) return 0;
+
+  const rightCounts = new Map();
+  rightWords.forEach((word) => {
+    rightCounts.set(word, (rightCounts.get(word) || 0) + 1);
+  });
+
+  let matches = 0;
+  leftWords.forEach((word) => {
+    const count = rightCounts.get(word) || 0;
+    if (!count) return;
+    matches += 1;
+    rightCounts.set(word, count - 1);
+  });
+
+  return matches / leftWords.length;
+}
+
+function transcriptQuality(text, confidence = 1) {
+  const cleanText = compactTranscript(text).toLowerCase();
+  const avatarText = compactTranscript(scriptInput.value).toLowerCase();
+  const words = cleanText.match(/[a-z']+/g) || [];
+  const uniqueWords = new Set(words);
+  const noisePhrase = /\b(static|background noise|noise|silence|music|typing|beep|buzzing|humming|breathing|coughing|laughing|applause|inaudible|unintelligible)\b/i.test(cleanText);
+  const repeatedJunk = words.length >= 3 && uniqueWords.size <= 1;
+  const minWords = activePersonality === "kids" ? 1 : salesSettings.autoMinMeaningfulWords;
+  const minConfidence = salesSettings.autoMinRecognitionConfidence;
+  const tooShort = words.length < minWords;
+  const lowConfidence = Number.isFinite(confidence) && confidence > 0 && confidence < minConfidence;
+  const onlyFiller = words.length > 0 && words.every(word => /^(um+|uh+|ah+|er+|hmm+|mm+|oh)$/.test(word));
+  const avatarEcho = Boolean(
+    avatarText &&
+      cleanText.length > 8 &&
+      (state.speaking || Date.now() < autoIgnoreMicUntil) &&
+      (avatarText.includes(cleanText) || wordOverlapRatio(cleanText, avatarText) > 0.72),
+  );
+  const meaningful = !noisePhrase && !repeatedJunk && !tooShort && !lowConfidence && !onlyFiller && !avatarEcho;
+  return {
+    meaningful,
+    reason: noisePhrase
+      ? "noise phrase"
+      : repeatedJunk
+        ? "repeated noise"
+        : tooShort
+          ? "too short"
+          : lowConfidence
+            ? "low confidence"
+            : onlyFiller
+              ? "filler only"
+              : avatarEcho
+                ? "avatar echo"
+                : "speech",
+    words: words.length,
+    confidence,
+  };
+}
+
+function resetAutoSpeechGate() {
+  autoNoiseFloorRms = 0;
+  autoNoiseSamples = 0;
+  autoNoiseLearningStartedAt = performance.now();
+  autoSpeechActiveFrames = 0;
+  autoSpeechSilentFrames = 0;
+  autoLastVoiceEnergyAt = 0;
+}
+
+function adaptiveSpeechGateEnabled() {
+  return isEnabledSetting(salesSettings.autoUseAdaptiveSpeechGate);
+}
+
+function chromeEnergyGateEnabled() {
+  return isEnabledSetting(salesSettings.autoChromeEnergyGate);
+}
+
+function preferRecorderModeEnabled() {
+  return isEnabledSetting(salesSettings.autoPreferRecorderMode);
+}
+
+function fluxEnabled() {
+  return isEnabledSetting(salesSettings.fluxEnabled);
+}
+
+function resampleToPcm16(input, inputRate, outputRate = 16000) {
+  const outputLength = Math.max(1, Math.round(input.length * outputRate / inputRate));
+  const output = new Int16Array(outputLength);
+  const ratio = input.length / outputLength;
+
+  for (let index = 0; index < outputLength; index += 1) {
+    const start = Math.floor(index * ratio);
+    const end = Math.max(start + 1, Math.floor((index + 1) * ratio));
+    let sum = 0;
+    for (let sampleIndex = start; sampleIndex < end && sampleIndex < input.length; sampleIndex += 1) {
+      sum += input[sampleIndex];
+    }
+    const sample = Math.max(-1, Math.min(1, sum / Math.max(1, end - start)));
+    output[index] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+  }
+  return output.buffer;
+}
+
+function stopFluxResources({ closeSocket = true } = {}) {
+  fluxUsingLiveMode = false;
+  fluxEagerTranscript = "";
+  fluxTurnBuffer = "";
+  if (fluxResponseTimer) window.clearTimeout(fluxResponseTimer);
+  fluxResponseTimer = null;
+
+  if (fluxProcessor) {
+    fluxProcessor.onaudioprocess = null;
+    fluxProcessor.disconnect();
+  }
+  fluxSource?.disconnect();
+  fluxSilentGain?.disconnect();
+  fluxStream?.getTracks().forEach(track => track.stop());
+  if (fluxAudioContext && fluxAudioContext.state !== "closed") {
+    fluxAudioContext.close().catch(() => {});
+  }
+  if (closeSocket && fluxSocket) {
+    try {
+      if (fluxSocket.readyState === WebSocket.OPEN) {
+        fluxSocket.send(JSON.stringify({ type: "CloseStream" }));
+      }
+      fluxSocket.close();
+    } catch {
+      // The socket may already be closing.
+    }
+  }
+
+  fluxProcessor = null;
+  fluxSource = null;
+  fluxSilentGain = null;
+  fluxStream = null;
+  fluxAudioContext = null;
+  fluxSocket = null;
+}
+
+async function handleFluxTurn(message) {
+  if (!autoConversation || message?.type !== "TurnInfo") return;
+  const transcript = compactTranscript(message.transcript);
+
+  if (message.event === "StartOfTurn") {
+    if (fluxResponseTimer) {
+      window.clearTimeout(fluxResponseTimer);
+      fluxResponseTimer = null;
+    }
+    if (state.speaking || autoSpeechStarting) stopSpeaking(true, "Listening");
+    noteAutoSpeechActivity();
+    return;
+  }
+
+  if (transcript) {
+    userInput.value = transcript;
+    updateSpeechMetrics(transcript);
+  }
+
+  if (message.event === "Update") {
+    if (transcript) setStatus("Listening", "busy");
+    return;
+  }
+
+  if (message.event === "EagerEndOfTurn") {
+    fluxEagerTranscript = transcript;
+    setStatus("Almost ready", "busy");
+    return;
+  }
+
+  if (message.event === "TurnResumed") {
+    fluxEagerTranscript = "";
+    setStatus("Listening", "busy");
+    return;
+  }
+
+  if (message.event !== "EndOfTurn" || !transcript) return;
+  fluxTurnBuffer = compactTranscript(`${fluxTurnBuffer} ${transcript}`);
+  userInput.value = fluxTurnBuffer;
+  updateSpeechMetrics(fluxTurnBuffer);
+  fluxEagerTranscript = "";
+  setStatus("Listening for more", "busy");
+
+  if (fluxResponseTimer) window.clearTimeout(fluxResponseTimer);
+  fluxResponseTimer = window.setTimeout(() => {
+    fluxResponseTimer = null;
+    void respondToFluxTurn();
+  }, salesSettings.fluxTurnGraceMs);
+}
+
+async function respondToFluxTurn() {
+  if (!autoConversation || autoTurnBusy) return;
+  const transcript = compactTranscript(fluxTurnBuffer);
+  if (!transcript) return;
+  const quality = transcriptQuality(transcript);
+  if (!quality.meaningful) {
+    fluxTurnBuffer = "";
+    setStatus("Listening", "ready");
+    setLog(`Flux ignored likely background noise: ${quality.reason}`);
+    return;
+  }
+
+  fluxTurnBuffer = "";
+  fluxEagerTranscript = "";
+  autoTurnBusy = true;
+  setStatus("Thinking", "busy");
+  setLog(`Flux end of turn: ${transcript}`);
+  try {
+    await requestCustomerReply({ scenario: transcript, autoSpeak: true, forceRespond: true });
+  } catch (error) {
+    if (autoConversation) {
+      setStatus("Conversation failed", "bad");
+      setLog(`Flux conversation failed: ${error.message || error}`);
+    }
+  } finally {
+    autoTurnBusy = false;
+    if (autoConversation && !state.speaking && !autoSpeechStarting) setStatus("Listening", "ready");
+  }
+}
+
+async function startFluxConversation() {
+  if (!navigator.mediaDevices?.getUserMedia || !(window.AudioContext || window.webkitAudioContext)) {
+    throw new Error("Live microphone audio is unavailable.");
+  }
+
+  await ensureRepCamera();
+  fluxStream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+  });
+
+  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  const params = new URLSearchParams({
+    eot_threshold: String(salesSettings.fluxEotThreshold),
+    eager_eot_threshold: String(salesSettings.fluxEagerEotThreshold),
+    eot_timeout_ms: String(salesSettings.fluxEotTimeoutMs),
+    access_token: await getCurrentUserToken(),
+  });
+  fluxSocket = new WebSocket(`${protocol}//${location.host}/api/ai-sales/flux?${params}`);
+  fluxSocket.binaryType = "arraybuffer";
+
+  await new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error("Flux connection timed out.")), 8000);
+    fluxSocket.onopen = () => {
+      window.clearTimeout(timeout);
+      resolve();
+    };
+    fluxSocket.onerror = () => {
+      window.clearTimeout(timeout);
+      reject(new Error("Flux WebSocket could not connect."));
+    };
+  });
+
+  fluxSocket.onmessage = event => {
+    if (typeof event.data !== "string") return;
+    try {
+      void handleFluxTurn(JSON.parse(event.data));
+    } catch {
+      // Ignore non-JSON service frames.
+    }
+  };
+  fluxSocket.onclose = () => {
+    if (!autoConversation || !fluxUsingLiveMode) return;
+    setLog("Flux disconnected. Auto mode stopped; restart Auto to reconnect.");
+    stopAutoConversation();
+  };
+
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  fluxAudioContext = new AudioContextClass({ sampleRate: 48000 });
+  await fluxAudioContext.resume();
+  fluxSource = fluxAudioContext.createMediaStreamSource(fluxStream);
+  fluxProcessor = fluxAudioContext.createScriptProcessor(4096, 1, 1);
+  fluxSilentGain = fluxAudioContext.createGain();
+  fluxSilentGain.gain.value = 0;
+  fluxProcessor.onaudioprocess = event => {
+    if (!fluxUsingLiveMode || fluxSocket?.readyState !== WebSocket.OPEN) return;
+    const samples = event.inputBuffer.getChannelData(0);
+    fluxSocket.send(resampleToPcm16(samples, fluxAudioContext.sampleRate));
+  };
+  fluxSource.connect(fluxProcessor);
+  fluxProcessor.connect(fluxSilentGain);
+  fluxSilentGain.connect(fluxAudioContext.destination);
+
+  autoConversation = true;
+  fluxUsingLiveMode = true;
+  autoTurnBusy = false;
+  autoSpeechStarting = false;
+  autoTranscriptBuffer = "";
+  resetAutoUtteranceText();
+  setAutoControls(true);
+  userInput.value = "";
+  updateSpeechMetrics("");
+  setStatus("Listening", "ready");
+  setLog("Flux live conversation connected. Speak naturally; you can interrupt the avatar.");
+}
+
+function updateAutoNoiseFloor(rms) {
+  if (!Number.isFinite(rms) || rms <= 0) return;
+
+  const now = performance.now();
+  const learning = now - autoNoiseLearningStartedAt < salesSettings.autoNoiseFloorLearningMs;
+  const maxNoiseSample = Math.max(salesSettings.autoRecorderRmsThreshold * 1.4, 0.012);
+
+  if (!autoNoiseSamples || (learning && rms < maxNoiseSample)) {
+    autoNoiseSamples += 1;
+    autoNoiseFloorRms += (rms - autoNoiseFloorRms) / autoNoiseSamples;
+    return;
+  }
+
+  if (rms < Math.max(autoNoiseFloorRms * 1.35, maxNoiseSample)) {
+    autoNoiseFloorRms = autoNoiseFloorRms * 0.96 + rms * 0.04;
+  }
+}
+
+function currentAutoSpeechThreshold() {
+  const fixedThreshold = salesSettings.autoRecorderRmsThreshold;
+  if (!adaptiveSpeechGateEnabled() || !autoNoiseFloorRms) return fixedThreshold;
+  return Math.max(fixedThreshold, autoNoiseFloorRms * salesSettings.autoSpeechRmsMultiplier);
+}
+
+function detectAutoVoiceActivity(rms) {
+  if (!adaptiveSpeechGateEnabled()) {
+    const active = rms > salesSettings.autoRecorderRmsThreshold;
+    if (active) autoLastVoiceEnergyAt = Date.now();
+    return active;
+  }
+
+  const threshold = currentAutoSpeechThreshold();
+  const rawVoiceActive = rms > threshold;
+
+  if (rawVoiceActive) {
+    autoSpeechActiveFrames += 1;
+    autoSpeechSilentFrames = 0;
+  } else {
+    autoSpeechSilentFrames += 1;
+    autoSpeechActiveFrames = Math.max(0, autoSpeechActiveFrames - 1);
+    if (!autoSpeechStarted) updateAutoNoiseFloor(rms);
+  }
+
+  const speechStarted = autoSpeechActiveFrames >= salesSettings.autoSpeechStartFrames;
+  const speechStillActive = autoSpeechStarted && autoSpeechSilentFrames < salesSettings.autoSpeechEndFrames;
+  const voiceActive = speechStarted || speechStillActive;
+  if (voiceActive) autoLastVoiceEnergyAt = Date.now();
+  return voiceActive;
+}
+
+function recentHumanVoiceEnergy() {
+  if (!autoAnalyser || !chromeEnergyGateEnabled()) return true;
+  const rms = readAnalyserRms();
+  const voiceActive = detectAutoVoiceActivity(rms);
+  return voiceActive || Date.now() - autoLastVoiceEnergyAt < salesSettings.autoChromeEnergyGraceMs;
+}
+
+function clampPercent(value) {
+  return Math.round(clamp(Number(value) || 0, 0, 100));
+}
+
+function ensureCoachingCanvas() {
+  if (coachingCanvas && coachingContext) return true;
+  coachingCanvas = document.createElement("canvas");
+  coachingCanvas.width = 96;
+  coachingCanvas.height = 72;
+  coachingContext = coachingCanvas.getContext("2d", { willReadFrequently: true });
+  return Boolean(coachingContext);
+}
+
+function analyzeSpeechText(text, startedAt = Date.now(), now = Date.now()) {
+  const cleanText = compactTranscript(text);
+  const words = cleanText.toLowerCase().match(/[a-z']+/g) || [];
+  const fillerMatches = cleanText.toLowerCase().match(/\b(um+|uh+|er+|ah+|like|basically|actually|literally|you know|kind of|sort of)\b/g) || [];
+  const repeatedWordMatches = cleanText.toLowerCase().match(/\b([a-z']+)\s+\1\b/g) || [];
+  const brokenWordMatches = cleanText.toLowerCase().match(/\b[a-z]{1,3}-[a-z]{1,}\b/g) || [];
+  const elapsedMinutes = Math.max((now - startedAt) / 60000, 0.08);
+  const wpm = words.length / elapsedMinutes;
+  const fillerRate = words.length ? fillerMatches.length / words.length : 0;
+  const stutterRate = words.length ? (repeatedWordMatches.length + brokenWordMatches.length) / words.length : 0;
+  const paceNervousness = wpm < 80 ? (80 - wpm) * 0.6 : wpm > 175 ? (wpm - 175) * 0.8 : 0;
+  const stutterNervousness = fillerRate * 260 + stutterRate * 360;
+
+  return {
+    text: cleanText,
+    words: words.length,
+    wpm,
+    fillerRate,
+    stutterRate,
+    paceNervousness: clampPercent(paceNervousness),
+    stutterNervousness: clampPercent(stutterNervousness),
+  };
+}
+
+function cumulativeSpeechText() {
+  return compactTranscript([coachingSession.transcript, speechMetrics.text].filter(Boolean).join(" "));
+}
+
+function updateSpeechMetrics(text) {
+  const cleanText = compactTranscript(text);
+  const now = Date.now();
+  if (!cleanText) {
+    speechMetrics = {
+      ...speechMetrics,
+      text: "",
+      words: 0,
+      wpm: 0,
+      fillerRate: 0,
+      stutterRate: 0,
+      paceNervousness: 0,
+      stutterNervousness: 0,
+    };
+    updateNervousnessPanel();
+    return;
+  }
+
+  if (!speechMetrics.text || cleanText.length < speechMetrics.text.length || !cleanText.startsWith(speechMetrics.text.slice(0, 24))) {
+    speechMetrics.startedAt = now;
+  }
+
+  const analysis = analyzeSpeechText(cleanText, speechMetrics.startedAt || now, now);
+  speechMetrics = {
+    ...analysis,
+    startedAt: speechMetrics.startedAt || now,
+    updatedAt: now,
+  };
+  updateNervousnessPanel();
+}
+
+function recordCompletedSpeechTurn(text) {
+  const cleanText = compactTranscript(text);
+  if (!cleanText || cleanText === coachingSession.lastRecordedTurn) return;
+  coachingSession.transcript = compactTranscript(`${coachingSession.transcript} ${cleanText}`);
+  coachingSession.lastRecordedTurn = cleanText;
+  speechMetrics.text = "";
+  updateNervousnessPanel();
+}
+
+function resetCoachingSession() {
+  coachingSession = {
+    transcript: "",
+    lastRecordedTurn: "",
+    visualSamples: 0,
+    eyeContactTotal: 0,
+    movementTotal: 0,
+    movementNervousnessTotal: 0,
+    gazeNervousnessTotal: 0,
+  };
+  updateSpeechMetrics("");
+}
+
+function scoreColor(score) {
+  if (score >= 70) return "var(--bad)";
+  if (score >= 40) return "var(--warn)";
+  return "var(--accent)";
+}
+
+function nervousnessCueText(score) {
+  if (activePersonality !== "sales") return "Sales coaching paused";
+  if (!repStream) return "Camera off";
+  if (score >= 70) return "Slow down, pause, and hold eye contact.";
+  if (score >= 40) return "Steady pace. Reduce filler words.";
+  return "Calm delivery.";
+}
+
+function confidenceCueText(confidence, nervousness) {
+  if (activePersonality !== "sales") return "Sales coaching paused";
+  if (!repStream) return "Camera off";
+  if (confidence >= 75) return "Confident delivery.";
+  if (confidence >= 50) return nervousness >= 50 ? "Good base. Slow down and steady your gaze." : "Building confidence.";
+  return "Use a slower pace, fewer fillers, and more eye contact.";
+}
+
+function updateNervousnessPanel() {
+  const visualReady = coachingSession.visualSamples > 0;
+  const speechAnalysis = analyzeSpeechText(cumulativeSpeechText(), speechMetrics.startedAt || Date.now());
+  const speechReady = speechAnalysis.words > 0;
+  const avgEyeContact = visualReady ? coachingSession.eyeContactTotal / coachingSession.visualSamples : 0;
+  const avgMovement = visualReady ? coachingSession.movementTotal / coachingSession.visualSamples : 0;
+  const eyeNervousness = visualReady ? coachingSession.gazeNervousnessTotal / coachingSession.visualSamples : 0;
+  const movementNervousness = visualReady ? coachingSession.movementNervousnessTotal / coachingSession.visualSamples : 0;
+  const paceNervousness = speechReady ? speechAnalysis.paceNervousness : 0;
+  const stutterNervousness = speechReady ? speechAnalysis.stutterNervousness : 0;
+  const score = clampPercent(
+    eyeNervousness * 0.25 +
+      movementNervousness * 0.25 +
+      paceNervousness * 0.2 +
+      stutterNervousness * 0.3
+  );
+  const paceConfidence = speechReady ? clamp(100 - Math.abs(speechAnalysis.wpm - 135) * 1.15, 0, 100) : 0;
+  const speechConfidence = speechReady ? clamp(100 - stutterNervousness, 0, 100) : 0;
+  const movementConfidence = visualReady ? clamp(100 - movementNervousness, 0, 100) : 0;
+  const eyeConfidence = visualReady ? avgEyeContact : 0;
+  const confidence = clampPercent(
+    eyeConfidence * 0.34 +
+      movementConfidence * 0.22 +
+      paceConfidence * 0.2 +
+      speechConfidence * 0.24
+  );
+
+  if (nervousnessScoreOutput) nervousnessScoreOutput.value = String(score);
+  if (nervousnessMeter) {
+    nervousnessMeter.style.width = `${score}%`;
+    nervousnessMeter.style.backgroundColor = scoreColor(score);
+  }
+  if (confidenceScoreOutput) confidenceScoreOutput.value = String(confidence);
+  if (confidenceMeter) {
+    confidenceMeter.style.width = `${confidence}%`;
+    confidenceMeter.style.backgroundColor = confidence >= 70 ? "var(--ready)" : confidence >= 45 ? "var(--warn)" : "var(--bad)";
+  }
+  if (eyeContactScoreOutput) eyeContactScoreOutput.value = visualReady ? `${clampPercent(avgEyeContact)}% avg` : "--";
+  if (movementScoreOutput) movementScoreOutput.value = visualReady ? `${clampPercent(avgMovement)}/100 avg` : "--";
+  if (paceScoreOutput) paceScoreOutput.value = speechReady ? `${Math.round(speechAnalysis.wpm)} wpm avg` : "--";
+  if (stutterScoreOutput) {
+    const stutterLabel = speechReady ? `${Math.round((speechAnalysis.fillerRate + speechAnalysis.stutterRate) * 100)}% avg` : "--";
+    stutterScoreOutput.value = stutterLabel;
+  }
+  if (nervousnessCue) nervousnessCue.value = `${nervousnessCueText(score)} ${confidenceCueText(confidence, score)}`;
+}
+
+async function detectFaceCenter() {
+  if (!("FaceDetector" in window) || faceDetectorBusy || !repVideo.videoWidth) return null;
+  try {
+    if (!faceDetector) faceDetector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+    faceDetectorBusy = true;
+    const faces = await faceDetector.detect(repVideo);
+    const box = faces?.[0]?.boundingBox;
+    if (!box) return null;
+    return {
+      x: (box.x + box.width / 2) / repVideo.videoWidth,
+      y: (box.y + box.height / 2) / repVideo.videoHeight,
+    };
+  } catch {
+    faceDetector = null;
+    return null;
+  } finally {
+    faceDetectorBusy = false;
+  }
+}
+
+async function sampleCoachingFrame() {
+  if (!repStream || repVideo.readyState < 2 || !ensureCoachingCanvas()) {
+    coachingFrameId = requestAnimationFrame(sampleCoachingFrame);
+    return;
+  }
+
+  coachingContext.drawImage(repVideo, 0, 0, coachingCanvas.width, coachingCanvas.height);
+  const frame = coachingContext.getImageData(0, 0, coachingCanvas.width, coachingCanvas.height).data;
+  let diff = 0;
+  let activeX = 0;
+  let activeY = 0;
+  let activeWeight = 0;
+
+  if (lastVideoSample) {
+    for (let index = 0; index < frame.length; index += 16) {
+      const pixel = index / 4;
+      const x = pixel % coachingCanvas.width;
+      const y = Math.floor(pixel / coachingCanvas.width);
+      const delta = Math.abs(frame[index] - lastVideoSample[index]) +
+        Math.abs(frame[index + 1] - lastVideoSample[index + 1]) +
+        Math.abs(frame[index + 2] - lastVideoSample[index + 2]);
+      diff += delta;
+      if (delta > 36) {
+        activeX += x * delta;
+        activeY += y * delta;
+        activeWeight += delta;
+      }
+    }
+  }
+
+  lastVideoSample = new Uint8ClampedArray(frame);
+  const motion = clamp(diff / 18000, 0, 100);
+  const faceCenter = await detectFaceCenter();
+  const estimatedCenter = activeWeight
+    ? { x: activeX / activeWeight / coachingCanvas.width, y: activeY / activeWeight / coachingCanvas.height }
+    : { x: 0.5, y: 0.5 };
+  const center = faceCenter || estimatedCenter;
+  const offCenter = Math.hypot(center.x - 0.5, center.y - 0.44);
+  const eyeContact = clamp(100 - offCenter * 210, 0, 100);
+  const movement = visualMetrics.movement * 0.84 + motion * 0.16;
+
+  visualMetrics = {
+    eyeContact: visualMetrics.eyeContact ? visualMetrics.eyeContact * 0.86 + eyeContact * 0.14 : eyeContact,
+    movement,
+    movementNervousness: clampPercent(Math.max(0, movement - 10) * 2.3),
+    gazeNervousness: clampPercent(100 - eyeContact),
+    frameCount: visualMetrics.frameCount + 1,
+    faceDetected: Boolean(faceCenter),
+  };
+  coachingSession.visualSamples += 1;
+  coachingSession.eyeContactTotal += visualMetrics.eyeContact;
+  coachingSession.movementTotal += visualMetrics.movement;
+  coachingSession.movementNervousnessTotal += visualMetrics.movementNervousness;
+  coachingSession.gazeNervousnessTotal += visualMetrics.gazeNervousness;
+  updateNervousnessPanel();
+  coachingFrameId = requestAnimationFrame(sampleCoachingFrame);
 }
 
 function currentAutoTranscript() {
@@ -650,7 +1561,7 @@ function hasTrailingContinuationCue(text) {
 
 function localTurnDecision(transcript, { finalSegment = false } = {}) {
   const text = compactTranscript(transcript);
-  if (text.length < AUTO_MIN_TRANSCRIPT_CHARS || hasTrailingContinuationCue(text)) return null;
+  if (text.length < AUTO_MIN_TRANSCRIPT_CHARS) return null;
 
   if (/[?.!]$/.test(text)) {
     return {
@@ -663,6 +1574,27 @@ function localTurnDecision(transcript, { finalSegment = false } = {}) {
   }
 
   const wordCount = text.split(/\s+/).filter(Boolean).length;
+  if (finalSegment && wordCount >= 1 && !hasTrailingContinuationCue(text)) {
+    return {
+      doneProbability: 0.96,
+      doneProbabilityThreshold: salesSettings.doneProbability,
+      shouldRespond: true,
+      provider: "local-heuristic",
+      model: "auto pause",
+    };
+  }
+
+  const startsLikeGreeting = /^(hi|hello|hey|good morning|good afternoon|good evening)\b/i.test(text);
+  if (finalSegment && startsLikeGreeting) {
+    return {
+      doneProbability: 0.92,
+      doneProbabilityThreshold: salesSettings.doneProbability,
+      shouldRespond: true,
+      provider: "local-heuristic",
+      model: "greeting pause",
+    };
+  }
+
   const startsLikeQuestion = /^(who|what|when|where|why|how|can|could|would|will|do|does|did|is|are|should)\b/i.test(text);
   const pausedCompleteTurn = finalSegment &&
     (wordCount >= salesSettings.autoLocalPauseMinWords || (startsLikeQuestion && wordCount >= 3));
@@ -682,6 +1614,8 @@ function localTurnDecision(transcript, { finalSegment = false } = {}) {
 function resetAutoUtteranceText() {
   autoFinalTranscript = "";
   autoInterimTranscript = "";
+  autoLastTranscriptAt = 0;
+  autoLastTranscriptText = "";
 }
 
 function setAutoControls(active) {
@@ -701,17 +1635,56 @@ function scheduleAutoTurnCheck(delay = salesSettings.autoPauseMs) {
   }, delay);
 }
 
+function scheduleAutoForceTurnCheck() {
+  if (!autoConversation) return;
+  if (autoForceTurnTimer) window.clearTimeout(autoForceTurnTimer);
+
+  autoForceTurnTimer = window.setTimeout(() => {
+    autoForceTurnTimer = null;
+    const transcript = currentAutoTranscript();
+    const stableFor = Date.now() - autoLastTranscriptAt;
+    const transcriptIsStable = transcript &&
+      transcript === autoLastTranscriptText &&
+      stableFor >= salesSettings.autoForceTurnMs - 25;
+
+    if (!autoConversation || !transcriptIsStable) return;
+
+    if (isAvatarEchoGuardActive() || autoTurnBusy) {
+      scheduleAutoForceTurnCheck();
+      return;
+    }
+
+    requestAutoTurnDecision({ forceStableTranscript: true });
+  }, salesSettings.autoForceTurnMs);
+}
+
 function isAvatarEchoGuardActive() {
-  return state.speaking || Date.now() < autoIgnoreMicUntil;
+  return autoSpeechStarting || (state.speaking && !autoPreListening) || Date.now() < autoIgnoreMicUntil;
 }
 
 function autoEchoGuardDelayMs() {
-  if (state.speaking) return salesSettings.avatarEchoCooldownMs;
+  if (autoSpeechStarting) return 250;
+  if (state.speaking && !autoPreListening) return Math.max(120, salesSettings.autoListenBeforeSpeechEndMs);
   return Math.max(0, autoIgnoreMicUntil - Date.now());
 }
 
 function holdMicForAvatarSpeech(extraMs = salesSettings.avatarEchoCooldownMs) {
   autoIgnoreMicUntil = Math.max(autoIgnoreMicUntil, Date.now() + extraMs);
+}
+
+function scheduleAutoListenBeforeSpeechEnd(durationMs) {
+  if (!autoConversation || !Number.isFinite(durationMs) || durationMs <= 0) return;
+  if (autoEarlyListenTimer) window.clearTimeout(autoEarlyListenTimer);
+  const delay = Math.max(0, durationMs - salesSettings.autoListenBeforeSpeechEndMs);
+  autoEarlyListenTimer = window.setTimeout(() => {
+    autoEarlyListenTimer = null;
+    if (!autoConversation || !state.speaking) return;
+    autoPreListening = true;
+    autoIgnoreMicUntil = 0;
+    resetAutoUtteranceText();
+    startAutoRecognitionNow();
+    if (autoUsingRecorderMode) startAutoRecorderSegment();
+  }, delay);
 }
 
 function noteAutoSpeechActivity() {
@@ -738,6 +1711,10 @@ function readAnalyserRms() {
   return Math.sqrt(sum / samples.length);
 }
 
+function autoRecorderStreamIsActive() {
+  return Boolean(autoRecorderStream?.active && autoRecorderStream.getAudioTracks().some(track => track.readyState === "live"));
+}
+
 function monitorAutoRecorder() {
   if (!autoConversation || !autoRecorder || !autoAnalyser) return;
 
@@ -752,7 +1729,7 @@ function monitorAutoRecorder() {
 
   const now = performance.now();
   const rms = readAnalyserRms();
-  const voiceActive = rms > salesSettings.autoRecorderRmsThreshold;
+  const voiceActive = detectAutoVoiceActivity(rms);
 
   if (voiceActive) {
     if (!autoSpeechStarted) {
@@ -803,26 +1780,18 @@ async function processAutoRecordedSegment(blob) {
     }
 
     const combinedTranscript = compactTranscript([autoTranscriptBuffer, transcript].filter(Boolean).join(" "));
-    userInput.value = combinedTranscript;
-    setLog(`transcript: ${combinedTranscript}\nChecking whether this is a complete turn.`);
-    const turn = localTurnDecision(combinedTranscript, { finalSegment: true }) ||
-      await requestFastTurnDecision(combinedTranscript);
-
-    if (!autoConversation) return;
-
-    if (!turn?.shouldRespond) {
-      autoTranscriptBuffer = combinedTranscript;
+    const quality = transcriptQuality(combinedTranscript);
+    if (!quality.meaningful) {
+      autoTranscriptBuffer = "";
       resetAutoUtteranceText();
       setStatus("Listening", "ready");
-      setLog(
-        `turn detector: ${turn?.provider || "ai"}\n` +
-          `model: ${turn?.model || "DeepSeek"}\n` +
-          `done probability: ${((turn?.doneProbability || 0) * 100).toFixed(0)}%\n` +
-          `threshold: ${((turn?.doneProbabilityThreshold || salesSettings.doneProbability) * 100).toFixed(0)}%\n` +
-          "Keeping the mic open.",
-      );
+      setLog(`Ignored likely background noise: ${quality.reason}`);
       return;
     }
+
+    userInput.value = combinedTranscript;
+    updateSpeechMetrics(combinedTranscript);
+    setLog(`transcript: ${combinedTranscript}\nAuto mode is responding after the pause.`);
 
     const result = await requestCustomerReply({ scenario: combinedTranscript, autoSpeak: true, forceRespond: true });
 
@@ -848,8 +1817,22 @@ async function processAutoRecordedSegment(blob) {
   }
 }
 
-function startAutoRecorderSegment() {
-  if (!autoConversation || !autoRecorder || autoRecorder.state !== "inactive") return;
+async function startAutoRecorderSegment() {
+  if (!autoConversation || !autoUsingRecorderMode) return;
+  if (!autoRecorderStreamIsActive()) {
+    try {
+      await setupAutoRecorderResources();
+    } catch (error) {
+      if (autoConversation) {
+        setStatus("Auto unavailable", "bad");
+        setLog(`Auto recorder unavailable: ${error.message || error}`);
+        stopAutoConversation();
+      }
+      return;
+    }
+  }
+
+  if (!autoRecorder || autoRecorder.state !== "inactive") return;
   if (isAvatarEchoGuardActive()) {
     window.setTimeout(startAutoRecorderSegment, autoEchoGuardDelayMs() + 120);
     return;
@@ -859,9 +1842,17 @@ function startAutoRecorderSegment() {
   autoSpeechStarted = false;
   autoSilenceStartedAt = 0;
   autoRecorderStartedAt = performance.now();
-  autoRecorder.start(250);
-  setStatus("Listening", "ready");
-  autoMonitorFrame = requestAnimationFrame(monitorAutoRecorder);
+  autoSpeechActiveFrames = 0;
+  autoSpeechSilentFrames = 0;
+  try {
+    autoRecorder.start(250);
+    setStatus("Listening", "ready");
+    autoMonitorFrame = requestAnimationFrame(monitorAutoRecorder);
+  } catch (error) {
+    setLog(`Auto recorder restart failed: ${error.message || error}`);
+    stopAutoRecorderResources();
+    if (autoConversation) window.setTimeout(startAutoRecorderSegment, 250);
+  }
 }
 
 function ensureAutoRecognition() {
@@ -900,14 +1891,28 @@ function ensureAutoRecognition() {
       return;
     }
 
+    const hasRecentVoiceEnergy = recentHumanVoiceEnergy();
+
     let interim = "";
     let heardSpeech = false;
 
     for (let index = event.resultIndex; index < event.results.length; index += 1) {
       const transcript = event.results[index][0]?.transcript || "";
       if (!transcript.trim()) continue;
+      const confidence = Number(event.results[index][0]?.confidence || 1);
+      const quality = transcriptQuality(transcript, confidence);
+      if (!hasRecentVoiceEnergy && !event.results[index].isFinal) continue;
+      if (!quality.meaningful && !event.results[index].isFinal) continue;
       heardSpeech = true;
       if (event.results[index].isFinal) {
+        if (!hasRecentVoiceEnergy) {
+          setLog("Ignored speech recognition text without matching mic voice energy.");
+          continue;
+        }
+        if (!quality.meaningful) {
+          setLog(`Ignored likely noise: ${quality.reason}`);
+          continue;
+        }
         autoFinalTranscript = compactTranscript(`${autoFinalTranscript} ${transcript}`);
         interim = "";
       } else {
@@ -918,12 +1923,18 @@ function ensureAutoRecognition() {
     autoInterimTranscript = interim;
     const transcript = currentAutoTranscript();
     if (transcript) {
+      if (transcript !== autoLastTranscriptText) {
+        autoLastTranscriptText = transcript;
+        autoLastTranscriptAt = Date.now();
+      }
       userInput.value = transcript;
+      updateSpeechMetrics(transcript);
     }
 
     if (heardSpeech) {
       noteAutoSpeechActivity();
       scheduleAutoTurnCheck();
+      if (transcript) scheduleAutoForceTurnCheck();
     }
   };
 
@@ -966,7 +1977,7 @@ function startAutoRecognitionNow(delay = 0) {
   }, delay);
 }
 
-async function requestAutoTurnDecision() {
+async function requestAutoTurnDecision({ forceStableTranscript = false } = {}) {
   if (!autoConversation) return;
 
   if (isAvatarEchoGuardActive()) {
@@ -981,35 +1992,36 @@ async function requestAutoTurnDecision() {
     if (transcript) scheduleAutoTurnCheck(200);
     return;
   }
+  const quality = transcriptQuality(transcript);
+  if (!quality.meaningful) {
+    autoTranscriptBuffer = "";
+    resetAutoUtteranceText();
+    setStatus("Listening", "ready");
+    setLog(`Ignored likely background noise: ${quality.reason}`);
+    return;
+  }
 
   if (autoTurnBusy) {
     autoTurnPending = true;
     return;
   }
 
+  if (autoPauseTimer) {
+    window.clearTimeout(autoPauseTimer);
+    autoPauseTimer = null;
+  }
+  if (autoForceTurnTimer) {
+    window.clearTimeout(autoForceTurnTimer);
+    autoForceTurnTimer = null;
+  }
+
   autoTurnBusy = true;
   autoTurnPending = false;
   setStatus("Thinking", "busy");
-  setLog(`live transcript: ${transcript}\nChecking whether this is a complete turn.`);
+  setLog(`live transcript: ${transcript}\nAuto mode is responding after the pause.`);
 
   try {
-    const turn = localTurnDecision(transcript, { finalSegment: true }) ||
-      await requestFastTurnDecision(transcript);
     if (!autoConversation) return;
-
-    if (!turn?.shouldRespond) {
-      autoTranscriptBuffer = transcript;
-      resetAutoUtteranceText();
-      setStatus("Listening", "ready");
-      setLog(
-        `turn detector: ${turn?.provider || "ai"}\n` +
-          `model: ${turn?.model || "DeepSeek"}\n` +
-          `done probability: ${((turn?.doneProbability || 0) * 100).toFixed(0)}%\n` +
-          `threshold: ${((turn?.doneProbabilityThreshold || salesSettings.doneProbability) * 100).toFixed(0)}%\n` +
-          "Keeping the mic open.",
-      );
-      return;
-    }
 
     const result = await requestCustomerReply({ scenario: transcript, autoSpeak: true, forceRespond: true });
     if (result?.shouldRespond) {
@@ -1031,14 +2043,14 @@ async function requestAutoTurnDecision() {
     if (autoConversation && autoTurnPending) {
       autoTurnPending = false;
       scheduleAutoTurnCheck(120);
-    } else if (autoConversation && !state.speaking && statusDot.dataset.tone !== "bad") {
+    } else if (autoConversation && !autoSpeechStarting && !state.speaking && statusDot.dataset.tone !== "bad") {
       setStatus("Listening", "ready");
     }
   }
 }
 
 async function requestFastTurnDecision(transcript) {
-  const response = await fetch("/api/ai-sales/turn", {
+  const response = await authFetch("/api/ai-sales/turn", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -1077,6 +2089,22 @@ async function requestFastTurnDecision(transcript) {
 async function startAutoConversation() {
   if (autoConversation) return;
 
+  if (fluxEnabled()) {
+    try {
+      setStatus("Connecting Flux", "busy");
+      await startFluxConversation();
+      return;
+    } catch (error) {
+      stopFluxResources();
+      setLog(`Flux unavailable; using browser fallback: ${error.message || error}`);
+    }
+  }
+
+  if (preferRecorderModeEnabled()) {
+    await startAutoRecorderConversation();
+    return;
+  }
+
   const activeRecognition = ensureAutoRecognition();
   if (!activeRecognition) {
     await startAutoRecorderConversation();
@@ -1084,22 +2112,76 @@ async function startAutoConversation() {
   }
 
   try {
+    await ensureRepCamera();
+    if (chromeEnergyGateEnabled()) {
+      await setupAutoRecorderResources();
+    }
     autoConversation = true;
+    autoUsingRecorderMode = false;
     autoTurnBusy = false;
     autoTurnPending = false;
+    autoSpeechStarting = false;
+    autoPreListening = false;
     autoTranscriptBuffer = "";
     resetAutoUtteranceText();
     setAutoControls(true);
     userInput.value = "";
+    updateSpeechMetrics("");
     setStatus("Starting mic", "busy");
     setLog("Starting live speech recognition. Begin speaking after it says Listening.");
     startAutoRecognitionNow();
   } catch (error) {
     autoConversation = false;
+    autoUsingRecorderMode = false;
+    stopAutoRecorderResources();
     setAutoControls(false);
     setStatus("Auto unavailable", "bad");
     setLog(`Auto conversation unavailable: ${error.message || error}`);
   }
+}
+
+async function setupAutoRecorderResources() {
+  stopAutoRecorderResources();
+  autoRecorderStream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+  });
+
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    throw new Error("AudioContext is unavailable.");
+  }
+
+  autoAudioContext = new AudioContextClass();
+  const source = autoAudioContext.createMediaStreamSource(autoRecorderStream);
+  autoAnalyser = autoAudioContext.createAnalyser();
+  autoAnalyser.fftSize = 1024;
+  autoAnalyser.smoothingTimeConstant = 0.08;
+  source.connect(autoAnalyser);
+  resetAutoSpeechGate();
+
+  autoRecorder = new MediaRecorder(autoRecorderStream);
+  autoRecorder.ondataavailable = (event) => {
+    if (event.data?.size) autoRecorderChunks.push(event.data);
+  };
+  autoRecorder.onstop = () => {
+    if (autoMonitorFrame) {
+      cancelAnimationFrame(autoMonitorFrame);
+      autoMonitorFrame = null;
+    }
+
+    const chunks = autoRecorderChunks;
+    const mimeType = autoRecorder.mimeType || "audio/webm";
+    autoRecorderChunks = [];
+    autoSpeechStarted = false;
+    autoSilenceStartedAt = 0;
+
+    if (!autoConversation || !chunks.length) return;
+    processAutoRecordedSegment(new Blob(chunks, { type: mimeType }));
+  };
 }
 
 async function startAutoRecorderConversation() {
@@ -1113,57 +2195,25 @@ async function startAutoRecorderConversation() {
 
   try {
     setStatus("Starting recorder auto", "busy");
-    autoRecorderStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-    });
-
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) {
-      throw new Error("AudioContext is unavailable.");
-    }
-
-    autoAudioContext = new AudioContextClass();
-    const source = autoAudioContext.createMediaStreamSource(autoRecorderStream);
-    autoAnalyser = autoAudioContext.createAnalyser();
-    autoAnalyser.fftSize = 1024;
-    autoAnalyser.smoothingTimeConstant = 0.08;
-    source.connect(autoAnalyser);
-
-    autoRecorder = new MediaRecorder(autoRecorderStream);
-    autoRecorder.ondataavailable = (event) => {
-      if (event.data?.size) autoRecorderChunks.push(event.data);
-    };
-    autoRecorder.onstop = () => {
-      if (autoMonitorFrame) {
-        cancelAnimationFrame(autoMonitorFrame);
-        autoMonitorFrame = null;
-      }
-
-      const chunks = autoRecorderChunks;
-      const mimeType = autoRecorder.mimeType || "audio/webm";
-      autoRecorderChunks = [];
-      autoSpeechStarted = false;
-      autoSilenceStartedAt = 0;
-
-      if (!autoConversation || !chunks.length) return;
-      processAutoRecordedSegment(new Blob(chunks, { type: mimeType }));
-    };
+    await ensureRepCamera();
+    await setupAutoRecorderResources();
 
     autoConversation = true;
+    autoUsingRecorderMode = true;
     autoTurnBusy = false;
     autoTurnPending = false;
+    autoSpeechStarting = false;
+    autoPreListening = false;
     autoTranscriptBuffer = "";
     resetAutoUtteranceText();
     setAutoControls(true);
     userInput.value = "";
+    updateSpeechMetrics("");
     startAutoRecorderSegment();
     setLog("Auto conversation is using microphone recording plus Cloudflare Whisper because live SpeechRecognition is unavailable.");
   } catch (error) {
     autoConversation = false;
+    autoUsingRecorderMode = false;
     stopAutoRecorderResources();
     setAutoControls(false);
     setStatus("Auto unavailable", "bad");
@@ -1172,14 +2222,18 @@ async function startAutoRecorderConversation() {
 }
 
 function stopAutoConversation() {
-  if (!autoConversation && !autoRecognition && !autoRecorder) return;
+  if (!autoConversation && !autoRecognition && !autoRecorder && !fluxSocket) return;
 
   autoConversation = false;
+  autoUsingRecorderMode = false;
   autoTurnBusy = false;
   autoTurnPending = false;
+  autoSpeechStarting = false;
+  autoPreListening = false;
   autoTranscriptBuffer = "";
   resetAutoUtteranceText();
   clearAutoTimers();
+  stopFluxResources();
 
   try {
     autoRecognition?.stop?.();
@@ -1211,6 +2265,7 @@ function startListening() {
   }
   if (listening) return;
   userInput.value = "";
+  updateSpeechMetrics("");
   setStatus("Starting mic", "busy");
   setLog("Starting speech recognition. Begin speaking after it says Listening.");
   activeRecognition.start();
@@ -1230,7 +2285,101 @@ function stopListening() {
 function rememberTurn(role, text) {
   if (!text) return;
   conversationTurns.push({ role, text });
-  while (conversationTurns.length > 8) conversationTurns.shift();
+  while (conversationTurns.length > salesSettings.conversationTurns * 2) conversationTurns.shift();
+}
+
+function isEnabledSetting(value) {
+  return String(value).toLowerCase() !== "false";
+}
+
+async function localKidsReply(input) {
+  if (activePersonality !== "kids") return null;
+
+  const text = compactTranscript(input).toLowerCase();
+  if (!text) return null;
+
+  if (pendingKidsActivity) {
+    const activity = pendingKidsActivity;
+    const childAnswer = parseChildNumber(text);
+    const correctAnswer = Number(activity.answer);
+    const answeredCorrectly = Number.isFinite(childAnswer) && childAnswer === correctAnswer;
+
+    showKidsActivity(activity, true);
+    setStatus("Showing answer", "ready");
+    await wait(1700);
+    hideKidsActivity();
+    kidsMathGameOffered = true;
+
+    return {
+      text: answeredCorrectly
+        ? `Yes, that's right. The true answer is ${correctAnswer}. ${activity.reveal}. Do you want another one?`
+        : `Good try. The true answer is ${correctAnswer}. ${activity.reveal}. Do you want another one?`,
+      provider: "local-kids-math",
+      model: "local-calculator",
+      shouldRespond: true,
+    };
+  }
+
+  if (childSaidYes(text)) {
+    return startKidsMathQuestion();
+  }
+
+  if (childSaidNo(text)) {
+    return startKidsAbcLesson();
+  }
+
+  if (childMentionedMath(text) || /\b(hi|hello|hey)\b/.test(text)) {
+    kidsMathGameActive = false;
+    kidsMathGameOffered = true;
+    hideKidsActivity();
+    return {
+      text: "Do you want to play a math game with me?",
+      provider: "local-kids-math",
+      model: "local-calculator",
+      shouldRespond: true,
+    };
+  }
+
+  if (!isEnabledSetting(salesSettings.kidsModeFastLocalReplies)) return null;
+
+  if (/\b(name|called)\b/.test(text)) {
+    return "My name is John. What is your name?";
+  }
+  if (/\b(apple|ball|car|truck|dinosaur|train|star|book)\b/.test(text)) {
+    return "Nice word. Can you say it one more time slowly?";
+  }
+  if (/\b(count|number|one|two|three|four|five)\b/.test(text)) {
+    return "Let's count together. One, two, three. What comes next?";
+  }
+  if (/\b(six|seven|eight|nine|ten)\b/.test(text)) {
+    return "Great counting. Let's clap and count again. One, two, three.";
+  }
+  if (/\b(letter|alphabet|abc|a b c)\b/.test(text)) {
+    return startKidsAbcLesson();
+  }
+  if (/^[a-z]$/.test(text) || /\b(a|b|c|d|e|f|g)\b/.test(text)) {
+    return "Good letter. A says ah. Can you say ah?";
+  }
+  if (/\b(color|red|blue|green|yellow)\b/.test(text)) {
+    return "Colors are fun. Can you find something blue?";
+  }
+  if (/\b(purple|pink|orange|black|white|brown)\b/.test(text)) {
+    return "That's a great color. Can you find that color near you?";
+  }
+  if (/\b(animal|dog|cat|cow|duck)\b/.test(text)) {
+    return "Animals are fun. What sound does a cow make?";
+  }
+  if (/\b(bird|fish|horse|pig|sheep|lion|tiger|bear)\b/.test(text)) {
+    return "Good animal. What sound does that animal make?";
+  }
+  if (/\b(mom|mommy|dad|daddy|baby|sister|brother)\b/.test(text)) {
+    return "That's nice. Can you tell me one word about them?";
+  }
+  if (text.split(/\s+/).length <= 4) {
+    return "That was great. Do you want to count or say letters?";
+  }
+
+  return null;
 }
 
 window.addEventListener("error", (event) => {
@@ -2201,12 +3350,14 @@ function prepareSpeechSequence(text, rate) {
 }
 
 function beginSpeechAnimation(statusLabel = "Speaking") {
+  autoSpeechStarting = false;
+  autoPreListening = false;
   state.sequenceCursor = 0;
   state.lastBoundaryChar = -1;
   state.sequenceStart = performance.now();
   state.speaking = true;
   if (autoConversation) {
-    holdMicForAvatarSpeech(salesSettings.avatarEchoCooldownMs + 250);
+    holdMicForAvatarSpeech(Math.min(500, salesSettings.avatarEchoCooldownMs + 250));
     autoInterimTranscript = "";
     autoFinalTranscript = "";
     try {
@@ -2221,17 +3372,36 @@ function beginSpeechAnimation(statusLabel = "Speaking") {
 
 async function requestCustomerReply({ scenario, autoSpeak = false, forceRespond = false }) {
   const currentText = scenario.trim();
+  if (activePersonality === "sales") recordCompletedSpeechTurn(currentText);
   generateButton.disabled = true;
   roleplayButton.disabled = true;
   setStatus("Generating reply", "busy");
-  setLog("Asking DeepSeek for a customer response.");
+  setLog(activePersonality === "kids" ? "Preparing John's answer." : "Asking DeepSeek for a customer response.");
 
   try {
-    const response = await fetch("/api/ai-sales/coach", {
+    const localReply = await localKidsReply(currentText);
+    if (localReply) {
+      const localText = typeof localReply === "string" ? localReply : localReply.text;
+      scriptInput.value = localText;
+      caption.textContent = localText;
+      rememberTurn("user", currentText);
+      rememberTurn("john", localText);
+      setStatus("Reply ready", "ready");
+      setLog(localReply.provider || "local kids reply");
+      if (autoSpeak) {
+        await startSpeaking();
+      }
+      return typeof localReply === "string"
+        ? { text: localText, provider: "local-kids", model: "local", shouldRespond: true }
+        : localReply;
+    }
+
+    const response = await authFetch("/api/ai-sales/coach", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         scenario: currentText,
+        personality: activePersonality,
         roleGuide: salesRoleGuide,
         conversation: conversationTurns,
         voice: voiceSelect.value || "male",
@@ -2239,6 +3409,8 @@ async function requestCustomerReply({ scenario, autoSpeak = false, forceRespond 
         language: salesSettings.language,
         model: salesSettings.deepseekModel,
         doneProbabilityThreshold: salesSettings.doneProbability,
+        maxTokens: salesSettings.maxCoachTokens,
+        conversationTurns: salesSettings.conversationTurns,
         forceRespond,
       }),
     });
@@ -2255,7 +3427,9 @@ async function requestCustomerReply({ scenario, autoSpeak = false, forceRespond 
 
     const doneProbability = Number(payload.doneProbability ?? 1);
     const doneProbabilityThreshold = clampProbability(payload.doneProbabilityThreshold, salesSettings.doneProbability);
-    const shouldRespond = payload.shouldRespond !== false && doneProbability > doneProbabilityThreshold;
+    const shouldRespond = forceRespond
+      ? payload.shouldRespond !== false
+      : payload.shouldRespond !== false && doneProbability > doneProbabilityThreshold;
 
     if (!shouldRespond) {
       setStatus("Waiting for you", "ready");
@@ -2264,15 +3438,20 @@ async function requestCustomerReply({ scenario, autoSpeak = false, forceRespond 
           `model: ${payload.model || "DeepSeek"}\n` +
           `done probability: ${(doneProbability * 100).toFixed(0)}%\n` +
           `threshold: ${(doneProbabilityThreshold * 100).toFixed(0)}%\n` +
-          "DeepSeek thinks you may still be speaking.",
+          "Waiting for more speech because this was not a forced Auto turn.",
       );
       return { ...payload, doneProbability, shouldRespond: false };
     }
 
     scriptInput.value = payload.text || currentText;
     caption.textContent = scriptInput.value;
-    rememberTurn("salesperson", currentText);
-    rememberTurn("customer", scriptInput.value);
+    rememberTurn(activePersonality === "kids" ? "child" : "salesperson", currentText);
+    rememberTurn(activePersonality === "kids" ? "john" : "customer", scriptInput.value);
+    if (activePersonality === "kids" && kidsMathGameActive && payload.activity) {
+      showKidsActivity(payload.activity, false);
+    } else if (activePersonality !== "kids") {
+      hideKidsActivity();
+    }
     setStatus("Reply ready", "ready");
     setLog(
       `provider: ${payload.provider || "ai"}\n` +
@@ -2306,13 +3485,20 @@ async function generateRoleplayReply(transcript = userInput.value.trim(), autoSp
     return;
   }
   userInput.value = transcript;
+  updateSpeechMetrics(transcript);
   await requestCustomerReply({ scenario: transcript, autoSpeak });
 }
 
 async function speakWithBrowserTts(text, selectedProfileKey, voiceProfile, duration) {
   if (!("speechSynthesis" in window)) {
     beginSpeechAnimation("Speaking");
-    window.setTimeout(() => stopSpeaking(false), duration + 300);
+    scheduleAutoListenBeforeSpeechEnd(duration + 300);
+    await new Promise(resolve => {
+      window.setTimeout(() => {
+        stopSpeaking(false);
+        resolve();
+      }, duration + 300);
+    });
     return;
   }
 
@@ -2328,11 +3514,16 @@ async function speakWithBrowserTts(text, selectedProfileKey, voiceProfile, durat
 
   let speechFinished = false;
   let fallbackStopTimer = null;
+  let resolveSpeech = () => {};
+  const speechDone = new Promise(resolve => {
+    resolveSpeech = resolve;
+  });
   const finishSpeech = (cancelSpeech = false) => {
     if (speechFinished) return;
     speechFinished = true;
     if (fallbackStopTimer) window.clearTimeout(fallbackStopTimer);
     stopSpeaking(cancelSpeech);
+    resolveSpeech();
   };
 
   utterance.onstart = () => {
@@ -2354,6 +3545,7 @@ async function speakWithBrowserTts(text, selectedProfileKey, voiceProfile, durat
 
   state.utterance = utterance;
   beginSpeechAnimation("Speaking");
+  scheduleAutoListenBeforeSpeechEnd(duration + 1200);
   fallbackStopTimer = window.setTimeout(() => finishSpeech(false), duration + 1200);
 
   try {
@@ -2365,52 +3557,139 @@ async function speakWithBrowserTts(text, selectedProfileKey, voiceProfile, durat
     setStatus("Speech failed", "bad");
     setLog(`Browser speech failed: ${error.message || error}`);
   }
+
+  await speechDone;
+}
+
+function wait(ms) {
+  return new Promise(resolve => window.setTimeout(resolve, ms));
+}
+
+async function fetchCloudflareTtsAudio(text) {
+  let lastError = null;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await authFetch("/api/ai-sales/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          model: salesSettings.ttsModel,
+          speaker: salesSettings.ttsSpeaker,
+          encoding: "mp3",
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await readJsonResponse(response);
+        throw new Error(payload.error || `Cloudflare TTS failed (${response.status})`);
+      }
+
+      const audioBlob = await response.blob();
+      if (!audioBlob.size) {
+        throw new Error("Cloudflare TTS returned empty audio.");
+      }
+      return audioBlob;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 1) {
+        ttsStatus.value = `Cloudflare retry ${attempt + 1}`;
+        await wait(180);
+      }
+    }
+  }
+
+  throw lastError || new Error("Cloudflare TTS failed.");
 }
 
 async function speakWithCloudflareTts(text, voiceProfile, duration) {
   setStatus("Generating voice", "busy");
   ttsStatus.value = "Cloudflare Aura-2";
 
-  const response = await fetch("/api/ai-sales/tts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      text,
-      model: salesSettings.ttsModel,
-      speaker: salesSettings.ttsSpeaker,
-      encoding: "mp3",
-    }),
-  });
-
-  if (!response.ok) {
-    const payload = await readJsonResponse(response);
-    throw new Error(payload.error || `Cloudflare TTS failed (${response.status})`);
-  }
-
-  const audioBlob = await response.blob();
-  if (!audioBlob.size) {
-    throw new Error("Cloudflare TTS returned empty audio.");
-  }
+  const audioBlob = await fetchCloudflareTtsAudio(text);
 
   const audio = new Audio();
   const objectUrl = URL.createObjectURL(audioBlob);
   let speechFinished = false;
   let fallbackStopTimer = null;
+  let resolveSpeech = () => {};
+  let rejectSpeech = () => {};
+  const speechDone = new Promise((resolve, reject) => {
+    resolveSpeech = resolve;
+    rejectSpeech = reject;
+  });
+
+  const cleanupAudio = () => {
+    if (fallbackStopTimer) window.clearTimeout(fallbackStopTimer);
+    if (activeAudio === audio) activeAudio = null;
+    try {
+      audio.pause();
+    } catch {
+      // Audio may already be stopped.
+    }
+    if (audio.src.startsWith("blob:")) URL.revokeObjectURL(audio.src);
+    audio.removeAttribute("src");
+    if (activeAudioFrame) cancelAnimationFrame(activeAudioFrame);
+    activeAudioFrame = null;
+    activeAudioAnalyser = null;
+    if (activeAudioContext && activeAudioContext.state !== "closed") {
+      activeAudioContext.close().catch(() => {});
+    }
+    activeAudioContext = null;
+    state.audioEnergy = 0;
+  };
 
   const finishSpeech = () => {
     if (speechFinished) return;
     speechFinished = true;
-    if (fallbackStopTimer) window.clearTimeout(fallbackStopTimer);
+    cleanupAudio();
     stopSpeaking(false);
+    resolveSpeech();
+  };
+
+  const failSpeech = (message) => {
+    if (speechFinished) return;
+    speechFinished = true;
+    cleanupAudio();
+    stopSpeaking(false, autoConversation ? "Generating voice" : "Avatar ready");
+    rejectSpeech(new Error(message));
   };
 
   activeAudio = audio;
   audio.src = objectUrl;
   audio.preload = "auto";
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    activeAudioContext = new AudioContextClass();
+    const source = activeAudioContext.createMediaElementSource(audio);
+    activeAudioAnalyser = activeAudioContext.createAnalyser();
+    activeAudioAnalyser.fftSize = 512;
+    activeAudioAnalyser.smoothingTimeConstant = 0.45;
+    source.connect(activeAudioAnalyser);
+    activeAudioAnalyser.connect(activeAudioContext.destination);
+    const samples = new Uint8Array(activeAudioAnalyser.fftSize);
+    const sampleSpeechEnergy = () => {
+      if (!activeAudioAnalyser || activeAudio !== audio) return;
+      activeAudioAnalyser.getByteTimeDomainData(samples);
+      let sum = 0;
+      for (const sample of samples) {
+        const centered = (sample - 128) / 128;
+        sum += centered * centered;
+      }
+      state.audioEnergy = Math.min(1, Math.sqrt(sum / samples.length) * 5.5);
+      activeAudioFrame = requestAnimationFrame(sampleSpeechEnergy);
+    };
+    sampleSpeechEnergy();
+  } catch {
+    activeAudioContext = null;
+    activeAudioAnalyser = null;
+  }
   audio.onloadedmetadata = () => {
     if (Number.isFinite(audio.duration) && audio.duration > 0) {
       const audioDurationMs = audio.duration * 1000;
       state.sequenceDuration = audioDurationMs;
+      scheduleAutoListenBeforeSpeechEnd(audioDurationMs);
       fallbackStopTimer = window.setTimeout(finishSpeech, audioDurationMs + 1200);
     }
   };
@@ -2419,14 +3698,24 @@ async function speakWithCloudflareTts(text, voiceProfile, duration) {
   };
   audio.onended = finishSpeech;
   audio.onerror = () => {
-    finishSpeech();
-    setStatus("Cloudflare voice failed", "warn");
+    failSpeech("Cloudflare audio playback failed.");
   };
 
   beginSpeechAnimation("Speaking");
+  scheduleAutoListenBeforeSpeechEnd(duration + 1800);
   fallbackStopTimer = window.setTimeout(finishSpeech, duration + 1800);
-  await audio.play();
+  try {
+    await audio.play();
+  } catch (error) {
+    if (!speechFinished) {
+      speechFinished = true;
+      cleanupAudio();
+      stopSpeaking(false, autoConversation ? "Generating voice" : "Avatar ready");
+    }
+    throw error;
+  }
   ttsStatus.value = `${salesSettings.ttsSpeaker} via Aura-2`;
+  await speechDone;
 }
 
 async function startSpeaking() {
@@ -2436,7 +3725,8 @@ async function startSpeaking() {
     return;
   }
 
-  stopSpeaking(true);
+  autoSpeechStarting = autoConversation;
+  stopSpeaking(true, autoConversation ? "Generating voice" : "Avatar ready");
   const runId = speechRunId;
   state.expression = expressionSelect.value;
   caption.textContent = text;
@@ -2458,7 +3748,7 @@ async function startSpeaking() {
       await speakWithCloudflareTts(text, voiceProfile, duration);
       return;
     } catch (error) {
-      setLog(`Cloudflare TTS failed, using browser fallback: ${error.message || error}`);
+      setLog(`Cloudflare voice unavailable after retries. Speaking with browser voice instead: ${error.message || error}`);
       syncStatus.value = "browser fallback";
     }
   }
@@ -2468,6 +3758,10 @@ async function startSpeaking() {
 
 function stopSpeaking(cancelSpeech = true, nextStatus = autoConversation ? "Listening" : "Avatar ready") {
   speechRunId += 1;
+  if (autoEarlyListenTimer) {
+    window.clearTimeout(autoEarlyListenTimer);
+    autoEarlyListenTimer = null;
+  }
   if (activeAudio) {
     const audio = activeAudio;
     activeAudio = null;
@@ -2475,6 +3769,13 @@ function stopSpeaking(cancelSpeech = true, nextStatus = autoConversation ? "List
     if (audio.src.startsWith("blob:")) URL.revokeObjectURL(audio.src);
     audio.removeAttribute("src");
   }
+  if (activeAudioFrame) cancelAnimationFrame(activeAudioFrame);
+  activeAudioFrame = null;
+  activeAudioAnalyser = null;
+  if (activeAudioContext && activeAudioContext.state !== "closed") {
+    activeAudioContext.close().catch(() => {});
+  }
+  activeAudioContext = null;
 
   if (cancelSpeech && "speechSynthesis" in window) {
     window.speechSynthesis.cancel();
@@ -2482,6 +3783,7 @@ function stopSpeaking(cancelSpeech = true, nextStatus = autoConversation ? "List
 
   state.speaking = false;
   if (autoConversation) {
+    autoPreListening = false;
     holdMicForAvatarSpeech(salesSettings.avatarEchoCooldownMs);
     autoInterimTranscript = "";
   }
@@ -2493,6 +3795,7 @@ function stopSpeaking(cancelSpeech = true, nextStatus = autoConversation ? "List
   state.viseme = "sil";
   state.visemeMix = [{ viseme: "sil", weight: 1 }];
   state.speechEnergy = 0;
+  state.audioEnergy = 0;
   speakButton.disabled = false;
   syncStatus.value = "idle";
   visemeStatus.value = "sil";
@@ -2514,10 +3817,15 @@ function updateBehavior(now) {
   const expression = EXPRESSIONS[state.expression] || EXPRESSIONS.friendly;
   const frame = selectCurrentViseme(now);
   const target = { ...frame.shape, smile: expression.smile };
+  if (state.speaking && state.audioEnergy > 0.02) {
+    target.open = clamp(target.open * 0.62 + state.audioEnergy * 0.38, 0.008, 0.88);
+  }
 
   state.viseme = frame.viseme;
   state.visemeMix = frame.mix;
-  state.speechEnergy = frame.energy;
+  state.speechEnergy = state.speaking && state.audioEnergy > 0.02
+    ? lerp(frame.energy, state.audioEnergy, 0.58)
+    : frame.energy;
   state.mouthTarget = target;
 
   const smoothing = state.speaking ? 0.38 : 0.14;
@@ -2527,13 +3835,14 @@ function updateBehavior(now) {
 
   if (now > state.nextBlink) {
     state.blinkStart = now;
-    state.nextBlink = now + randomRange(2300, 5200);
+    state.nextBlink = now + randomRange(2600, 6100);
   }
 
   if (now > state.nextGaze) {
-    state.gazeTargetX = randomRange(-0.55, 0.55);
-    state.gazeTargetY = randomRange(-0.28, 0.28);
-    state.nextGaze = now + randomRange(1300, 3100);
+    const glanceAway = Math.random() < 0.18 && !state.speaking;
+    state.gazeTargetX = glanceAway ? randomRange(-0.32, 0.32) : randomRange(-0.07, 0.07);
+    state.gazeTargetY = glanceAway ? randomRange(-0.12, 0.08) : randomRange(-0.045, 0.045);
+    state.nextGaze = now + randomRange(glanceAway ? 450 : 1800, glanceAway ? 900 : 4200);
   }
 
   state.gazeX = lerp(state.gazeX, state.gazeTargetX, 0.035);
@@ -2756,7 +4065,7 @@ function animate(now) {
 
 async function checkHealth() {
   try {
-    const response = await fetch("/api/ai-sales/health");
+    const response = await authFetch("/api/ai-sales/health");
     const health = await response.json();
     rendererStatus.value = rig.mode === "gltf" ? "webgl glb" : health.renderer?.engine?.includes("Three") ? "webgl" : "ready";
     modelStatus.value = rig.mode === "gltf" ? rig.modelName || health.renderer?.model || "loaded" : "procedural fallback";
@@ -2831,6 +4140,7 @@ async function init() {
     const selectedVoice = voiceChoices[voiceSelect.value];
     if (selectedVoice) ttsStatus.value = selectedVoice.name;
   });
+  userInput.addEventListener("input", () => updateSpeechMetrics(userInput.value));
   cameraButton.addEventListener("click", startRepCamera);
   autoConversationButton.addEventListener("click", toggleAutoConversation);
   listenButton.addEventListener("click", startListening);

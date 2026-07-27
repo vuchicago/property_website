@@ -1,4 +1,5 @@
 import { jsonResponse } from '../_auth.js';
+import { requireAiSalesAdmin } from './_access.js';
 
 const DEFAULT_WHISPER_MODEL = '@cf/openai/whisper';
 const DEFAULT_CLOUDFLARE_ACCOUNT_ID = '215a936bbe84f807d69a113fbbd125fe';
@@ -64,6 +65,9 @@ async function transcribeWithBinding(env, audioBytes) {
 }
 
 export const onRequestPost = async (context) => {
+        const access = await requireAiSalesAdmin(context);
+        if (access.response) return access.response;
+
         try {
                 const audioBuffer = await context.request.arrayBuffer();
 

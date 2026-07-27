@@ -5,9 +5,12 @@
         "pages_build_output_dir": "dist",
         "vars": {
                 "CLOUDFLARE_ACCOUNT_ID": "215a936bbe84f807d69a113fbbd125fe",
-                "CLOUDFLARE_DEEPSEEK_MODEL": "deepseek/deepseek-v4-pro",
+                "INSURANCE_NOTIFICATION_EMAIL": "vnguyen1@amfam.com",
+                "CLOUDFLARE_DEEPSEEK_MODEL": "deepseek/deepseek-v4-flash",
+                "CLOUDFLARE_DEEPSEEK_TURN_MODEL": "deepseek/deepseek-v4-flash",
                 "DEEPSEEK_MODEL": "deepseek-v4-flash",
                 "AI_SALES_TRANSCRIBE_MODEL": "@cf/openai/whisper",
+                "AI_SALES_FLUX_MODEL": "@cf/deepgram/flux",
                 "AI_SALES_TTS_MODEL": "@cf/deepgram/aura-2-en",
                 "AI_SALES_TTS_SPEAKER": "apollo",
                 "AI_SALES_WORKERS_MODEL": "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b"

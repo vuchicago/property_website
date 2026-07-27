@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description"
-        content="Request help comparing life, health, home, auto, property, and casualty insurance options.">
+        content="Get thoughtful insurance guidance for life, health, home, auto, property, and casualty coverage from an agent who is here when you need help.">
     <link rel="canonical" href="https://cookcountytaxcompare.com/insurance.html">
     <link rel="icon" href="/favicon.ico" sizes="any">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -70,8 +70,8 @@
                             stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                 </button>
-                <a href="#insurance-contact" class="cta-btn">
-                    <span>Get Quote Help</span>
+                <a href="#insurance-form" class="cta-btn">
+                    <span>Talk With an Agent</span>
                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2"
                             stroke-linecap="round" stroke-linejoin="round" />
@@ -101,41 +101,70 @@
     <main class="content-page insurance-page">
         <section class="container insurance-hero">
             <div class="insurance-copy">
-                <span class="section-badge">Insurance</span>
-                <h1>Save on Home, Auto, Life Insurance.</h1>
-                <p>Request help reviewing life, health, property, and casualty insurance options. Share your contact
-                    information and the coverage types you want to discuss.</p>
+                <span class="section-badge">Personal insurance guidance</span>
+                <h1>Insurance advice built around <span>what matters to you.</span></h1>
+                <p class="insurance-lead">The right coverage starts with a real conversation. Get clear, thoughtful
+                    guidance from an agent who takes time to understand your needs—and is ready to help when life
+                    changes or the unexpected happens.</p>
+                <div class="insurance-trust-points" aria-label="Our service commitments">
+                    <div>
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M12 22S20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z"
+                                stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                            <path d="M9 12L11 14L15.5 9.5" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span><strong>Advice you can trust</strong>Coverage explained clearly, without pressure.</span>
+                    </div>
+                    <div>
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M20 15.5A3.5 3.5 0 0116.5 19H15L12 22V19H7.5A3.5 3.5 0 014 15.5V9.5A3.5 3.5 0 017.5 6H16.5A3.5 3.5 0 0120 9.5V15.5Z"
+                                stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                        </svg>
+                        <span><strong>Here when you need help</strong>A responsive advocate beyond the policy purchase.</span>
+                    </div>
+                </div>
                 <figure class="insurance-agent-card">
-                    <img src="assets/agent_image.png" alt="Insurance agent">
+                    <img src="assets/agent_image.JPG" alt="Your local insurance agent" width="1616" height="1080">
+                    <figcaption>
+                        <span class="insurance-agent-status" aria-hidden="true"></span>
+                        <span><strong>Your dedicated insurance resource</strong>Personal guidance for every stage of life.</span>
+                    </figcaption>
                 </figure>
                 <div class="insurance-lines">
-                    <span>Life Insurance</span>
-                    <span>Health Insurance</span>
+                    <span>Life</span>
+                    <span>Health</span>
                     <span>Home & Property</span>
                     <span>Auto & Casualty</span>
                 </div>
             </div>
 
             <form class="contact-form insurance-form" id="insurance-form">
-                <h2>Request Insurance Help</h2>
-                <p class="text-muted">Add your name plus an email or phone number.</p>
+                <span class="insurance-form-eyebrow">Start a conversation</span>
+                <h2>How can I help protect what matters?</h2>
+                <p class="text-muted">Tell me a little about what you need. I’ll follow up personally to discuss your
+                    questions and options.</p>
                 <div id="insurance-form-alert" class="form-alert" style="display: none;"></div>
                 <div class="input-group">
                     <label for="insurance-name">Full Name</label>
-                    <input type="text" id="insurance-name" required placeholder="Jane Doe">
+                    <input type="text" id="insurance-name" required autocomplete="name" placeholder="Jane Doe">
                 </div>
                 <div class="form-row">
                     <div class="input-group">
                         <label for="insurance-email">Email Address</label>
-                        <input type="email" id="insurance-email" placeholder="jane@example.com">
+                        <input type="email" id="insurance-email" required autocomplete="email"
+                            placeholder="jane@example.com">
                     </div>
                     <div class="input-group">
                         <label for="insurance-phone">Phone Number</label>
-                        <input type="tel" id="insurance-phone" placeholder="(773) 555-1234">
+                        <input type="tel" id="insurance-phone" required autocomplete="tel" inputmode="tel"
+                            pattern="(?:\+?1[\s.-]?)?(?:\([2-9][0-9]{2}\)|[2-9][0-9]{2})[\s.-]?[2-9][0-9]{2}[\s.-]?[0-9]{4}"
+                            title="Enter a valid 10-digit U.S. phone number, including area code."
+                            placeholder="(773) 555-1234">
                     </div>
                 </div>
                 <fieldset class="insurance-fieldset">
-                    <legend>Coverage Interest</legend>
+                    <legend>What would you like guidance on?</legend>
                     <label><input type="checkbox" name="insurance-type" value="Life Insurance"> Life</label>
                     <label><input type="checkbox" name="insurance-type" value="Health Insurance"> Health</label>
                     <label><input type="checkbox" name="insurance-type" value="Property Insurance"> Property</label>
@@ -144,14 +173,45 @@
                     <label><input type="checkbox" name="insurance-type" value="Auto Insurance"> Auto</label>
                 </fieldset>
                 <div class="input-group">
-                    <label for="insurance-message">Notes</label>
+                    <label for="insurance-message">How can I help?</label>
                     <textarea id="insurance-message" rows="4"
-                        placeholder="Tell me what coverage you want to review..."></textarea>
+                        placeholder="Share any questions, upcoming changes, or coverage concerns..."></textarea>
                 </div>
-                <button type="submit" class="btn btn-primary btn-full">Send Insurance Request</button>
+                <button type="submit" class="btn btn-primary btn-full">Request a Personal Consultation</button>
                 <p class="insurance-disclaimer">Submitting this form sends your request to Cook County Tax Compare. It
                     does not bind coverage or create an insurance policy.</p>
             </form>
+        </section>
+
+        <section class="insurance-service-section" aria-labelledby="insurance-service-title">
+            <div class="container">
+                <div class="insurance-section-heading">
+                    <span class="section-badge">A better insurance experience</span>
+                    <h2 id="insurance-service-title">Guidance that continues after you choose a policy.</h2>
+                    <p>Insurance should feel understandable and personal. From reviewing your options to navigating
+                        changes in your life, you’ll have a knowledgeable point of contact along the way.</p>
+                </div>
+                <div class="insurance-service-grid">
+                    <article>
+                        <span>01</span>
+                        <h3>Listen first</h3>
+                        <p>Your goals, family, property, and concerns shape the conversation—not a one-size-fits-all
+                            recommendation.</p>
+                    </article>
+                    <article>
+                        <span>02</span>
+                        <h3>Make coverage clear</h3>
+                        <p>Understand your options, tradeoffs, and protection in straightforward language before you
+                            make a decision.</p>
+                    </article>
+                    <article>
+                        <span>03</span>
+                        <h3>Stay by your side</h3>
+                        <p>Get responsive support when your needs change, questions come up, or you simply want a second
+                            look at your coverage.</p>
+                    </article>
+                </div>
+            </div>
         </section>
     </main>
 
@@ -175,8 +235,13 @@
             const insuranceTypes = Array.from(document.querySelectorAll('input[name="insurance-type"]:checked'))
                 .map(input => input.value);
 
-            if (!email && !phone) {
-                showInsuranceAlert('Please add either an email address or phone number.', 'error');
+            if (!email || !phone) {
+                showInsuranceAlert('Please add both your email address and phone number.', 'error');
+                return;
+            }
+
+            if (!form.checkValidity()) {
+                form.reportValidity();
                 return;
             }
 

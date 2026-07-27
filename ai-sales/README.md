@@ -7,8 +7,10 @@ Static avatar app integrated into vu-web at `/ai-sales/`.
 - Static files are served from `ai-sales/`.
 - Cloudflare Pages Functions live under `/api/ai-sales/`.
 - `Generate Reply` uses direct DeepSeek when `DEEPSEEK_API_TOKEN` is a DeepSeek key. When the token starts with `cfut_`, it uses Cloudflare's OpenAI-compatible Workers AI endpoint with a hosted DeepSeek model. If no token is present, it falls back to the existing Cloudflare Workers AI binding.
-- `Listen` uses browser SpeechRecognition when available. If unavailable, it records microphone audio and transcribes it with Cloudflare Workers AI Whisper.
-- `Speak` uses the browser's built-in `SpeechSynthesis` voices.
+- `Auto` streams 16 kHz PCM microphone audio over a WebSocket to Cloudflare-hosted Deepgram Flux for transcription, end-of-turn detection, and interruption handling. Browser SpeechRecognition and record-then-Whisper remain fallbacks.
+- `Speak` uses Cloudflare-hosted Deepgram Aura-2 English, with browser `SpeechSynthesis` as a fallback.
+- Aura playback is analyzed in real time so facial articulation follows the actual voice energy as well as scheduled visemes.
+- Adjacent Flux segments are combined during a configurable grace period, and up to eight recent conversation turns are retained for response context.
 
 ## Secrets
 

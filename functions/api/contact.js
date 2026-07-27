@@ -1,6 +1,7 @@
 import { sendNotificationEmail } from './_email.js';
 
 const ADMIN_EMAIL = 'vu@cookcountytaxcompare.com';
+const INSURANCE_EMAIL = 'vnguyen1@amfam.com';
 
 export const onRequestPost = async (context) => {
         let savedMessageId = null;
@@ -22,22 +23,24 @@ export const onRequestPost = async (context) => {
                 const selectedInsurance = Array.isArray(insuranceTypes) && insuranceTypes.length
                         ? insuranceTypes.join(', ')
                         : 'Not provided';
+                const normalizedEmail = normalizeEmail(email);
+                const normalizedPhone = normalizeUsPhone(phone);
 
-                const contactName = name || (isWaitlistInquiry && email ? email : '');
+                const contactName = String(name || (isWaitlistInquiry && normalizedEmail ? normalizedEmail : '')).trim();
 
-                if (!contactName || (!email && !isInsuranceInquiry)) {
+                if (!contactName || (!normalizedEmail && !isInsuranceInquiry)) {
                         return jsonResponse({ error: 'Name and email are required' }, 400);
                 }
 
-                if (email && !isValidEmail(email)) {
+                if (email && !normalizedEmail) {
                         return jsonResponse({ error: 'Please enter a valid email address.' }, 400);
                 }
 
-                if (isInsuranceInquiry && !email && !phone) {
-                        return jsonResponse({ error: 'Please provide an email address or phone number.' }, 400);
+                if (isInsuranceInquiry && (!normalizedEmail || !normalizedPhone)) {
+                        return jsonResponse({ error: 'A valid email address and 10-digit U.S. phone number are required.' }, 400);
                 }
 
-                if (phone && !isValidPhone(phone)) {
+                if (phone && !normalizedPhone) {
                         return jsonResponse({ error: 'Please enter a valid 10-digit phone number.' }, 400);
                 }
 
@@ -57,8 +60,8 @@ export const onRequestPost = async (context) => {
                 savedMessageId = await saveContactMessage(context, {
                         inquiryType: normalizedType,
                         name: contactName,
-                        email,
-                        phone,
+                        email: normalizedEmail,
+                        phone: normalizedPhone,
                         propertyAddress,
                         insuranceTypes: selectedInsurance,
                         message: savedMessage
@@ -69,8 +72,8 @@ export const onRequestPost = async (context) => {
                         <table cellpadding="8" cellspacing="0" style="border-collapse: collapse;">
                                 <tr><td><strong>Inquiry Type</strong></td><td>${escapeHtml(normalizedType)}</td></tr>
                                 <tr><td><strong>Name</strong></td><td>${escapeHtml(contactName)}</td></tr>
-                                <tr><td><strong>Email</strong></td><td>${escapeHtml(email)}</td></tr>
-                                <tr><td><strong>Phone</strong></td><td>${escapeHtml(phone || 'Not provided')}</td></tr>
+                                <tr><td><strong>Email</strong></td><td>${escapeHtml(normalizedEmail)}</td></tr>
+                                <tr><td><strong>Phone</strong></td><td>${escapeHtml(formatUsPhone(normalizedPhone) || 'Not provided')}</td></tr>
                                 <tr><td><strong>Firm Name</strong></td><td>${escapeHtml(firmName || 'Not provided')}</td></tr>
                                 <tr><td><strong>Insurance Interest</strong></td><td>${escapeHtml(selectedInsurance)}</td></tr>
                                 <tr><td><strong>Property Address</strong></td><td>${escapeHtml(propertyAddress || 'Not provided')}</td></tr>
@@ -84,8 +87,8 @@ export const onRequestPost = async (context) => {
                         '',
                         `Inquiry Type: ${normalizedType}`,
                         `Name: ${contactName}`,
-                        `Email: ${email}`,
-                        `Phone: ${phone || 'Not provided'}`,
+                        `Email: ${normalizedEmail}`,
+                        `Phone: ${formatUsPhone(normalizedPhone) || 'Not provided'}`,
                         `Firm Name: ${firmName || 'Not provided'}`,
                         `Insurance Interest: ${selectedInsurance}`,
                         `Property Address: ${propertyAddress || 'Not provided'}`,
@@ -95,9 +98,11 @@ export const onRequestPost = async (context) => {
                         message || 'No message provided'
                 ].join('\n');
 
-                const to = isPartnershipInquiry
-                        ? (context.env.PARTNERSHIP_NOTIFICATION_EMAIL || ADMIN_EMAIL)
-                        : (context.env.ADMIN_NOTIFICATION_EMAIL || ADMIN_EMAIL);
+                const to = isInsuranceInquiry
+                        ? (context.env.INSURANCE_NOTIFICATION_EMAIL || INSURANCE_EMAIL)
+                        : isPartnershipInquiry
+                                ? (context.env.PARTNERSHIP_NOTIFICATION_EMAIL || ADMIN_EMAIL)
+                                : (context.env.ADMIN_NOTIFICATION_EMAIL || ADMIN_EMAIL);
                 const from = context.env.NOTIFICATION_FROM_EMAIL
                         || (context.env.RESEND_API_KEY
                                 ? 'Cook County Tax Compare <onboarding@resend.dev>'
@@ -105,7 +110,7 @@ export const onRequestPost = async (context) => {
                 const result = await sendNotificationEmail(context.env, {
                         from,
                         to,
-                        replyTo: email || undefined,
+                        replyTo: normalizedEmail || undefined,
                         subject: `${normalizedType} from ${contactName}`,
                         html,
                         text
@@ -203,11 +208,38 @@ function escapeHtml(value) {
         })[char]);
 }
 
-function isValidEmail(value) {
-        return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(value || '').trim());
+function normalizeEmail(value) {
+        const email = String(value || '').trim().toLowerCase();
+        if (!email || email.length > 254 || email.includes('..')) {
+                return '';
+        }
+
+        const match = email.match(/^([a-z0-9.!#$%&'*+/=?^_`{|}~-]+)@([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+)$/i);
+        if (!match || match[1].length > 64) {
+                return '';
+        }
+
+        return email;
 }
 
-function isValidPhone(value) {
+function normalizeUsPhone(value) {
         const digits = String(value || '').replace(/\D/g, '');
-        return digits.length === 10 || (digits.length === 11 && digits.startsWith('1'));
+        const nationalNumber = digits.length === 11 && digits.startsWith('1')
+                ? digits.slice(1)
+                : digits;
+
+        if (!/^[2-9]\d{2}[2-9]\d{6}$/.test(nationalNumber)) {
+                return '';
+        }
+
+        return `+1${nationalNumber}`;
+}
+
+function formatUsPhone(value) {
+        const digits = String(value || '').replace(/\D/g, '').replace(/^1/, '');
+        if (digits.length !== 10) {
+                return '';
+        }
+
+        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }

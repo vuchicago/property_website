@@ -111,6 +111,10 @@ function normalizeText(value) {
                 .trim();
 }
 
+function compactName(value) {
+        return normalizeText(value).replace(/\s+/g, '');
+}
+
 function levenshteinRatio(left, right) {
         if (left === right) return 1;
         if (!left || !right) return 0;
@@ -138,6 +142,7 @@ function levenshteinRatio(left, right) {
 function matchCalendarName(value) {
         const candidate = normalizeText(value);
         if (!candidate) return null;
+        const compactCandidate = compactName(candidate);
 
         let best = null;
         let bestScore = 0;
@@ -145,6 +150,9 @@ function matchCalendarName(value) {
         for (const entry of APPEAL_CALENDAR) {
                 const official = normalizeText(entry.name);
                 if (official === candidate) return { entry, confidence: 1, matchedBy: 'exact' };
+                if (compactName(official) === compactCandidate) {
+                        return { entry, confidence: 1, matchedBy: 'normalized-exact' };
+                }
 
                 const score = levenshteinRatio(candidate, official);
                 if (score > bestScore) {

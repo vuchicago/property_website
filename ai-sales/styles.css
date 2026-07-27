@@ -123,6 +123,68 @@ input {
   height: 100%;
   min-height: 592px;
   background: #dce8e9;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.avatar-stage[data-activity-visible="true"] #avatarCanvas {
+  opacity: 0.08;
+  transform: scale(0.98);
+}
+
+.kids-activity-card {
+  position: absolute;
+  inset: 8%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  align-items: center;
+  justify-items: center;
+  gap: 18px;
+  padding: clamp(22px, 5vw, 54px);
+  border: 2px solid rgba(16, 104, 83, 0.28);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(243, 249, 247, 0.96));
+  box-shadow: 0 24px 60px rgba(24, 33, 43, 0.16);
+  text-align: center;
+}
+
+.kids-activity-card[hidden],
+.kids-activity-answer[hidden] {
+  display: none;
+}
+
+.kids-activity-type {
+  justify-self: start;
+  min-width: 84px;
+  padding: 8px 12px;
+  border: 1px solid rgba(16, 104, 83, 0.22);
+  border-radius: 999px;
+  color: var(--accent-strong);
+  background: rgba(16, 104, 83, 0.08);
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.kids-activity-prompt,
+.kids-activity-answer {
+  width: 100%;
+  overflow-wrap: anywhere;
+  color: #14233a;
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.kids-activity-prompt {
+  font-size: clamp(48px, 10vw, 124px);
+}
+
+.kids-activity-answer {
+  padding-top: 18px;
+  border-top: 1px solid rgba(16, 104, 83, 0.18);
+  color: var(--accent-strong);
+  font-size: clamp(36px, 7vw, 88px);
 }
 
 .caption {
@@ -250,6 +312,84 @@ input[type="range"] {
 .practice-actions button {
   min-height: 38px;
   font-size: 13px;
+}
+
+.coaching-panel {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbfc;
+}
+
+.coaching-score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #263240;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+#nervousnessScore {
+  font-size: 26px;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.coaching-meter {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dce5ea;
+}
+
+.coaching-meter span {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 180ms ease, background-color 180ms ease;
+}
+
+.confidence-meter span {
+  background: var(--ready);
+}
+
+.coaching-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.coaching-grid div {
+  min-height: 46px;
+  padding: 8px 10px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.coaching-grid span,
+.coaching-cue {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.coaching-grid output {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.coaching-cue {
+  min-height: 18px;
 }
 
 .button-row {

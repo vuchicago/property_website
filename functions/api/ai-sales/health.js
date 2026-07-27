@@ -1,4 +1,5 @@
 import { jsonResponse } from '../_auth.js';
+import { requireAiSalesAdmin } from './_access.js';
 
 function deepSeekApiKey(env) {
         return env.DEEPSEEK_API_KEY ||
@@ -12,6 +13,9 @@ function isCloudflareApiToken(value) {
 }
 
 export const onRequestGet = async (context) => {
+        const access = await requireAiSalesAdmin(context);
+        if (access.response) return access.response;
+
         const apiKey = deepSeekApiKey(context.env);
         const hasDeepSeekApiKey = Boolean(apiKey && !isCloudflareApiToken(apiKey));
         const hasCloudflareApiKey = Boolean(apiKey && isCloudflareApiToken(apiKey));
@@ -28,6 +32,12 @@ export const onRequestGet = async (context) => {
                         available: true,
                         provider: context.env.AI || hasCloudflareApiKey ? 'Cloudflare Workers AI' : 'Browser SpeechSynthesis fallback',
                         fallback: 'Browser SpeechSynthesis'
+                },
+                listening: {
+                        engine: '@cf/deepgram/flux',
+                        available: Boolean(context.env.AI),
+                        transport: 'WebSocket',
+                        fallback: 'Browser SpeechRecognition or Whisper'
                 },
                 coach: {
                         engine: hasDeepSeekApiKey

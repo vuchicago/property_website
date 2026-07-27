@@ -1,4 +1,5 @@
 import { jsonResponse } from '../_auth.js';
+import { requireAiSalesAdmin } from './_access.js';
 
 const DEFAULT_TTS_MODEL = '@cf/deepgram/aura-2-en';
 const DEFAULT_TTS_SPEAKER = 'apollo';
@@ -132,6 +133,9 @@ async function synthesizeWithBinding(env, payload) {
 }
 
 export const onRequestPost = async (context) => {
+        const access = await requireAiSalesAdmin(context);
+        if (access.response) return access.response;
+
         try {
                 const payload = await context.request.json();
                 const text = String(payload.text || '').replace(/\s+/g, ' ').trim().slice(0, MAX_TEXT_CHARS);

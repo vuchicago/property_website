@@ -1,4 +1,5 @@
 User-agent: *
+Disallow: /ai-sales/
 Allow: /
 
 User-agent: OAI-SearchBot

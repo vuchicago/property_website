@@ -1,4 +1,5 @@
 import { jsonResponse } from '../_auth.js';
+import { requireAiSalesAdmin } from './_access.js';
 
 const DEFAULT_CLOUDFLARE_ACCOUNT_ID = '215a936bbe84f807d69a113fbbd125fe';
 const DEFAULT_CLOUDFLARE_DEEPSEEK_MODEL = 'deepseek/deepseek-v4-pro';
@@ -6,6 +7,10 @@ const DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-flash';
 const DEFAULT_DONE_PROBABILITY_THRESHOLD = 0.45;
 const MAX_SCENARIO_CHARS = 1600;
 const MAX_CONVERSATION_TURNS = 8;
+const ALLOWED_CLOUDFLARE_DEEPSEEK_MODELS = new Set([
+        'deepseek/deepseek-v4-flash',
+        'deepseek/deepseek-v4-pro'
+]);
 
 function stripReasoning(value) {
         return String(value || '')
@@ -34,6 +39,13 @@ function cloudflareAccountId(env) {
                 env.CF_ACCOUNT_ID ||
                 env.ACCOUNT_ID ||
                 DEFAULT_CLOUDFLARE_ACCOUNT_ID;
+}
+
+function cloudflareDeepSeekModel(env, requestedModel) {
+        const requested = String(requestedModel || '').trim();
+        return ALLOWED_CLOUDFLARE_DEEPSEEK_MODELS.has(requested)
+                ? requested
+                : env.CLOUDFLARE_DEEPSEEK_TURN_MODEL || env.CLOUDFLARE_DEEPSEEK_MODEL || DEFAULT_CLOUDFLARE_DEEPSEEK_MODEL;
 }
 
 function cleanConversation(value) {
@@ -113,10 +125,8 @@ function turnMessages({ scenario, conversation, doneProbabilityThreshold, langua
         return messages;
 }
 
-async function runCloudflareAiRest(env, apiKey, messages) {
-        const model = env.CLOUDFLARE_DEEPSEEK_TURN_MODEL ||
-                env.CLOUDFLARE_DEEPSEEK_MODEL ||
-                DEFAULT_CLOUDFLARE_DEEPSEEK_MODEL;
+async function runCloudflareAiRest(env, apiKey, messages, requestedModel) {
+        const model = cloudflareDeepSeekModel(env, requestedModel);
         const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId(env)}/ai/v1/chat/completions`, {
                 method: 'POST',
                 headers: {
@@ -152,14 +162,14 @@ async function runCloudflareAiRest(env, apiKey, messages) {
         };
 }
 
-async function runDeepSeekApi(env, messages) {
+async function runDeepSeekApi(env, messages, requestedModel) {
         const apiKey = deepSeekApiKey(env);
 
         if (isCloudflareApiToken(apiKey)) {
-                return runCloudflareAiRest(env, apiKey, messages);
+                return runCloudflareAiRest(env, apiKey, messages, requestedModel);
         }
 
-        const model = env.DEEPSEEK_TURN_MODEL || env.DEEPSEEK_MODEL || DEFAULT_DEEPSEEK_MODEL;
+        const model = String(requestedModel || '').trim() || env.DEEPSEEK_TURN_MODEL || env.DEEPSEEK_MODEL || DEFAULT_DEEPSEEK_MODEL;
         const response = await fetch('https://api.deepseek.com/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -209,6 +219,9 @@ async function runWorkersAi(env, messages) {
 }
 
 export const onRequestPost = async (context) => {
+        const access = await requireAiSalesAdmin(context);
+        if (access.response) return access.response;
+
         try {
                 const payload = await context.request.json();
                 const scenario = String(payload.scenario || payload.message || '').trim().slice(0, MAX_SCENARIO_CHARS);
@@ -217,6 +230,7 @@ export const onRequestPost = async (context) => {
                         DEFAULT_DONE_PROBABILITY_THRESHOLD
                 );
                 const language = String(payload.language || payload.settings?.language || 'en-US').slice(0, 16);
+                const requestedModel = String(payload.model || payload.settings?.deepseekTurnModel || payload.settings?.deepseekModel || '').trim();
                 if (hasCompleteTurnCue(scenario)) {
                         return jsonResponse({
                                 doneProbability: 0.85,
@@ -234,7 +248,7 @@ export const onRequestPost = async (context) => {
                         language
                 });
                 const completion = deepSeekApiKey(context.env)
-                        ? await runDeepSeekApi(context.env, messages)
+                        ? await runDeepSeekApi(context.env, messages, requestedModel)
                         : await runWorkersAi(context.env, messages);
                 const parsed = parseTurnResponse(completion.rawText, doneProbabilityThreshold);
                 const doneProbability = parsed.doneProbability;

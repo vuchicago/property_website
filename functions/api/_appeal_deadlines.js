@@ -1,16 +1,16 @@
 export const OFFICIAL_CALENDAR_URL = 'https://www.cookcountyassessoril.gov/assessment-calendar-and-deadlines';
 export const CURRENT_CALENDAR_URL = 'https://rpie.cookcountyassessor.com/assessment-calendar-and-deadlines';
-export const APPEAL_CALENDAR_SOURCE_LAST_UPDATED = '5/20/2026';
+export const APPEAL_CALENDAR_SOURCE_LAST_UPDATED = '7/24/2026';
 
 const APPEAL_CALENDAR_ROWS = [
         ['Oak Park', '5/6/2026', '6/18/2026', '', '', '', 'south-west-suburbs'],
         ['Riverside', '4/24/2026', '6/8/2026', '', '', '', 'south-west-suburbs'],
         ['River Forest', '4/20/2026', '6/2/2026', '', '', '', 'south-west-suburbs'],
         ['Berwyn', '5/20/2026', '7/6/2026', '', '', '', 'south-west-suburbs'],
-        ['Palos', '', '', '', '', '', 'south-west-suburbs'],
-        ['Cicero', '', '', '', '', '', 'south-west-suburbs'],
-        ['Stickney', '', '', '', '', '', 'south-west-suburbs'],
-        ['Lyons', '', '', '', '', '', 'south-west-suburbs'],
+        ['Palos', '6/3/2026', '7/17/2026', '', '', '', 'south-west-suburbs'],
+        ['Cicero', '6/17/2026', '7/31/2026', '', '', '', 'south-west-suburbs'],
+        ['Stickney', '6/29/2026', '8/12/2026', '', '', '', 'south-west-suburbs'],
+        ['Lyons', '7/23/2026', '9/3/2026', '', '', '', 'south-west-suburbs'],
         ['Bremen', '', '', '', '', '', 'south-west-suburbs'],
         ['Lemont', '', '', '', '', '', 'south-west-suburbs'],
         ['Worth', '', '', '', '', '', 'south-west-suburbs'],
@@ -24,11 +24,11 @@ const APPEAL_CALENDAR_ROWS = [
         ['Norwood Park', '4/13/2026', '5/26/2026', '', '', '', 'north-suburbs-chicago'],
         ['Rogers Park', '4/17/2026', '6/1/2026', '', '', '', 'north-suburbs-chicago'],
         ['Evanston', '4/22/2026', '6/4/2026', '', '', '', 'north-suburbs-chicago'],
-        ['Lake View', '', '', '', '', '', 'north-suburbs-chicago'],
-        ['Maine', '', '', '', '', '', 'north-suburbs-chicago'],
-        ['Elk Grove', '', '', '', '', '', 'north-suburbs-chicago'],
-        ['West Chicago', '', '', '', '', '', 'north-suburbs-chicago'],
-        ['Northfield', '', '', '', '', '', 'north-suburbs-chicago'],
+        ['Lake View', '5/28/2026', '7/13/2026', '', '', '', 'north-suburbs-chicago'],
+        ['Maine', '6/5/2026', '7/21/2026', '', '', '', 'north-suburbs-chicago'],
+        ['Elk Grove', '6/22/2026', '8/4/2026', '', '', '', 'north-suburbs-chicago'],
+        ['West Chicago', '7/10/2026', '8/21/2026', '', '', '', 'north-suburbs-chicago'],
+        ['Northfield', '7/24/2026', '9/4/2026', '', '', '', 'north-suburbs-chicago'],
         ['Barrington', '', '', '', '', '', 'north-suburbs-chicago'],
         ['Hyde Park', '', '', '', '', '', 'north-suburbs-chicago'],
         ['Leyden', '', '', '', '', '', 'north-suburbs-chicago'],

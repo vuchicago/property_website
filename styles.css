@@ -1030,49 +1030,122 @@ ol {
 
 .insurance-page {
     background:
-        linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(15, 118, 110, 0.08)),
+        radial-gradient(circle at 8% 10%, rgba(67, 83, 168, 0.12), transparent 34%),
+        radial-gradient(circle at 92% 22%, rgba(15, 118, 110, 0.08), transparent 28%),
         var(--dark-50);
 }
 
 .insurance-hero {
     align-items: start;
     display: grid;
-    gap: var(--space-10);
-    grid-template-columns: minmax(0, 1fr) minmax(320px, 480px);
+    gap: clamp(2.5rem, 6vw, 6rem);
+    grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
+    padding-bottom: clamp(4rem, 8vw, 7rem);
+    padding-top: clamp(3rem, 7vw, 6rem);
 }
 
 .insurance-copy {
-    padding-top: var(--space-8);
+    min-width: 0;
 }
 
 .insurance-copy h1 {
+    font-size: clamp(2.6rem, 5vw, 4.8rem);
+    letter-spacing: -0.055em;
+    line-height: 1.02;
+    margin-top: var(--space-5);
     max-width: 760px;
 }
 
-.insurance-copy p {
+.insurance-copy h1 span {
+    color: var(--primary);
+}
+
+.insurance-copy .insurance-lead {
     color: var(--dark-500);
-    font-size: var(--font-size-xl);
+    font-size: clamp(1.05rem, 1.6vw, 1.25rem);
     line-height: 1.7;
     margin-top: var(--space-5);
     max-width: 720px;
 }
 
+.insurance-trust-points {
+    display: grid;
+    gap: var(--space-4);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: var(--space-8);
+}
+
+.insurance-trust-points > div {
+    align-items: flex-start;
+    display: flex;
+    gap: var(--space-3);
+}
+
+.insurance-trust-points svg {
+    color: var(--primary);
+    flex: 0 0 28px;
+    height: 28px;
+    margin-top: 2px;
+    width: 28px;
+}
+
+.insurance-trust-points span {
+    color: var(--dark-500);
+    font-size: var(--font-size-sm);
+    line-height: 1.55;
+}
+
+.insurance-trust-points strong {
+    color: var(--dark-800);
+    display: block;
+    font-size: var(--font-size-base);
+    margin-bottom: 2px;
+}
+
 .insurance-agent-card {
     background: var(--white);
-    border: 1px solid var(--dark-200);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-lg);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: var(--radius-2xl);
+    box-shadow: 0 24px 55px -28px rgba(15, 23, 42, 0.45);
     margin-top: var(--space-8);
     max-width: 720px;
     overflow: hidden;
 }
 
 .insurance-agent-card img {
-    aspect-ratio: 16 / 9;
+    aspect-ratio: 3 / 2;
     height: auto;
     object-fit: cover;
-    object-position: center 28%;
+    object-position: center 22%;
     width: 100%;
+}
+
+.insurance-agent-card figcaption {
+    align-items: center;
+    display: flex;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+}
+
+.insurance-agent-card figcaption span:last-child {
+    color: var(--dark-500);
+    font-size: var(--font-size-sm);
+    line-height: 1.45;
+}
+
+.insurance-agent-card figcaption strong {
+    color: var(--dark-800);
+    display: block;
+}
+
+.insurance-agent-status {
+    background: var(--accent);
+    border: 4px solid rgba(16, 185, 129, 0.16);
+    border-radius: 50%;
+    box-sizing: content-box;
+    flex: 0 0 10px;
+    height: 10px;
+    width: 10px;
 }
 
 .insurance-lines {
@@ -1083,8 +1156,8 @@ ol {
 }
 
 .insurance-lines span {
-    background: var(--white);
-    border: 1px solid var(--dark-200);
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(148, 163, 184, 0.35);
     border-radius: var(--radius-full);
     color: var(--dark-700);
     font-weight: 700;
@@ -1093,15 +1166,29 @@ ol {
 
 .insurance-form {
     background: var(--white);
-    border: 1px solid var(--dark-200);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-xl);
-    padding: var(--space-8);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: var(--radius-2xl);
+    box-shadow: 0 30px 80px -35px rgba(15, 23, 42, 0.45);
+    padding: clamp(1.5rem, 4vw, 2.5rem);
+    position: sticky;
+    top: 100px;
 }
 
 .insurance-form h2 {
     color: var(--dark-900);
+    font-size: clamp(1.65rem, 2.5vw, 2.1rem);
+    line-height: 1.2;
     margin-bottom: var(--space-2);
+}
+
+.insurance-form-eyebrow {
+    color: var(--primary);
+    display: block;
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    margin-bottom: var(--space-3);
+    text-transform: uppercase;
 }
 
 .insurance-fieldset {
@@ -1133,6 +1220,70 @@ ol {
     font-size: var(--font-size-xs);
     line-height: 1.5;
     margin-top: var(--space-4);
+}
+
+.insurance-service-section {
+    background: var(--white);
+    border-top: 1px solid var(--dark-100);
+    padding: clamp(4rem, 8vw, 7rem) 0;
+}
+
+.insurance-section-heading {
+    margin: 0 auto clamp(2.5rem, 5vw, 4rem);
+    max-width: 780px;
+    text-align: center;
+}
+
+.insurance-section-heading h2 {
+    color: var(--dark-900);
+    font-size: clamp(2rem, 4vw, 3.25rem);
+    letter-spacing: -0.04em;
+    line-height: 1.12;
+    margin-top: var(--space-4);
+}
+
+.insurance-section-heading p {
+    color: var(--dark-500);
+    font-size: var(--font-size-lg);
+    line-height: 1.7;
+    margin-top: var(--space-5);
+}
+
+.insurance-service-grid {
+    display: grid;
+    gap: var(--space-5);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.insurance-service-grid article {
+    background: var(--dark-50);
+    border: 1px solid var(--dark-100);
+    border-radius: var(--radius-xl);
+    padding: clamp(1.5rem, 3vw, 2rem);
+    transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.insurance-service-grid article:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-4px);
+}
+
+.insurance-service-grid article > span {
+    color: var(--primary);
+    font-size: var(--font-size-sm);
+    font-weight: 800;
+    letter-spacing: 0.08em;
+}
+
+.insurance-service-grid h3 {
+    color: var(--dark-900);
+    font-size: var(--font-size-xl);
+    margin: var(--space-5) 0 var(--space-3);
+}
+
+.insurance-service-grid p {
+    color: var(--dark-500);
+    line-height: 1.7;
 }
 
 .form-alert {
@@ -5154,6 +5305,10 @@ textarea {
         grid-template-columns: 1fr;
     }
 
+    .insurance-form {
+        position: static;
+    }
+
     .loan-summary {
         grid-template-columns: repeat(2, 1fr);
     }
@@ -5311,6 +5466,23 @@ textarea {
 
     .content-page h1 {
         font-size: var(--font-size-3xl);
+    }
+
+    .insurance-copy h1 {
+        font-size: clamp(2.35rem, 11vw, 3.5rem);
+    }
+
+    .insurance-trust-points,
+    .insurance-service-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .insurance-hero {
+        gap: var(--space-10);
+    }
+
+    .insurance-agent-card {
+        border-radius: var(--radius-xl);
     }
 
     .testimonials-grid {

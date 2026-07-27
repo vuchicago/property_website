@@ -42,11 +42,11 @@ async function getFirebaseJwks() {
         return jwksCache;
 }
 
-export async function requireFirebaseUser(request) {
+export async function requireFirebaseUser(request, providedToken = null) {
         const header = request.headers.get('authorization') || '';
         const match = header.match(/^Bearer\s+(.+)$/i);
         const fallbackToken = request.headers.get('x-firebase-auth');
-        const tokenValue = match?.[1] || fallbackToken;
+        const tokenValue = match?.[1] || fallbackToken || providedToken;
 
         if (!tokenValue) {
                 return { response: jsonResponse({ error: 'Missing authorization token' }, 401) };

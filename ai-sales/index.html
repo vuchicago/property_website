@@ -4,12 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI Sales Trainer Avatar</title>
+    <meta name="robots" content="noindex, nofollow, noarchive" />
     <meta http-equiv="Cache-Control" content="no-store" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <link rel="stylesheet" href="./styles.css" />
+    <style>
+      body.auth-pending .app-shell { visibility: hidden; }
+    </style>
   </head>
-  <body>
+  <body class="auth-pending">
     <main class="app-shell">
       <section class="studio" aria-label="Real-time speaking avatar">
         <div class="topbar">
@@ -22,6 +26,11 @@
 
         <div class="avatar-stage">
           <canvas id="avatarCanvas" width="960" height="1080" aria-label="Realistic 3D speaking avatar"></canvas>
+          <div id="kidsActivityCard" class="kids-activity-card" aria-live="polite" hidden>
+            <div id="kidsActivityType" class="kids-activity-type">Math</div>
+            <div id="kidsActivityPrompt" class="kids-activity-prompt">2 + 2 =</div>
+            <div id="kidsActivityAnswer" class="kids-activity-answer" hidden>2 + 2 = 4</div>
+          </div>
         </div>
 
         <div class="caption" id="caption">
@@ -44,6 +53,42 @@
             <button id="stopListenButton" type="button" disabled>Stop</button>
             <button id="roleplayButton" class="primary" type="button">Respond</button>
           </div>
+        </div>
+
+        <div class="coaching-panel" aria-label="Sales delivery coaching">
+          <div class="coaching-score">
+            <span>Meeting nervousness</span>
+            <output id="nervousnessScore">0</output>
+          </div>
+          <div class="coaching-meter" aria-hidden="true">
+            <span id="nervousnessMeter"></span>
+          </div>
+          <div class="coaching-score">
+            <span>Meeting confidence</span>
+            <output id="confidenceScore">0</output>
+          </div>
+          <div class="coaching-meter confidence-meter" aria-hidden="true">
+            <span id="confidenceMeter"></span>
+          </div>
+          <div class="coaching-grid">
+            <div>
+              <span>Eye contact</span>
+              <output id="eyeContactScore">--</output>
+            </div>
+            <div>
+              <span>Movement</span>
+              <output id="movementScore">--</output>
+            </div>
+            <div>
+              <span>Speech pace</span>
+              <output id="paceScore">--</output>
+            </div>
+            <div>
+              <span>Stutter/filler</span>
+              <output id="stutterScore">--</output>
+            </div>
+          </div>
+          <output id="nervousnessCue" class="coaching-cue">Camera off</output>
         </div>
 
         <div class="field">
@@ -151,6 +196,20 @@
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.wasm.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.30/dist/bundle.min.js"></script>
     -->
-    <script type="module" src="./app.js?v=deepseek-speech-auto-20260707a"></script>
+    <script type="module">
+      import { waitForAuthUser } from "../auth-client.js";
+
+      try {
+        const user = await waitForAuthUser();
+        if (String(user.email || "").trim().toLowerCase() !== "vuchicago@gmail.com") {
+          window.location.replace("../index.html");
+        } else {
+          document.body.classList.remove("auth-pending");
+          await import("./app.js?v=private-admin-20260727");
+        }
+      } catch {
+        window.location.replace("../login.html");
+      }
+    </script>
   </body>
 </html>

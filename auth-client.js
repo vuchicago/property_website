@@ -243,6 +243,7 @@ export const initAuthUI = () => {
 
 const updateNavigation = (user) => {
         updateDesktopNavForAuth(user);
+        updateAiSalesVisibility(user);
 
         // Desktop Nav Action Button
         const desktopContainer = document.getElementById('auth-action-container');
@@ -270,6 +271,29 @@ const updateNavigation = (user) => {
                         dashboard.style.display = 'none';
                 }
         }
+};
+
+const updateAiSalesVisibility = (user) => {
+        document.getElementById('admin-ai-sales-link')?.remove();
+
+        if (String(user?.email || '').trim().toLowerCase() !== 'vuchicago@gmail.com') {
+                return;
+        }
+
+        const toolsGrid = document.querySelector('#tools-preview .tool-link-grid');
+        if (!toolsGrid) return;
+
+        const aiSalesLink = document.createElement('a');
+        aiSalesLink.id = 'admin-ai-sales-link';
+        aiSalesLink.href = 'ai-sales/';
+        aiSalesLink.className = 'dashboard-card tool-link-card';
+        aiSalesLink.innerHTML = `
+                <span class="section-badge">Private AI Sales</span>
+                <h3>Sales Trainer Avatar</h3>
+                <p>Practice discovery-call responses with the private real-time 3D sales trainer.</p>
+                <span class="feature-link">Open Sales Trainer →</span>
+        `;
+        toolsGrid.appendChild(aiSalesLink);
 };
 
 const updateAuthButton = (container, user) => {
