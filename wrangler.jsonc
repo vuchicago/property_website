@@ -1,6 +1,5 @@
 {
         "name": "cookcountytaxcomparev2",
-        "account_id": "215a936bbe84f807d69a113fbbd125fe",
         "compatibility_date": "2026-02-01",
         "pages_build_output_dir": "dist",
         "vars": {
