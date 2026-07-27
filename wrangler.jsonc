@@ -24,12 +24,6 @@
         "ai": {
                 "binding": "AI"
         },
-        "vectorize": [
-                {
-                        "binding": "TAX_DOCS_VECTORIZE",
-                        "index_name": "cook-county-tax-docs"
-                }
-        ],
         "observability": {
                 "enabled": true
         }
