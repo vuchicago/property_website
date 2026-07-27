@@ -73,10 +73,6 @@ const AVATAR_MODELS = [
     url: "./assets/john.glb",
   },
   {
-    name: "MPFB high-detail fallback",
-    url: "./assets/mpfb.glb",
-  },
-  {
     name: "MPFB remote fallback",
     url: "https://raw.githubusercontent.com/met4citizen/TalkingHead/main/avatars/mpfb.glb",
   },

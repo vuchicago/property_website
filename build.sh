@@ -48,6 +48,9 @@ cp -r assets/ dist/assets/ 2>/dev/null || true
 rm -rf dist/ai-sales
 cp -r ai-sales/ dist/ai-sales/ 2>/dev/null || true
 find dist/ai-sales -type f \( -name ".env" -o -name ".env.*" \) -delete 2>/dev/null || true
+# Cloudflare Pages limits individual static assets to 25 MiB. The app uses
+# john.glb first and retains the equivalent hosted MPFB model as a fallback.
+find dist/ai-sales/assets -type f -name "mpfb.glb" -delete 2>/dev/null || true
 rm -rf dist/functions
 cp -r functions/ dist/functions/
 
