@@ -3,7 +3,6 @@
         "compatibility_date": "2026-02-01",
         "pages_build_output_dir": "dist",
         "vars": {
-                "CLOUDFLARE_ACCOUNT_ID": "215a936bbe84f807d69a113fbbd125fe",
                 "INSURANCE_NOTIFICATION_EMAIL": "vnguyen1@amfam.com",
                 "CLOUDFLARE_DEEPSEEK_MODEL": "deepseek/deepseek-v4-flash",
                 "CLOUDFLARE_DEEPSEEK_TURN_MODEL": "deepseek/deepseek-v4-flash",
