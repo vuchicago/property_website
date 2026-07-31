@@ -103,10 +103,19 @@ export const onRequestPost = async (context) => {
                         : isPartnershipInquiry
                                 ? (context.env.PARTNERSHIP_NOTIFICATION_EMAIL || ADMIN_EMAIL)
                                 : (context.env.ADMIN_NOTIFICATION_EMAIL || ADMIN_EMAIL);
+                const usesCloudflareEmailApi = Boolean(
+                        context.env.CLOUDFLARE_EMAIL_API_TOKEN && context.env.CLOUDFLARE_ACCOUNT_ID
+                );
                 const from = context.env.NOTIFICATION_FROM_EMAIL
-                        || (context.env.RESEND_API_KEY
+                        || (usesCloudflareEmailApi
+                                ? isInsuranceInquiry
+                                        ? 'Cook County Tax Compare <welcome@insurance.cookcountytaxcompare.com>'
+                                        : 'Cook County Tax Compare <notifications@inquiry.cookcountytaxcompare.com>'
+                                : context.env.RESEND_API_KEY
                                 ? 'Cook County Tax Compare <onboarding@resend.dev>'
-                                : 'Cook County Tax Compare <notifications@inquiry.cookcountytaxcompare.com>');
+                                : isInsuranceInquiry
+                                        ? 'Cook County Tax Compare <welcome@insurance.cookcountytaxcompare.com>'
+                                        : 'Cook County Tax Compare <notifications@inquiry.cookcountytaxcompare.com>');
                 const result = await sendNotificationEmail(context.env, {
                         from,
                         to,

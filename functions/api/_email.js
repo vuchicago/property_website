@@ -95,16 +95,17 @@ export async function sendCustomerDocumentRequestEmail(env, request) {
 }
 
 export async function sendNotificationEmail(env, email) {
-        if (env.RESEND_API_KEY) {
-                return sendWithResend(env.RESEND_API_KEY, email);
+        const cloudflareApiToken = env.CLOUDFLARE_EMAIL_API_TOKEN;
+        if (cloudflareApiToken && env.CLOUDFLARE_ACCOUNT_ID) {
+                return sendWithCloudflareEmailApi(env, cloudflareApiToken, email);
         }
 
         if (env.EMAIL && typeof env.EMAIL.send === 'function') {
                 return sendWithCloudflareEmail(env.EMAIL, email);
         }
 
-        if (env.CLOUDFLARE_EMAIL_API_TOKEN && env.CLOUDFLARE_ACCOUNT_ID) {
-                return sendWithCloudflareEmailApi(env, email);
+        if (env.RESEND_API_KEY) {
+                return sendWithResend(env.RESEND_API_KEY, email);
         }
 
         console.warn('No outbound email provider is configured.');
@@ -136,13 +137,13 @@ async function sendWithResend(apiKey, email) {
         return response.json();
 }
 
-async function sendWithCloudflareEmailApi(env, email) {
+async function sendWithCloudflareEmailApi(env, apiToken, email) {
         const response = await fetch(
                 `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/email/sending/send`,
                 {
                         method: 'POST',
                         headers: {
-                                'Authorization': `Bearer ${env.CLOUDFLARE_EMAIL_API_TOKEN}`,
+                                'Authorization': `Bearer ${apiToken}`,
                                 'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
@@ -162,7 +163,25 @@ async function sendWithCloudflareEmailApi(env, email) {
                 throw new Error(`Cloudflare email notification failed: ${errorText}`);
         }
 
-        return { success: true, provider: 'cloudflare_email_api', result };
+        const delivery = result?.result || result || {};
+        const permanentBounces = delivery.permanent_bounces || delivery.permanentBounces || [];
+        const delivered = delivery.delivered || [];
+        const queued = delivery.queued || [];
+
+        if (permanentBounces.length) {
+                throw new Error(`Cloudflare permanently rejected the email: ${JSON.stringify(permanentBounces)}`);
+        }
+
+        if (!delivered.length && !queued.length) {
+                throw new Error(`Cloudflare did not confirm email delivery or queueing: ${JSON.stringify(delivery)}`);
+        }
+
+        return {
+                success: true,
+                provider: 'cloudflare_email_api',
+                delivered: delivered.length,
+                queued: queued.length
+        };
 }
 
 async function sendWithCloudflareEmail(binding, email) {
