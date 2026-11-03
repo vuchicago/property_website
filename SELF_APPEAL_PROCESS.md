@@ -8,7 +8,7 @@ The launch service is Assessor-only. Customers choose their argument and request
 
 **The $49 fee must be confirmed paid before any DocuSign envelope is created or sent.** This fee covers DocuSign signing, printing, assembly, postage and tracking for the approved packet version. A pending checkout, checkout redirect, or client checkbox cannot unlock signing. Refunded payments cannot unlock signing or mailing. Preparation is free; DocuSign is part of paid fulfillment.
 
-After payment: administrator reviews signature positions → creates DocuSign draft → previews it → sends owner invitation → service retrieves completed PDF and certificate → owner reviews signed version and authorizes mailing → dispatch → carrier delivery → county confirmation. These last three events are separate.
+After payment: administrator reviews signature positions → creates DocuSign draft → previews it → sends owner invitation → service retrieves completed PDF and certificate → owner reviews signed version and authorizes mailing → hold until the township appeal window is open → dispatch → carrier delivery → county confirmation. These last three events are separate. Optional fulfillment manages the calendar; owners do not enter a deadline in the preparation form. Unpublished, unmatched, wrong-year or closed windows block dispatch.
 
 DocuSign acceptance is a **user-authorized working assumption, not verified county acceptance**. The integration defaults to demo, requires Stripe test mode while in demo, and blocks real mailing of demo-signed packets. Standard DocuSign does not provide notarization; the initial integrated flow is limited to one owner signer and packets requiring no notarial act. See [DOCUSIGN_INTEGRATION.md](DOCUSIGN_INTEGRATION.md) for setup and test limitations.
 

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import { onRequestGet as addresses, onRequestPost as addAddress } from '../functions/api/addresses.js';
+import { onRequestGet as addresses, onRequestPost as addAddress, onRequestDelete as deleteAddress } from '../functions/api/addresses.js';
 import { onRequestPost as start } from '../functions/api/packet-start.js';
 
 const pair = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
@@ -12,11 +12,11 @@ globalThis.fetch = async url => {
     assert.ok(String(url).includes('googleapis.com'), 'These tests must not contact external providers');
     return Response.json({ keys: [jwk] });
 };
-async function request(path, uid = 'owner', body) {
+async function request(path, uid = 'owner', body, method = body ? 'POST' : 'GET') {
     const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
     const content = `${encode({ alg: 'RS256', kid: jwk.kid })}.${encode({ sub: uid, email: `${uid}@example.com`, email_verified: true, aud: 'cookcounty-tax-compare', iss: 'https://securetoken.google.com/cookcounty-tax-compare', exp: Math.floor(Date.now() / 1000) + 3600 })}`;
     const signature = Buffer.from(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', pair.privateKey, new TextEncoder().encode(content))).toString('base64url');
-    return new Request(`https://example.test${path}`, { method: body ? 'POST' : 'GET', headers: { Authorization: `Bearer ${content}.${signature}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    return new Request(`https://example.test${path}`, { method, headers: { Authorization: `Bearer ${content}.${signature}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
 }
 
 function fixture({ large = false } = {}) {
@@ -128,4 +128,43 @@ test('adding a selected property uses the normalized-address index', async () =>
         assert.equal(plans.some(plan => /SCAN property_addresses\b/.test(plan)), false, plans.join('\n'));
         assert.ok(plans.some(plan => /SEARCH property_addresses USING INDEX/.test(plan)));
     } finally { f.close(); }
+});
+
+
+test('deleting a saved property keeps its packet, appeal record and documents', async () => {
+    const f=fixture();
+    try {
+        const created=await start({request:await request('/api/packet-start','owner',{propertyId:7,taxYear:2026}),env:f});
+        const id=(await created.json()).id;
+        const packetBefore=f.sqlite.prepare('SELECT state_json FROM appeal_packets WHERE transaction_id=?').get(id).state_json;
+        const removed=await deleteAddress({request:await request('/api/addresses','owner',{propertyId:7},'DELETE'),env:f});
+        assert.equal(removed.status,200,await removed.clone().text());
+        assert.equal((await removed.json()).deleted,1);
+        assert.equal(f.sqlite.prepare('SELECT count(*) AS total FROM user_addresses WHERE id=7').get().total,0);
+        assert.equal(f.sqlite.prepare('SELECT count(*) AS total FROM appeals WHERE transaction_id=?').get(id).total,1);
+        assert.equal(f.sqlite.prepare('SELECT state_json FROM appeal_packets WHERE transaction_id=?').get(id).state_json,packetBefore);
+        assert.equal(f.sqlite.prepare('SELECT count(*) AS total FROM user_addresses WHERE id=9').get().total,1);
+    } finally { f.sqlite.close(); }
+});
+
+test('property deletion checks ownership and rejects invalid IDs',async()=>{
+    const f=fixture();
+    try {
+        const remove=(uid,body)=>request('/api/addresses',uid,body,'DELETE').then(request=>deleteAddress({request,env:f}));
+        assert.equal((await remove('stranger',{propertyId:7,address:'123 TEST AVE SKOKIE'})).status,404);
+        assert.equal((await remove('owner',{propertyId:-1})).status,400);
+        assert.equal((await remove('owner',{propertyId:999})).status,404);
+        assert.equal(f.sqlite.prepare('SELECT count(*) AS total FROM user_addresses').get().total,3);
+    } finally { f.sqlite.close(); }
+});
+
+test('legacy self-appeal work is retained rather than cascade-deleted',async()=>{
+    const f=fixture();
+    try {
+        f.sqlite.prepare("INSERT INTO self_appeal_cases(customer_id,address_id,agency,tax_year,state_json) VALUES('owner',7,'assessor',2026,'{}')").run();
+        const result=await deleteAddress({request:await request('/api/addresses','owner',{propertyId:7},'DELETE'),env:f});
+        assert.equal(result.status,409);
+        assert.equal(f.sqlite.prepare('SELECT count(*) AS total FROM self_appeal_cases').get().total,1);
+        assert.equal(f.sqlite.prepare('SELECT count(*) AS total FROM user_addresses WHERE id=7').get().total,1);
+    } finally { f.sqlite.close(); }
 });

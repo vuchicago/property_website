@@ -1,4 +1,4 @@
-import {authFetch,onAuthUserChanged} from './auth-client.js?v=20261103-packet-access';
+import {authFetch,onAuthUserChanged} from './auth-client.js?v=20261103-property-mailing';
 import {checklist,SOURCES,CHECKED_ON} from './self-appeal-checklist.js';
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const selector=document.getElementById('self-selector');

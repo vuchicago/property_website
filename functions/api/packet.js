@@ -4,6 +4,7 @@ import { requireFirebaseUser } from './_auth.js';
 import { paidFulfillment, isFreePacket } from './_fulfillment.js';
 import { initialPacket, transitionPacket } from './_packet_workflow.js';
 import { appealAccess } from './_appeal_access.js';
+import { packetMailingWindow, requireOpenMailingWindow } from './_packet_mailing.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 const FILE_ACTIONS = new Set(['evidence', 'packet', 'signed_packet', 'certificate', 'mail', 'delivered', 'filed']);
@@ -52,6 +53,7 @@ export async function onRequest(context) {
         const state = row ? JSON.parse(row.state_json) : initialPacket();
         const revision = row?.revision || 0;
         const free = isFreePacket(transactionId);
+        actor.freePacket = free;
         const fulfillment = free ? await paidFulfillment(db,transactionId,state.version,appeal.customer_id) : null;
         const signature = free ? await db.prepare('SELECT envelope_id, status, environment FROM packet_signatures WHERE packet_id = ? AND packet_version = ?').bind(transactionId,state.version).first() : null;
         if (free && !fulfillment && !(await appealAccess(db,user)).allowed) return json({error:'Free appeal testing is currently by invitation. You can join the public waitlist.'},403);
@@ -67,7 +69,7 @@ export async function onRequest(context) {
                 return new Response(object.body, { headers: { 'Content-Type': doc.type, 'Content-Disposition': `attachment; filename="${doc.name}"`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' } });
             }
             const events = row ? await db.prepare('SELECT action, status, created_at FROM appeal_packet_events WHERE transaction_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 100').bind(transactionId).all() : { results: [] };
-            return json({ packetId: transactionId, fulfillmentPaid: Boolean(fulfillment), signature, appeal, state: { ...state, documents: state.documents.map(({ key, ...doc }) => doc) }, revision, isOwner: actor.isOwner, isAdmin: actor.isAdmin, storageReady: Boolean(context.env.APPEAL_PACKETS), events: events.results });
+            return json({ packetId: transactionId, fulfillmentPaid: Boolean(fulfillment), signature, appeal, state: { ...state, documents: state.documents.map(({ key, ...doc }) => doc) }, mailingWindow: free ? packetMailingWindow(state) : null, revision, isOwner: actor.isOwner, isAdmin: actor.isAdmin, storageReady: Boolean(context.env.APPEAL_PACKETS), events: events.results });
         }
 
         // Payment is trusted only from the server's Stripe-backed order record.
@@ -86,6 +88,7 @@ export async function onRequest(context) {
         if (signature && input.action === 'revise' && signature.status !== 'voided') return json({error:'Void the DocuSign envelope through the signing service before revising.'},409);
         if (free && ['mail','delivered','filed'].includes(input.action) && !fulfillment) return json({error:'Paid fulfillment for this packet version is required.'},402);
         if (free && input.action === 'mail' && signature?.environment !== 'production') return json({error:'Demo signatures cannot be used for real mailing.'},409);
+        if (free && input.action === 'mail') requireOpenMailingWindow(state);
         if (input.revision !== revision) return json({ error: 'This case changed. Refresh before saving.' }, 409);
         // Never accept a client-provided object key or document metadata.
         delete input.document;

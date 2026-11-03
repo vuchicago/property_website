@@ -1,4 +1,4 @@
-import { auth, authFetch } from './auth-client.js?v=20261103-packet-access';
+import { auth, authFetch } from './auth-client.js?v=20261103-property-mailing';
 
 let userAddresses = [];
 let allAppeals = [];
@@ -395,7 +395,6 @@ function renderAddressList() {
                 const propertyAppeals = appealsForProperty(addrObj);
                 const appealCount = propertyAppeals.length;
                 const propertyStatus = propertyAppealStatus(propertyAppeals);
-                const canDelete = appealCount === 0;
 
                 const safeAddress = escapeHtml(addrObj.address);
                 const safePropertyKey = escapeHtml(addrObj.property_key || addrObj.propertyKey || addrObj.address);
@@ -411,7 +410,7 @@ function renderAddressList() {
                                 ${!accessReady ? `<span class="text-sm text-muted">Checking appeal access…</span>` : freeAppealTester ? `<a class="btn btn-primary btn-sm" style="margin-top:.75rem" href="appeal-packet.html?property=${encodeURIComponent(addrObj.id)}">Prepare my appeal</a>` : `<a class="btn btn-secondary btn-sm" style="margin-top:.75rem" href="#contact">Join appeal waitlist</a>`}
                                 ${propertyStatus ? renderPropertyAppealStatus(propertyStatus) : ''}
                         </div>
-                        ${canDelete ? `<button type="button" class="btn btn-secondary btn-sm delete-address-btn" data-address="${safeAddress}" data-property-key="${safePropertyKey}" aria-label="Delete ${safeAddress}">Delete</button>` : ''}
+                        <button type="button" class="btn btn-secondary btn-sm delete-address-btn" data-id="${Number(addrObj.id)}" data-address="${safeAddress}" data-property-key="${safePropertyKey}" aria-label="Delete ${safeAddress}">Delete</button>
                 </div>
             </li>
         `;
@@ -446,7 +445,7 @@ function renderAddressList() {
                         const propertyKey = event.currentTarget.dataset.propertyKey;
                         if (!address && !propertyKey) return;
 
-                        await deleteAddress(address, propertyKey);
+                        await deleteAddress(address, propertyKey, Number(event.currentTarget.dataset.id), event.currentTarget);
                 });
         });
 }
@@ -515,17 +514,19 @@ function renderPropertyAppealStatus(status) {
         `;
 }
 
-async function deleteAddress(address, propertyKey) {
-        const confirmed = window.confirm(`Delete ${address} from My Properties?`);
+async function deleteAddress(address, propertyKey, propertyId, button) {
+        const confirmed = window.confirm(`Delete ${address} from My Properties? Your appeal packets and documents will be kept.`);
         if (!confirmed) return;
-
+        const uid = dashboardUser?.uid;
+        const revision = dashboardRevision;
+        button.disabled = true;
         try {
                 const response = await dashboardAuthFetch('/api/addresses', {
                         method: 'DELETE',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ address, propertyKey })
+                        body: JSON.stringify({ propertyId, address, propertyKey })
                 });
-
+                if (!dashboardIsCurrent(uid, revision)) return;
                 if (!response.ok) {
                         const err = await response.json();
                         alert(`Failed to delete address: ${err.error}`);
@@ -533,14 +534,24 @@ async function deleteAddress(address, propertyKey) {
                 }
 
                 propertyMutationRevision++;
-                await fetchAddresses();
-                if (dashboardUser) saveDashboardCache(dashboardUser.uid);
+                userAddresses = userAddresses.filter(row => Number(row.id) !== propertyId);
+                if (selectedPropertyId === propertyId) {
+                        selectedPropertyId = null;
+                        selectedDetailsRevision++;
+                        selectedAddressForImage = '';
+                        selectedPinForImage = '';
+                        showEmptyDetailsPanel();
+                }
+                loadedDetails.delete(`${uid}:${propertyId}`);
+                saveDashboardCache(uid);
                 renderAccountSummary(dashboardUser || auth.currentUser);
                 renderAddressList();
+                void fetchAddresses(revision);
         } catch (error) {
+                if (!dashboardIsCurrent(uid, revision)) return;
                 console.error('Error deleting address:', error);
                 alert('An error occurred while deleting the address.');
-        }
+        } finally { button.disabled = false; }
 }
 
 function showEmptyDetailsPanel() {
@@ -1078,7 +1089,7 @@ function renderAppeals(appeals, address) {
                         const addr = e.currentTarget.dataset.address;
                         if (freeAppealTester) location.href = `appeal-packet.html?property=${encodeURIComponent(selectedProperty.id)}`;
                         else {
-                                const { openAppealModal } = await import('./appeal.js?v=20261103-packet-access');
+                                const { openAppealModal } = await import('./appeal.js?v=20261103-property-mailing');
                                 openAppealModal(addr, selectedProperty);
                         }
                 });

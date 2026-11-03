@@ -63,6 +63,9 @@ async function scenario(options = {}) {
     const store = { contacts: [], starts: [], pilots: [], unexpected: [], requests: [], contactFails: false, accessFails: false, addressesFailsLeft: 0, startFailsLeft: 0, packetFailsLeft: 0, historyFails: false, historyRequests: 0, access: Boolean(options.access), packetStatus: options.packetStatus || 'approved', signatureCalls: 0 };
     store.addresses = [...(options.properties || [property])];
     store.addressPosts = [];
+    store.addressDeletes = [];
+    store.intakes = [];
+    store.intake = {};
     store.lookups = [];
     store.summaryRequests = 0;
     store.authAttempts = [];
@@ -95,6 +98,15 @@ async function scenario(options = {}) {
         switch (url.pathname) {
             case '/api/appeal-access': return deferred('Access', () => store.accessFails ? json({ error: 'Test access service unavailable' }, 503) : json({ allowed: store.access, admin: ['admin', 'superadmin'].includes(options.role) }));
             case '/api/addresses': {
+                if (request.method() === 'DELETE') {
+                    const entry=request.postDataJSON();
+                    store.addressDeletes.push(entry);
+                    if (store.deleteFails) return json({error:'Test deletion failure'},503);
+                    const saved=store.addresses.find(row=>row.id===entry.propertyId);
+                    if (!saved) return json({error:'Saved property not found.'},404);
+                    store.addresses=store.addresses.filter(row=>row.id!==entry.propertyId);
+                    return json({success:true,deleted:1,propertyId:entry.propertyId});
+                }
                 if (request.method() === 'POST') {
                     const entry = request.postDataJSON();
                     store.addressPosts.push(entry);
@@ -141,13 +153,22 @@ async function scenario(options = {}) {
                 return json({ id: 'free_fixture', url: 'appeal-packet.html?id=free_fixture' });
             case '/api/packet': {
                 if (!store.access) return json({ error: 'Free appeal testing is currently by invitation.' }, 403);
+                if (request.method() === 'POST') {
+                    const data=request.postDataJSON();
+                    if (data.action==='intake') {
+                        store.intakes.push(data);store.intake=data;store.packetStatus='preparing';
+                        return json({success:true});
+                    }
+                    return json({error:'Unexpected packet action'},400);
+                }
                 if (url.searchParams.has('document')) return route.fulfill({ contentType: 'application/pdf', body: '%PDF-1.7\nRegression test fixture\n%%EOF' });
                 if (store.packetFailsLeft > 0) { store.packetFailsLeft--; return json({ error: 'Test packet loading failure' }, 503); }
                 const chosen = store.addresses.find(row => row.id === store.starts.at(-1)?.propertyId) || property;
                 return json({
                     appeal: { customer_name: 'Test Owner', property_address: chosen.address, payment_status: 'free' },
-                    state: { status: store.packetStatus, version: 1, taxYear: 2026, documents: [{ id: 'prepared', kind: 'packet', version: 1, name: 'test-appeal.pdf' }], propertySnapshot: { address: chosen.address, pin: chosen.pin || suggestedProperty.pin } },
-                    revision: 0, events: [], isOwner: true, isAdmin: Boolean(options.role === 'admin'), storageReady: true, fulfillmentPaid: false
+                    state: { status: store.packetStatus, version: 1, taxYear: 2026, intake:store.intake, mailingConsent:options.mailingConsent ? {version:1} : undefined, documents: [{ id: 'prepared', kind: 'packet', version: 1, name: 'test-appeal.pdf' }], propertySnapshot: { address: chosen.address, pin: chosen.pin || suggestedProperty.pin } },
+                    mailingWindow:options.mailingWindow, signature:options.signature,
+                    revision: 0, events: [], isOwner: true, isAdmin: Boolean(options.role === 'admin'), storageReady: true, fulfillmentPaid:Boolean(options.fulfillmentPaid)
                 });
             }
             case '/api/packet-signature': store.signatureCalls++; return json({ error: 'Payment required' }, 402);
@@ -464,7 +485,7 @@ test('unverified account remains signed in while protected appeal actions stay u
         assert.equal(s.store.starts.length, 0);
         assert.equal(await s.page.evaluate(() => sessionStorage.getItem('regression-sign-outs')), null);
         const result = await s.page.evaluate(async () => {
-            const { authFetch } = await import('/auth-client.js?v=20261103-packet-access');
+            const { authFetch } = await import('/auth-client.js?v=20261103-property-mailing');
             try { await authFetch('/api/addresses'); return 'unexpected access'; } catch (error) { return error.message; }
         });
         assert.match(result, /verify your email/i);
@@ -779,3 +800,91 @@ test('account loads property details only when that saved property is selected',
         assert.ok(!s.store.requests.includes('/api/addresses'));
     } finally { await s.close(); }
 });
+
+test('property with an existing appeal can be deleted while its packet remains available',async()=>{
+    const history=[{id:'free_fixture',propertyKey:property.property_key,propertyAddress:property.address,paymentStatus:'free',appealStatus:'Pending'}];
+    const s=await scenario({email:'tester@example.com',access:true,history});
+    try {
+        await s.goto('/login.html');
+        await s.page.locator('#address-list').getByText('1 appeal(s)',{exact:true}).waitFor();
+        const remove=s.page.getByRole('button',{name:`Delete ${property.address}`,exact:true});
+        await remove.waitFor();
+        s.page.once('dialog',dialog=>dialog.accept());
+        await remove.click();
+        await s.page.locator('#address-list').getByText('No addresses added yet.',{exact:true}).waitFor();
+        assert.equal(s.store.addressDeletes.length,1);
+        assert.equal(s.store.addressDeletes[0].propertyId,7);
+        assert.equal(s.store.history.length,1);
+        await s.page.reload();
+        await s.page.locator('#address-list').getByText('No addresses added yet.',{exact:true}).waitFor();
+        await s.goto('/appeal-packet.html?id=free_fixture');
+        await s.page.getByRole('heading',{name:'Submit it yourself · Free'}).waitFor();
+    } finally {await s.close();}
+});
+
+test('canceling property deletion leaves the saved property untouched',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true});
+    try {
+        await s.goto('/login.html');
+        const remove=s.page.getByRole('button',{name:`Delete ${property.address}`,exact:true});
+        await remove.waitFor();
+        s.page.once('dialog',dialog=>dialog.dismiss());
+        await remove.click();
+        assert.equal(s.store.addressDeletes.length,0);
+        assert.equal(await remove.isEnabled(),true);
+    } finally {await s.close();}
+});
+
+test('failed property deletion keeps the address and allows retry',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true});
+    try {
+        s.store.deleteFails=true;
+        await s.goto('/login.html');
+        const remove=s.page.getByRole('button',{name:`Delete ${property.address}`,exact:true});
+        s.page.on('dialog',dialog=>dialog.accept());
+        await remove.click();
+        await s.page.waitForFunction(()=>!document.querySelector('.delete-address-btn').disabled);
+        assert.equal(s.store.addresses.length,1);
+        s.store.deleteFails=false;
+        await remove.click();
+        await s.page.locator('#address-list').getByText('No addresses added yet.',{exact:true}).waitFor();
+        assert.equal(s.store.addressDeletes.length,2);
+    } finally {await s.close();}
+});
+
+test('appeal form saves without requiring an owner-entered deadline or calendar check',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake'});
+    try {
+        await s.goto('/appeal-packet.html?id=free_fixture');
+        const form=s.page.locator('form[data-action="intake"]');
+        await form.waitFor();
+        assert.equal(await form.locator('[name="filingDeadline"]').count(),0);
+        assert.equal(await form.getByRole('link',{name:/calendar/i}).count(),0);
+        await form.locator('[name="ownerName"]').fill('Test Owner');
+        await form.locator('[name="mailingAddress"]').fill('123 Test Ave, Skokie IL');
+        await form.locator('[name="requestedMarketValue"]').fill('200000');
+        await form.locator('[name="explanation"]').fill('Similar properties have lower assessments.');
+        await form.locator('[name="ownResidence"]').check();
+        for (const checkbox of await form.locator('input[type="checkbox"][required]').all()) await checkbox.check();
+        const saved=s.page.waitForResponse(response=>new URL(response.url()).pathname==='/api/packet'&&response.request().method()==='POST');
+        await form.getByRole('button',{name:'Save information',exact:true}).click();
+        assert.equal((await saved).status(),200);
+        assert.equal(s.store.intakes.length,1);
+        assert.equal('filingDeadline' in s.store.intakes[0],false);
+        assert.equal(s.store.intakes[0].requestedMarketValue,200000);
+    } finally {await s.close();}
+});
+
+for (const status of ['upcoming','open','closed','unannounced']) {
+    test(`signed print-and-mail packet shows its calendar hold and dispatch control: ${status}`,async()=>{
+        const s=await scenario({email:'admin@example.com',role:'admin',access:true,packetStatus:'signed',mailingConsent:true,fulfillmentPaid:true,signature:{environment:'production',status:'completed'},mailingWindow:{status,opensOn:status==='unannounced'?null:'2026-10-20',closesOn:status==='unannounced'?null:'2026-12-03'}});
+        try {
+            await s.goto('/appeal-packet.html?id=free_fixture');
+            await s.page.locator('#packet-mailing-queue').waitFor();
+            assert.equal(await s.page.locator('form[data-action="mail"]').count(),status==='open'?1:0);
+            const title={upcoming:'Waiting for the appeal window to open',open:'Ready for print and mail',closed:'Appeal window closed',unannounced:'Waiting for the township appeal calendar'}[status];
+            await s.page.getByRole('heading',{name:title,exact:true}).waitFor();
+            assert.equal(await s.page.locator('form[data-action="mail"] [name="filingDeadline"]').count(),0);
+        } finally {await s.close();}
+    });
+}

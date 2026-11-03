@@ -194,24 +194,19 @@ export const onRequestDelete = async (context) => {
         }
 
         try {
-                const { address, propertyKey } = await context.request.json();
+                const { address, propertyKey, propertyId } = await context.request.json();
 
-                if (!address && !propertyKey) {
+                if (propertyId !== undefined && (!Number.isSafeInteger(propertyId) || propertyId < 1)) {
+                        return jsonResponse({ error: 'Invalid saved property ID' }, 400);
+                }
+                if (!propertyId && !address && !propertyKey) {
                         return jsonResponse({ error: 'Missing address or property key' }, 400);
                 }
 
-                const appeal = await context.env.DB.prepare(
-                        `SELECT id
-                         FROM appeals
-                         WHERE customer_id = ? AND property_address = ?
-                         LIMIT 1`
-                ).bind(user.uid, address).first();
-
-                if (appeal) {
-                        return jsonResponse({
-                                error: 'This property already has an appeal record and cannot be deleted.'
-                        }, 400);
-                }
+                const property = await context.env.DB.prepare(
+                        'SELECT id FROM user_addresses WHERE customer_id = ? AND ' + (propertyId ? 'id = ?' : propertyKey ? 'property_key = ?' : 'address = ?')
+                ).bind(user.uid, propertyId || propertyKey || address).first();
+                if (!property) return jsonResponse({ error: 'Saved property not found.' }, 404);
 
                 const selfAppealTable = await context.env.DB.prepare(
                         "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'self_appeal_cases'"
@@ -220,17 +215,16 @@ export const onRequestDelete = async (context) => {
                         ? ' AND NOT EXISTS (SELECT 1 FROM self_appeal_cases WHERE self_appeal_cases.customer_id = user_addresses.customer_id AND self_appeal_cases.address_id = user_addresses.id)'
                         : '';
                 const result = await context.env.DB.prepare(
-                        (propertyKey
-                                ? "DELETE FROM user_addresses WHERE customer_id = ? AND property_key = ?"
-                                : "DELETE FROM user_addresses WHERE customer_id = ? AND address = ?") + selfAppealGuard
-                ).bind(user.uid, propertyKey || address).run();
+                        'DELETE FROM user_addresses WHERE customer_id = ? AND id = ?' + selfAppealGuard
+                ).bind(user.uid, property.id).run();
                 if (!result.meta?.changes && selfAppealTable) {
                         return jsonResponse({ error: 'Property was not deleted. Properties with saved self-appeal work must be retained.' }, 409);
                 }
 
                 return jsonResponse({
                         success: true,
-                        deleted: result.meta?.changes || 0
+                        deleted: result.meta?.changes || 0,
+                        propertyId: property.id
                 });
         } catch (err) {
                 return jsonResponse({ error: err.message }, 500);

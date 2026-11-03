@@ -1,3 +1,5 @@
+import { requireOpenMailingWindow } from './_packet_mailing.js';
+
 export const initialPacket = () => ({ status: 'intake', version: 0, documents: [] });
 
 function requireCondition(value, message) {
@@ -46,7 +48,6 @@ export function transitionPacket(current, input, actor, now = new Date().toISOSt
                 next.intake.requestedMarketValue = input.requestedMarketValue;
                 next.intake.pins = field(input.pins, 'All property PINs', 500);
                 requireCondition(next.intake.pins.split(/[,;\n]+/).every(pin=>pin.replace(/[-\s]/g,'').match(/^\d{14}$/)), 'Enter each 14-digit PIN, separated by commas.');
-                next.intake.filingDeadline = date(input.filingDeadline, 'Verified filing deadline');
                 for(const key of ['ownResidence','recentSale','appraisal','condo','damage','affidavit','documentsReviewed','recordsConfirmed']) next.intake[key] = input[key] === true;
                 const allowed = new Set((current.propertySnapshot?.comparables || []).map(c=>String(c.pin)));
                 requireCondition(Array.isArray(input.selectedComparables) && input.selectedComparables.every(pin=>allowed.has(pin)), 'Select comparisons from this property record.');
@@ -98,7 +99,12 @@ export function transitionPacket(current, input, actor, now = new Date().toISOSt
             admin(); at('signed');
             requireCondition(current.mailingConsent?.version === current.version, 'The customer must authorize mailing this signed version.');
             requireCondition(input.rulesChecked === true, 'Verify current filing, signature, copy, representation, and mailing requirements for this agency.');
-            next.mailing = { recipient: field(input.recipient, 'Agency and full mailing address', 1500), carrier: field(input.carrier, 'Carrier', 100), tracking: field(input.tracking, 'Tracking number', 200), mailedOn: date(input.mailedOn, 'Mailing date'), filingDeadline: date(input.filingDeadline, 'Verified filing deadline'), notes: field(input.reviewNotes, 'Filing and mailing rule review', 2000), proofId: artifact('mailing_proof') };
+            const window = actor.freePacket || current.service === 'assessor_self_service' ? requireOpenMailingWindow(current, now) : null;
+            next.mailing = { recipient: field(input.recipient, 'Agency and full mailing address', 1500), carrier: field(input.carrier, 'Carrier', 100), tracking: field(input.tracking, 'Tracking number', 200), mailedOn: date(input.mailedOn, 'Mailing date'), filingDeadline: window?.closesOn || date(input.filingDeadline, 'Verified filing deadline'), notes: field(input.reviewNotes, 'Filing and mailing rule review', 2000), proofId: artifact('mailing_proof') };
+            if (window) {
+                requireCondition(next.mailing.mailedOn >= window.opensOn, 'Mailing date is before the township appeal window opens.');
+                next.mailing.calendar = window;
+            }
             requireCondition(next.mailing.mailedOn <= today, 'Record mailing only after dispatch.');
             requireCondition(next.mailing.mailedOn <= next.mailing.filingDeadline, 'Mailing date is after the recorded filing deadline.');
             next.status = 'mailed'; break;

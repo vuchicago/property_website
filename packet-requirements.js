@@ -29,7 +29,7 @@ export function requirements(state) {
 export function preparationProblems(state) {
     const p=state.intake || {};
     const problems=requirements(state).filter(r=>!r.done).map(r=>r.title);
-    if(!p.requestedMarketValue || !p.pins || !p.filingDeadline || !p.recordsConfirmed) problems.unshift('Save your requested market value, PINs, verified deadline and record confirmation.');
+    if(!p.requestedMarketValue || !p.pins || !p.recordsConfirmed) problems.unshift('Save your requested market value, PINs and record confirmation.');
     if(!p.residentialScope) problems.push('Confirm this is residential property with no more than six units.');
     if(!p.documentsReviewed) problems.push('Review the applicable forms, attachment contents and signature / notary requirements.');
     return problems;

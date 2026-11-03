@@ -36,18 +36,18 @@ before(async () => {
     ], { encoding: 'utf8' }));
     for (const statement of statements) await db.prepare(statement).run();
     await db.prepare("INSERT INTO appeal_pilot_access(email,invited_by) VALUES('owner@example.com','admin@example.com'),('stranger@example.com','admin@example.com')").run();
-    await db.prepare("INSERT INTO property_addresses(id,pin,address,normalized_address,taxable_value,home_size,year_built,pin_proration_rate) VALUES(1,'00000000000001','123 TEST AVE SKOKIE','123 TEST AVE SKOKIE',21000,1450,1965,1)").run();
+    await db.prepare("INSERT INTO property_addresses(id,pin,address,normalized_address,taxable_value,home_size,year_built,pin_proration_rate,township_name) VALUES(1,'00000000000001','123 TEST AVE SKOKIE','123 TEST AVE SKOKIE',21000,1450,1965,1,'Niles')").run();
     await db.prepare("INSERT INTO property_addresses(id,pin,address,normalized_address,taxable_value,home_size,year_built,pin_proration_rate) VALUES(2,'00000000000002','125 TEST AVE SKOKIE','125 TEST AVE SKOKIE',22000,1500,1966,1)").run();
     await db.prepare("INSERT INTO user_addresses(id,customer_id,address,property_key,email) VALUES(7,'owner','123 TEST AVE SKOKIE','123 TEST AVE SKOKIE|pin:00000000000001','owner@example.com')").run();
     await db.prepare("WITH RECURSIVE entries(n) AS (SELECT 1000 UNION ALL SELECT n+1 FROM entries WHERE n<100999) INSERT INTO property_addresses(id,pin,address,normalized_address,taxable_value,pin_proration_rate) SELECT n,printf('%014d',n),printf('%d UNRELATED ST',n),printf('%d UNRELATED ST',n),10000,1 FROM entries").run();
 }, { timeout: 60000 });
 after(async () => { await worker?.dispose(); });
 
-async function api(route, uid = 'owner', body, claims = {}) {
+async function api(route, uid = 'owner', body, claims = {}, method = body ? 'POST' : 'GET') {
     const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
     const content = `${encode({ alg: 'RS256', kid: jwk.kid })}.${encode({ sub: uid, email: `${uid}@example.com`, email_verified: true, aud: 'cookcounty-tax-compare', iss: 'https://securetoken.google.com/cookcounty-tax-compare', exp: Math.floor(Date.now() / 1000) + 3600, ...claims })}`;
     const signature = Buffer.from(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', pair.privateKey, new TextEncoder().encode(content))).toString('base64url');
-    return worker.dispatchFetch(`https://local.test${route}`, { method: body ? 'POST' : 'GET', headers: { Authorization: `Bearer ${content}.${signature}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    return worker.dispatchFetch(`https://local.test${route}`, { method, headers: { Authorization: `Bearer ${content}.${signature}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
 }
 
 test('local Worker loads saved properties, starts, opens, and resumes with 100,000 unrelated rows', async t => {
@@ -133,4 +133,28 @@ test('local Worker enforces invitation status on start and packet reads independ
     const anonymous=await worker.dispatchFetch('https://local.test/api/appeal-access');
     assert.equal(anonymous.status,401);
     assert.match(anonymous.headers.get('Cache-Control'),/no-store/);
+});
+
+test('local Worker saves intake without a deadline and preserves the packet after deleting its saved address',async()=>{
+    const before=await api(`/api/packet?id=${packetId}`);
+    const packet=await before.json();
+    assert.equal(packet.mailingWindow.township,'Niles');
+    assert.equal(packet.mailingWindow.opensOn,'2026-10-20');
+    const intake={action:'intake',revision:packet.revision,agency:'assessor',taxYear:2026,ownerName:'Test Owner',mailingAddress:'123 Test Ave',reason:'characteristics',explanation:'Incorrect area',individualOwner:true,noExistingAppeal:true,requestedMarketValue:200000,residentialScope:true,ownResidence:true,recordsConfirmed:true,pins:'00000000000001',selectedComparables:[]};
+    const saved=await api(`/api/packet?id=${packetId}`,'owner',intake);
+    assert.equal(saved.status,200,await saved.clone().text());
+    const unauthorized=await api('/api/addresses','stranger',{propertyId:7},{},'DELETE');
+    assert.equal(unauthorized.status,404);
+    const removed=await api('/api/addresses','owner',{propertyId:7},{},'DELETE');
+    assert.equal(removed.status,200,await removed.clone().text());
+    assert.equal((await removed.json()).deleted,1);
+    const rows=await (await api('/api/addresses?summary=1')).json();
+    assert.equal(rows.some(row=>row.id===7),false);
+    const retained=await api(`/api/packet?id=${packetId}`);
+    assert.equal(retained.status,200,await retained.clone().text());
+    const data=await retained.json();
+    assert.equal(data.state.intake.ownerName,'Test Owner');
+    assert.equal(data.state.intake.filingDeadline,undefined);
+    assert.equal(data.state.propertySnapshot.address,'123 TEST AVE SKOKIE');
+    assert.equal((await db.prepare('SELECT count(*) AS total FROM appeals WHERE transaction_id=?').bind(packetId).first()).total,1);
 });
