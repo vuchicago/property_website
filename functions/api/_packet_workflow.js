@@ -34,12 +34,33 @@ export function transitionPacket(current, input, actor, now = new Date().toISOSt
             requireCondition(input.individualOwner === true, 'This workflow is for property titled in the individual taxpayer’s name. Contact us for other ownership types.');
             requireCondition(input.noExistingAppeal === true, 'Resolve any existing appeal or representation before continuing.');
             requireCondition(Number.isInteger(input.taxYear) && input.taxYear >= 2020 && input.taxYear <= new Date(now).getUTCFullYear() + 1, 'Select a valid assessment tax year.');
+            if(current.taxYear) requireCondition(input.taxYear === current.taxYear, 'Start a separate workspace for a different assessment year.');
             requireCondition(['uniformity', 'overvaluation', 'characteristics'].includes(input.reason), 'Select a reason for appeal.');
             next.intake = { agency: input.agency, taxYear: input.taxYear, ownerName: field(input.ownerName, 'Legal owner name', 200), mailingAddress: field(input.mailingAddress, 'Owner mailing address'), reason: input.reason, explanation: field(input.explanation, 'Explanation', 10000), individualOwner: true, noExistingAppeal: true, confirmedAt: now };
+            if (input.requestedMarketValue !== undefined) {
+                requireCondition(Number.isFinite(input.requestedMarketValue) && input.requestedMarketValue > 0 && input.requestedMarketValue <= 1e10, 'Enter a valid requested fair market value.');
+                requireCondition(input.residentialScope === true, 'This workflow supports individually owned residential property with up to six units.');
+                next.intake.residentialScope = true;
+                requireCondition(typeof input.ownResidence === 'boolean', 'Confirm whether you live at this property.');
+                requireCondition(input.recordsConfirmed === true, 'Verify the imported data against your current assessment record.');
+                next.intake.requestedMarketValue = input.requestedMarketValue;
+                next.intake.pins = field(input.pins, 'All property PINs', 500);
+                requireCondition(next.intake.pins.split(/[,;\n]+/).every(pin=>pin.replace(/[-\s]/g,'').match(/^\d{14}$/)), 'Enter each 14-digit PIN, separated by commas.');
+                next.intake.filingDeadline = date(input.filingDeadline, 'Verified filing deadline');
+                for(const key of ['ownResidence','recentSale','appraisal','condo','damage','affidavit','documentsReviewed','recordsConfirmed']) next.intake[key] = input[key] === true;
+                const allowed = new Set((current.propertySnapshot?.comparables || []).map(c=>String(c.pin)));
+                requireCondition(Array.isArray(input.selectedComparables) && input.selectedComparables.every(pin=>allowed.has(pin)), 'Select comparisons from this property record.');
+                next.intake.selectedComparables = [...new Set(input.selectedComparables)];
+            }
             next.status = 'preparing';
             break;
         case 'evidence':
             requireCondition(actor.isOwner || actor.isAdmin, 'Access denied.'); at('intake', 'preparing'); artifact('evidence'); break;
+        case 'remove_evidence':
+            owner(); at('intake','preparing');
+            requireCondition(current.documents.some(d=>d.id===input.documentId && d.kind==='evidence'), 'Evidence not found.');
+            next.documents=next.documents.filter(d=>d.id!==input.documentId);
+            break;
         case 'packet':
             requireCondition(actor.isOwner || actor.isAdmin, 'Access denied.'); at('preparing'); requireCondition(current.intake, 'Customer intake is required.');
             next.version += 1;

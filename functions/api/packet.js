@@ -1,3 +1,5 @@
+import { assemblePacket } from './_packet_pdf.js';
+import { evidenceCategories } from '../../packet-requirements.js';
 import { requireFirebaseUser } from './_auth.js';
 import { paidFulfillment, isFreePacket } from './_fulfillment.js';
 import { initialPacket, transitionPacket } from './_packet_workflow.js';
@@ -86,6 +88,13 @@ export async function onRequest(context) {
         // Never accept a client-provided object key or document metadata.
         delete input.document;
         let bytes;
+        if(input.action === 'generate') {
+            if(!actor.isOwner || state.status !== 'preparing') return json({error:'Save your information before building the packet.'},400);
+            if(!context.env.APPEAL_PACKETS) return json({error:'Private document storage is not configured.'},503);
+            bytes = await assemblePacket(state,appeal,context.env.APPEAL_PACKETS);
+            input.action='packet';
+            file=new File([bytes],`assessor-${state.intake.taxYear}-packet.pdf`,{type:'application/pdf'});
+        }
         if (FILE_ACTIONS.has(input.action)) {
             if (!context.env.APPEAL_PACKETS) return json({ error: 'Private document storage must be configured before uploading.' }, 503);
             if (!file || typeof file.arrayBuffer !== 'function' || !file.size || file.size > MAX_FILE_SIZE) return json({ error: 'Choose a PDF or evidence image up to 15 MB.' }, 400);
@@ -97,6 +106,13 @@ export async function onRequest(context) {
             if (!type || (input.action !== 'evidence' && !pdf)) return json({ error: 'Packet, signature, and mailing records must be PDFs. Evidence may also be JPG or PNG.' }, 400);
             const id = crypto.randomUUID();
             input.document = { id, key: `packets/${transactionId}/${id}`, name: String(file.name).replace(/[^\w.() -]/g, '_').slice(0, 160) || 'document.pdf', type, size: bytes.length, kind: input.action === 'mail' ? 'mailing_proof' : input.action === 'filed' ? 'filing_receipt' : input.action === 'delivered' ? 'delivery_proof' : input.action, version: state.version + (input.action === 'packet' ? 1 : 0), uploadedAt: new Date().toISOString() };
+        }
+        if(input.action === 'evidence') {
+            if(!evidenceCategories[input.category]) return json({error:'Choose the type of evidence.'},400);
+            if(input.category==='application' && input.document.type!=='application/pdf') return json({error:'Upload the completed application as a PDF.'},400);
+            if(input.category==='photo' && (!/^\d{4}-\d{2}-\d{2}$/.test(input.photoDate||'') || !Number.isFinite(Date.parse(input.photoDate)) || new Date(input.photoDate).toISOString().slice(0,10)!==input.photoDate || input.photoDate > new Date().toISOString().slice(0,10))) return json({error:'Enter the actual date the photograph was taken.'},400);
+            input.document.category=input.category;
+            if(input.category==='photo')input.document.photoDate=input.photoDate;
         }
         if (free && input.action === 'revise' && signature?.status === 'voided') input.envelopeVoided = true;
         const next = transitionPacket(state, input, actor);

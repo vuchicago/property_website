@@ -309,7 +309,7 @@ function renderAddressList() {
                                 ${addrObj.pin ? `<div class="text-xs text-muted">${String(addrObj.pin).includes(',') ? 'PINs' : 'PIN'} ${escapeHtml(addrObj.pin)}</div>` : ''}
                                 ${addrObj.propertyDetails?.mailingName ? `<div class="text-xs text-muted">${escapeHtml(addrObj.propertyDetails.mailingName)}</div>` : ''}
                                 <div class="text-xs text-muted">${appealCount} appeal(s)</div>
-                                ${dashboardUser?.email?.toLowerCase() === 'vuchicago@gmail.com' ? `<a class="btn btn-secondary btn-sm" style="margin-top:.75rem" href="self-appeal.html?property=${encodeURIComponent(addrObj.id)}">Self-appeal this property</a>` : ''}
+                                <a class="btn btn-primary btn-sm" style="margin-top:.75rem" href="appeal-packet.html?property=${encodeURIComponent(addrObj.id)}">Prepare my appeal · Free</a>
                                 ${propertyStatus ? renderPropertyAppealStatus(propertyStatus) : ''}
                         </div>
                         ${canDelete ? `<button type="button" class="btn btn-secondary btn-sm delete-address-btn" data-address="${safeAddress}" data-property-key="${safePropertyKey}" aria-label="Delete ${safeAddress}">Delete</button>` : ''}
@@ -906,8 +906,8 @@ function renderAppeals(appeals, address) {
                 historyContainer.innerHTML = `
             <div style="text-align: center; padding: 2rem 0; color: var(--text-muted);">
                 <p>No appeals found for this property.</p>
-                <p class="text-sm text-muted">We are not accepting appeal submissions yet. Join the waitlist and we will follow up when the service is ready.</p>
-                <button class="btn btn-primary appeal-again-btn" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Start Appeal</button>
+                <p class="text-sm text-muted">Prepare and download your Assessor appeal for free. Optional $49 fulfillment includes DocuSign, printing, mailing and tracking.</p>
+                <button class="btn btn-primary appeal-again-btn" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Prepare my appeal · Free</button>
                 ${uploadLegalFootnote()}
             </div>
         `;
@@ -928,7 +928,7 @@ function renderAppeals(appeals, address) {
                 <li class="history-item" style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <div class="history-info">
-                            <span class="history-date text-sm text-muted">Date of Successful Payment: ${payDate}</span>
+                            <span class="history-date text-sm text-muted">${data.id?.startsWith('free_') ? 'Free preparation workspace' : `Payment date: ${payDate}`}</span>
                             <div style="margin-top: 0.25rem; font-size: 0.875rem;" class="text-muted">Date of Appeal: ${appDate}</div>
                             <div style="margin-top: 0.25rem; font-size: 0.875rem;" class="text-muted">Payment Status: ${escapeHtml(formatPaymentStatus(data.paymentStatus))}</div>
                             <div style="margin-top: 0.5rem; font-weight: 500;">Amount: $${data.amount ? (data.amount / 100).toFixed(2) : '0.00'}</div>
@@ -941,7 +941,7 @@ function renderAppeals(appeals, address) {
             `;
                 });
                 html += '</ul>';
-                html += `<button class="btn btn-secondary appeal-again-btn btn-full" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Start Another Appeal</button>`;
+                html += `<button class="btn btn-secondary appeal-again-btn btn-full" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Open self-appeal workspace</button>`;
                 html += uploadLegalFootnote();
                 historyContainer.innerHTML = html;
         }
@@ -950,8 +950,7 @@ function renderAppeals(appeals, address) {
         historyContainer.querySelectorAll('.appeal-again-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                         const addr = e.currentTarget.dataset.address;
-                        const { openAppealModal } = await import('./appeal.js?v=20260524-checkout-address');
-                        openAppealModal(addr, selectedProperty);
+                        location.href = `appeal-packet.html?property=${encodeURIComponent(selectedProperty.id)}`;
                 });
         });
 }

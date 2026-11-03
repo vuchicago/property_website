@@ -101,3 +101,17 @@ test('free preparation remains editable without payment, while signing and maili
     assert.equal((await onRequest({request:await req({action:'request_signature',revision:0}),env:environment})).status,400);
     assert.equal((await onRequest({request:await req({action:'mail',revision:0}),env:environment})).status,402);
 });
+
+test('starting an appeal checks saved-property ownership and resumes the existing year',async()=>{
+    const {onRequestPost:start}=await import('../functions/api/packet-start.js');
+    let writes=0;
+    const db={prepare(sql){let args;return{bind(...v){args=v;return this;},async first(){
+        if(sql.includes('FROM user_addresses'))return args[1]==='owner'?{id:7,address:'123 Test',property_key:'key'}:null;
+        if(sql.includes('JOIN appeal_packets'))return {transaction_id:'free_existing',state_json:JSON.stringify({status:'preparing',propertySnapshot:{propertyId:7}}),revision:2};
+        return null;
+    }};},async batch(){writes++;}};
+    const make=async uid=>({request:new Request('https://example.com/api/packet-start',{method:'POST',headers:{Authorization:`Bearer ${await token(uid)}`,'Content-Type':'application/json'},body:JSON.stringify({propertyId:7,taxYear:2026})}),env:{DB:db}});
+    assert.equal((await start(await make('stranger'))).status,404);
+    const response=await start(await make('owner'));
+    assert.equal(response.status,200);assert.equal((await response.json()).id,'free_existing');assert.equal(writes,0);
+});
