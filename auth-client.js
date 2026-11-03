@@ -18,12 +18,13 @@ const firebaseConfig = {
 let app;
 let auth;
 let analytics;
+let persistenceReady = Promise.resolve();
 
 try {
         app = initializeApp(firebaseConfig);
         auth = getAuth(app);
         // Explicitly set persistence to local (it keeps the user logged in even after browser restart)
-        setPersistence(auth, browserLocalPersistence).catch(error => {
+        persistenceReady = setPersistence(auth, browserLocalPersistence).catch(error => {
                 console.error("Firebase persistence error:", error);
         });
         analytics = getAnalytics(app);
@@ -32,6 +33,21 @@ try {
 }
 
 export { app, auth };
+
+// Do not treat the initial empty currentUser as a signed-out session.
+const authReady = persistenceReady.then(async () => {
+        if (!auth) throw new Error('Authentication is not initialized. Please reload the page.');
+        await auth.authStateReady();
+});
+
+async function refreshVerification(user) {
+        if (!user || user.emailVerified) return user;
+        await user.reload();
+        const refreshed = auth.currentUser;
+        if (refreshed?.uid !== user.uid) return null;
+        if (refreshed.emailVerified) await refreshed.getIdToken(true);
+        return refreshed;
+}
 
 function emailVerificationActionSettings() {
         if (typeof window === 'undefined') {
@@ -47,6 +63,7 @@ function emailVerificationActionSettings() {
 // Authentication Functions
 export const loginUser = async (email, password) => {
         try {
+                await authReady;
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
                 if (!userCredential.user.emailVerified) {
                         await sendEmailVerification(userCredential.user, emailVerificationActionSettings()).catch(() => { });
@@ -59,6 +76,7 @@ export const loginUser = async (email, password) => {
 
 export const registerUser = async (email, password) => {
         try {
+                await authReady;
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 try {
                         await sendEmailVerification(userCredential.user, emailVerificationActionSettings());
@@ -129,10 +147,12 @@ export const sendCurrentUserVerificationEmail = async () => {
 
 export const refreshCurrentUser = async () => {
         try {
+                await authReady;
                 if (!auth.currentUser) {
                         return { success: false, error: 'No signed-in user.' };
                 }
                 await auth.currentUser.reload();
+                await auth.currentUser?.getIdToken(true);
                 return { success: true, user: auth.currentUser };
         } catch (error) {
                 return { success: false, error: error.message };
@@ -141,6 +161,7 @@ export const refreshCurrentUser = async () => {
 
 export const signInWithGoogle = async () => {
         try {
+                await authReady;
                 const provider = new GoogleAuthProvider();
                 provider.setCustomParameters({ prompt: 'select_account' });
                 const userCredential = await signInWithPopup(auth, provider);
@@ -159,57 +180,38 @@ export const logoutUser = async () => {
         }
 };
 
-export const onAuthUserChanged = (callback) => {
-        if (!auth) return () => { };
-        return onAuthStateChanged(auth, callback);
+export const onAuthUserChanged = (callback, onError = error => console.error('Could not restore your session:', error)) => {
+        let stopped = false;
+        let unsubscribe = () => { };
+        let revision = 0;
+        authReady.then(() => {
+                if (stopped) return;
+                unsubscribe = onAuthStateChanged(auth, async user => {
+                        const observedRevision = ++revision;
+                        let confirmed = user;
+                        try { confirmed = await refreshVerification(user); }
+                        catch (error) { console.warn('Could not refresh email verification:', error); }
+                        if (!stopped && observedRevision === revision) callback(confirmed);
+                });
+        }).catch(error => { if (!stopped) onError(error); });
+        return () => { stopped = true; unsubscribe(); };
 };
 
 export const waitForAuthUser = async () => {
-        if (!auth) {
-                throw new Error('Authentication is not initialized.');
-        }
-
-        if (auth.currentUser) {
-                if (!auth.currentUser.emailVerified) {
-                        await signOut(auth).catch(() => { });
-                        throw new Error('Please verify your email address before continuing.');
-                }
-                return auth.currentUser;
-        }
-
-        return new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                        unsubscribe();
-                        reject(new Error('Please log in again before continuing.'));
-                }, 8000);
-
-                const unsubscribe = onAuthStateChanged(auth, (user) => {
-                        if (!user) return;
-                        if (!user.emailVerified) {
-                                clearTimeout(timeout);
-                                unsubscribe();
-                                signOut(auth).catch(() => { });
-                                reject(new Error('Please verify your email address before continuing.'));
-                                return;
-                        }
-                        clearTimeout(timeout);
-                        unsubscribe();
-                        resolve(user);
-                }, (error) => {
-                        clearTimeout(timeout);
-                        unsubscribe();
-                        reject(error);
-                });
-        });
+        await authReady;
+        const user = await refreshVerification(auth.currentUser);
+        if (!user) throw new Error('Please sign in to continue.');
+        if (!user.emailVerified) throw new Error('Please verify your email address before continuing.');
+        return user;
 };
 
 export const getCurrentUserToken = async () => {
         const user = await waitForAuthUser();
-        await user.reload();
-        const refreshedUser = auth.currentUser || user;
-        const token = await refreshedUser.getIdToken(true);
+        // Let Firebase refresh expired tokens without reloading the account for
+        // every API request.
+        const token = await user.getIdToken();
 
-        if (!token) {
+        if (!token || auth.currentUser?.uid !== user.uid) {
                 throw new Error('Could not verify your login. Please log in again.');
         }
 
@@ -232,12 +234,9 @@ export const authFetch = async (url, options = {}) => {
 export const initAuthUI = () => {
         if (!auth) return;
 
-        onAuthStateChanged(auth, (user) => {
+        onAuthUserChanged((user) => {
                 const verifiedUser = user && user.emailVerified ? user : null;
                 updateNavigation(verifiedUser);
-                if (user && !user.emailVerified) {
-                        signOut(auth).catch(error => console.error('Failed to sign out unverified user:', error));
-                }
         });
 };
 
@@ -263,7 +262,7 @@ const updateNavigation = (user) => {
                 if (user) {
                         dashboard.style.display = 'block';
                         // Load history
-                        import('./history.js?v=20261103-builder').then(module => {
+                        import('./history.js?v=20261103-session').then(module => {
                                 module.loadAppealHistory(user);
                         }).catch(err => console.error("Failed to load history module:", err));
                 } else {

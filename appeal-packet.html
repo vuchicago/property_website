@@ -4,22 +4,22 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <title>My Appeal Packet · Cook County Tax Compare</title>
-  <link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="appeal-packet.css">
+  <link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="styles.css?v=20261103-session">
+  <link rel="stylesheet" href="appeal-packet.css?v=20261103-session">
 </head>
 <body>
-  <header class="packet-nav"><a href="index.html">Cook County Tax Compare</a><nav><a href="index.html#user-dashboard">My account</a><a href="login.html">Sign in</a></nav></header>
+  <header class="packet-nav"><a href="index.html">Cook County Tax Compare</a><nav><span id="packet-session" role="status">Restoring your session…</span><a href="index.html#user-dashboard">My account</a><a href="login.html" id="packet-sign-in" hidden>Sign in</a></nav></header>
   <main class="packet-shell">
     <div class="packet-heading"><span class="section-badge">Prepare your own appeal</span><h1>Your property. Your appeal.</h1>
     <p>Prepare your Assessor appeal for free, review your documents, and download them to submit yourself. Optional $49 fulfillment includes DocuSign signing, printing, assembly, postage and tracking.</p></div>
-    <section class="packet-card" id="packet-orders"><h2>Free Assessor appeal preparation</h2>
+    <section class="packet-card" id="packet-orders" hidden><h2>Free Assessor appeal preparation</h2>
       <p>Choose a property saved in your account. You choose the appeal grounds and requested value. Preparation and downloads do not require payment.</p>
-      <label>Saved property<select id="packet-property"><option value="">Sign in to load properties</option></select></label><label>Assessment tax year<input id="packet-year" type="number" min="2020" max="2100" required></label><button class="btn btn-primary" id="packet-start">Start or resume free appeal</button><div id="order-list"></div>
+      <label>Saved property<select id="packet-property" disabled><option value="">Loading your saved properties…</option></select></label><label>Assessment tax year<input id="packet-year" type="number" min="2020" max="2100" required></label><button class="btn btn-primary" id="packet-start" disabled>Start or resume appeal</button><div id="order-list"></div>
     </section>
-    <p id="packet-message" role="status" aria-live="polite">Sign in to view your requests.</p>
+    <p id="packet-message" role="status" aria-live="polite">Restoring your session…</p>
     <p id="packet-waitlist" hidden>Free appeal testing is currently by invitation. <a href="index.html#contact">Join the public appeal waitlist</a>.</p>
     <div id="packet-workspace" hidden></div>
   </main>
-  <script type="module" src="appeal-packet.js?v=20261103-builder"></script>
+  <script type="module" src="appeal-packet.js?v=20261103-session"></script>
 </body>
 </html>

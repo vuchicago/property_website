@@ -22,10 +22,10 @@
     <link rel="manifest" href="/site.webmanifest">
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
                 rel="stylesheet">
-        <link rel="stylesheet" href="site-1.css?v=20260522">
-    <link rel="stylesheet" href="site-2.css?v=20260522">
-    <link rel="stylesheet" href="site-3.css?v=20260522">
-    <link rel="stylesheet" href="site-4.css?v=20260522">
+        <link rel="stylesheet" href="site-1.css?v=20261103-session">
+    <link rel="stylesheet" href="site-2.css?v=20261103-session">
+    <link rel="stylesheet" href="site-3.css?v=20261103-session">
+    <link rel="stylesheet" href="site-4.css?v=20261103-session">
         <style>
                 .auth-container {
                         min-height: 80vh;
@@ -585,7 +585,7 @@
 
         <!-- Auth Logic Script -->
         <script type="module">
-                import { auth, authFetch, loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, refreshCurrentUser, resetPasswordForEmail } from './auth-client.js?v=20261103-builder';
+                import { auth, authFetch, loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, refreshCurrentUser, resetPasswordForEmail } from './auth-client.js?v=20261103-session';
 
                 const form = document.getElementById('auth-form');
                 const emailInput = document.getElementById('email');
@@ -593,7 +593,7 @@
                 const toggleBtn = document.getElementById('toggle-btn');
                 const pageTitle = document.getElementById('page-title');
                 const pageSubtitle = document.getElementById('page-subtitle');
-                const submitBtn = form.querySelector('button');
+                const submitBtn = form.querySelector('button[type="submit"]');
                 const toggleText = document.getElementById('toggle-text');
                 const errorAlert = document.getElementById('error-alert');
                 const resetAlert = document.getElementById('reset-alert');
@@ -611,6 +611,14 @@
                 const authToggle = document.querySelector('.auth-toggle');
 
                 const pageParams = new URLSearchParams(window.location.search);
+                let returnTo = null;
+                let returningToAppeal = false;
+                try {
+                        const destination = new URL(pageParams.get('next') || '', window.location.origin);
+                        if (pageParams.has('next') && destination.origin === window.location.origin && !/^\/login(?:\.html)?\/?$/.test(destination.pathname)) {
+                                returnTo = destination.pathname + destination.search + destination.hash;
+                        }
+                } catch { /* Ignore invalid return URLs. */ }
                 const authMode = pageParams.get('mode');
                 const returnedFromVerification = pageParams.get('verified') === '1';
                 const inBlockedOAuthBrowser = isBlockedOAuthBrowser();
@@ -668,7 +676,6 @@
                                 submitBtn.textContent = isLogin ? 'Sign In' : 'Sign Up';
                                 if (!result.user.emailVerified) {
                                         showVerificationPanel(result.user.email, result.emailVerificationSent !== false);
-                                        await logoutUser();
                                         return;
                                 }
                                 await showDashboard(result.user);
@@ -734,7 +741,6 @@
                         if (result.success) {
                                 if (!result.user.emailVerified) {
                                         showVerificationPanel(result.user.email, false);
-                                        await logoutUser();
                                         return;
                                 }
                                 await showDashboard(result.user);
@@ -753,7 +759,6 @@
 
                                 if (!user.emailVerified) {
                                         showVerificationPanel(user.email, false);
-                                        await logoutUser();
                                         return;
                                 }
                                 await showDashboard(user);
@@ -770,7 +775,7 @@
                 });
 
                 addAppealBtn.addEventListener('click', async () => {
-                        const { openAppealModal } = await import('./appeal.js?v=20260527-checkout-identity');
+                        const { openAppealModal } = await import('./appeal.js?v=20261103-session');
                         openAppealModal();
                 });
 
@@ -782,13 +787,19 @@
                 });
 
                 async function showDashboard(userForDashboard = null) {
+                        if (returnTo) {
+                                if (returningToAppeal) return;
+                                returningToAppeal = true;
+                                window.location.replace(returnTo);
+                                return;
+                        }
                         authContainer.style.display = 'none';
                         dashboard.style.display = 'block';
                         pendingVerificationEmail = '';
                         hideVerificationPanel();
                         clearVerificationReturnFlag();
                         await updateAdminWorkspaceButton(userForDashboard || auth.currentUser);
-                        const { loadAppealHistory } = await import('./history.js?v=20260524-payment-status');
+                        const { loadAppealHistory } = await import('./history.js?v=20261103-session');
                         await loadAppealHistory(userForDashboard || auth.currentUser);
                 }
 
@@ -845,7 +856,12 @@
                         verificationPanel.innerHTML = `
                                 <h2>Email verification required</h2>
                                 <p>Please check ${escapeHtml(pendingVerificationEmail)} for the verification link. <strong>(Check spam folder as well!)</strong></p>
+                                <button type="button" class="btn btn-secondary" id="verification-sign-out">Use a different account</button>
                         `;
+                        verificationPanel.querySelector('#verification-sign-out').addEventListener('click', async () => {
+                                await logoutUser();
+                                updateUI();
+                        });
                         verificationPanel.style.display = 'block';
                 }
 

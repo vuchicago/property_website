@@ -670,13 +670,13 @@ async function openAppealHelp() {
     }
 
     try {
-        const { auth } = await import('./auth-client.js?v=20260524-auth-gate');
+        const { auth } = await import('./auth-client.js?v=20261103-session');
         if (!auth.currentUser) {
             window.location.href = buildCreateAccountUrl();
             return;
         }
 
-        const { openAppealModal } = await import('./appeal.js?v=20260527-checkout-identity');
+        const { openAppealModal } = await import('./appeal.js?v=20261103-session');
         openAppealModal(selectedProperty.address, {
             propertyKey: searchResults?.target?.propertyKey || searchResults?.target?.property_key || '',
             pin: selectedProperty.pin || searchResults?.target?.pin || '',

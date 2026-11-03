@@ -1320,53 +1320,6 @@ ol {
     margin-top: var(--space-4);
 }
 
-.waitlist-cta {
-    background: transparent;
-    border: 100;
-    border-radius: var(--radius-lg);
-    box-shadow: none;
-    color: var(--dark-900);
-    justify-content: center;
-    max-width: 360px;
-    min-width: 300px;
-    overflow: hidden;
-    position: relative;
-    text-align: center;
-    white-space: normal;
-    width: 100%;
-}
-
-.waitlist-cta:hover {
-    background: rgba(124, 58, 237, 0.04);
-    box-shadow: none;
-}
-
-.waitlist-cta-text {
-    display: flex;
-    flex-direction: column;
-    line-height: 1.8;
-    position: relative;
-    z-index: 1;
-}
-
-.waitlist-cta-text strong {
-    font-size: var(--font-size-base);
-    text-align: center;
-}
-
-.waitlist-cta-text span {
-    font-size: var(--font-size-xs);
-    font-weight: 700;
-    opacity: 0.72;
-    text-align: center;
-}
-
-.waitlist-cta>svg:not(.waitlist-border-light) {
-    position: absolute;
-    right: var(--space-4);
-    z-index: 1;
-}
-
 .btn-lg {
     padding: var(--space-4) var(--space-8);
     font-size: var(--font-size-lg);
@@ -1867,7 +1820,9 @@ ol {
     max-width: 912px;
 }
 
-.hero-address-cta>.btn-secondary {
+.hero-secondary-actions {
+    display: grid;
+    gap: var(--space-3);
     align-self: center;
 }
 
@@ -2009,83 +1964,6 @@ ol {
     transform: translateY(-2px);
 }
 
-.waitlist-stat {
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius-md);
-    box-shadow: none;
-    min-width: 285px;
-    overflow: hidden;
-    position: relative;
-    text-align: center;
-}
-
-.waitlist-stat:hover {
-    background: rgba(124, 58, 237, 0.04);
-    box-shadow: none;
-}
-
-.waitlist-stat .stat-number,
-.waitlist-stat .stat-label {
-    position: relative;
-    z-index: 1;
-}
-
-.waitlist-stat .stat-number {
-    color: var(--dark-900);
-}
-
-.waitlist-stat .stat-label {
-    color: var(--dark-600);
-}
-
-.waitlist-stat .stat-label {
-    font-weight: 700;
-    opacity: 0.88;
-}
-
-.waitlist-border-light {
-    height: 100%;
-    inset: 0;
-    overflow: hidden;
-    pointer-events: none;
-    position: absolute;
-    width: 100%;
-    z-index: 0;
-}
-
-.cta-btn .waitlist-border-light {
-    height: 100%;
-    width: 100%;
-}
-
-.waitlist-border-light rect {
-    animation: waitlistBorderRun 1s linear infinite;
-    fill: none;
-    opacity: 1;
-    stroke: url(#hero-waitlist-border-gradient);
-    stroke-dasharray: 80 10;
-    stroke-dashoffset: 0;
-    stroke-linecap: butt;
-    stroke-width: 5.2;
-    vector-effect: non-scaling-stroke;
-}
-
-.waitlist-cta .waitlist-border-light rect {
-    stroke: url(#pricing-waitlist-border-gradient);
-}
-
-@keyframes waitlistBorderRun {
-    to {
-        stroke-dashoffset: -80;
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .waitlist-border-light rect {
-        animation: none;
-    }
-}
 
 .stat-number {
     display: block;

@@ -1,5 +1,5 @@
 import { requirements, preparationProblems, evidenceCategories, OFFICIAL_FORM } from './packet-requirements.js';
-import { authFetch, onAuthUserChanged } from './auth-client.js';
+import { authFetch, onAuthUserChanged } from './auth-client.js?v=20261103-session';
 
 const labels = { intake: 'Your information', preparing: 'Preparing packet', review: 'Review packet', approved: 'Download or choose fulfillment', awaiting_signature: 'Awaiting signatures', signed: 'Signed', mailed: 'Mailed', delivered: 'Delivered by carrier', filed: 'County filing confirmed' };
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -11,30 +11,45 @@ const file = (label = 'PDF document', evidence = false) => `<label>${label}<inpu
 const form = (action, title, fields, button) => `<form class="packet-card" data-action="${action}"><h2>${title}</h2>${fields}<button class="btn btn-primary" type="submit">${button}</button></form>`;
 let selectedId = new URLSearchParams(location.search).get('id');
 let current;
+let sessionRevision = 0;
 document.getElementById('packet-year').value=new Date().getFullYear();
 const propertyQuery=new URLSearchParams(location.search).get('property');
 const money=value=>value==null?'Not available':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(value);
 const toggle=(name,label,value=false)=>`<label><input type="checkbox" name="${name}" ${value?'checked':''}>${label}</label>`;
+const signInLink = document.getElementById('packet-sign-in');
+signInLink.href = `login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
 
 document.getElementById('packet-start').addEventListener('click', async event => {
     const button=event.currentTarget;button.disabled=true;
     try {const response=await authFetch('/api/packet-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({propertyId:Number(document.getElementById('packet-property').value),taxYear:Number(document.getElementById('packet-year').value)})});const result=await response.json();if(!response.ok)throw new Error(result.error);location.href=result.url;}catch(e){message(e.message,true);}finally{button.disabled=false;}
 });
 onAuthUserChanged(async user => {
+    const revision = ++sessionRevision;
+    const propertySelect = document.getElementById('packet-property');
+    const startButton = document.getElementById('packet-start');
+    const session = document.getElementById('packet-session');
+    startButton.disabled = true;
+    propertySelect.disabled = true;
+    document.getElementById('packet-orders').hidden = true;
     document.getElementById('packet-workspace').hidden = true;
+    signInLink.hidden = Boolean(user?.emailVerified);
+    signInLink.textContent = user ? 'Verify email' : 'Sign in';
+    session.textContent = user ? `Signed in as ${user.email}` : 'You are signed out';
     if (!user || !user.emailVerified) {
         current = null;
-        selectedId = null;
         document.getElementById('order-list').replaceChildren();
-        document.getElementById('packet-property').innerHTML='<option value="">Sign in to load properties</option>';
-        document.getElementById('packet-orders').hidden=true;
+        propertySelect.innerHTML='<option value="">Sign in with a verified email to choose a property</option>';
         document.getElementById('packet-waitlist').hidden=false;
         document.getElementById('packet-workspace').replaceChildren();
-        message('Sign in with a verified email to continue.'); return;
+        message(user ? 'Verify your email to prepare your appeal. Your account is still signed in.' : 'Sign in to prepare your appeal. We will return you to this property.');
+        return;
     }
     try {
+        message('Loading your saved properties…');
         const accessResponse=await authFetch('/api/appeal-access');
-        const access=accessResponse.ok ? await accessResponse.json() : {allowed:false};
+        if (!accessResponse.ok) throw new Error('Could not check appeal access. Your session is still signed in. Please reload to try again.');
+        const access=await accessResponse.json();
+        if (revision !== sessionRevision) return;
         document.getElementById('packet-orders').hidden=!access.allowed;
         document.getElementById('packet-waitlist').hidden=access.allowed || Boolean(selectedId);
         if(!access.allowed){
@@ -44,19 +59,28 @@ onAuthUserChanged(async user => {
         }
         const addresses=await authFetch('/api/addresses'); if(!addresses.ok)throw new Error('Could not load saved properties.');
         const properties=await addresses.json();
-        document.getElementById('packet-property').innerHTML='<option value="">Choose a saved property</option>'+properties.map(p=>`<option value="${Number(p.id)}">${escape(p.address)}</option>`).join('');
-        if(propertyQuery)document.getElementById('packet-property').value=propertyQuery;
+        if (revision !== sessionRevision) return;
+        propertySelect.innerHTML='<option value="">Choose a saved property</option>'+properties.map(p=>`<option value="${Number(p.id)}">${escape(p.address)}</option>`).join('');
+        propertySelect.disabled = properties.length === 0;
+        startButton.disabled = properties.length === 0;
+        if(propertyQuery)propertySelect.value=propertyQuery;
         const response = await authFetch('/api/history');
         if (!response.ok) throw new Error('Could not load your orders.');
         const orders = await response.json();
+        if (revision !== sessionRevision) return;
         document.getElementById('order-list').innerHTML = orders.filter(order => order.id.startsWith('free_')).map(order => `<p><a href="appeal-packet.html?id=${encodeURIComponent(order.id)}">${escape(order.propertyAddress)} — open packet</a></p>`).join('') || '<p>No free workspaces yet. Add a property in My account, then start here.</p>';
         if (selectedId) await load(); else if(propertyQuery && properties.some(p=>String(p.id)===propertyQuery)) document.getElementById('packet-start').click(); else message('Choose a saved property and assessment year to start or resume.');
-    } catch (error) { message(error.message, true); }
+    } catch (error) { if (revision === sessionRevision) message(error.message, true); }
+}, error => {
+    document.getElementById('packet-session').textContent = 'Session could not be restored';
+    message(error.message || 'Could not restore your session. Please reload and try again.', true);
 });
 
 async function load() {
+    const revision = sessionRevision;
     const response = await authFetch(`/api/packet?id=${encodeURIComponent(selectedId)}`);
     const data = await response.json();
+    if (revision !== sessionRevision) return;
     if (!response.ok) throw new Error(data.error || 'Could not load packet.');
     current = data;
     if(data.packetId)selectedId=data.packetId;

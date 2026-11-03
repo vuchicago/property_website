@@ -30,20 +30,24 @@ const menus = {
     Company: [['Partners', 'partners.html'], ['Contact', 'index.html#contact']]
 };
 
-function firebaseSource(identity) {
+function firebaseSource(identity, options = {}) {
     return `
         const callbacks = new Set();
         const identity = ${JSON.stringify(identity)};
-        const makeUser = value => value ? {...value, reload: async()=>{}, getIdToken: async()=> 'regression-token', providerData: []} : null;
-        const subscribe = callback => { callbacks.add(callback); queueMicrotask(()=>callback(auth.currentUser)); return ()=>callbacks.delete(callback); };
-        const auth = { currentUser: sessionStorage.getItem('regression-signed-out') ? null : makeUser(identity), onAuthStateChanged: subscribe };
+        let resolveReady;
+        const ready = new Promise(resolve => { resolveReady = resolve; });
+        const makeUser = value => value ? {...value, reload: async()=>{ window.__regressionReloads = (window.__regressionReloads || 0) + 1; if (${Boolean(options.refreshVerified)}) auth.currentUser.emailVerified = true; }, getIdToken: async()=> 'regression-token', providerData: []} : null;
+        const subscribe = callback => { callbacks.add(callback); ready.then(()=>{ if(callbacks.has(callback)) callback(auth.currentUser); }); return ()=>callbacks.delete(callback); };
+        const auth = { currentUser: null, onAuthStateChanged: subscribe, authStateReady: ()=>ready };
+        const restore = ()=>{ auth.currentUser = sessionStorage.getItem('regression-signed-out') || (${Boolean(options.startSignedOut)} && !sessionStorage.getItem('regression-signed-in')) ? null : makeUser(identity); resolveReady(); };
+        if (${Number(options.restoreDelay) || 0}) setTimeout(restore, ${Number(options.restoreDelay) || 0}); else restore();
         window.__setRegressionUser = value => { auth.currentUser = makeUser(value); for(const callback of callbacks) queueMicrotask(()=>callback(auth.currentUser)); };
         export const getAuth = ()=>auth;
         export const onAuthStateChanged = (auth, callback)=>subscribe(callback);
-        export const signOut = async()=>{ sessionStorage.setItem('regression-signed-out','1'); window.__setRegressionUser(null); };
+        export const signOut = async()=>{ sessionStorage.setItem('regression-signed-out','1'); sessionStorage.setItem('regression-sign-outs', String(Number(sessionStorage.getItem('regression-sign-outs') || 0)+1)); window.__setRegressionUser(null); };
         export const browserLocalPersistence = {};
         export const setPersistence = async()=>{};
-        export const signInWithEmailAndPassword = async()=>({user:auth.currentUser});
+        export const signInWithEmailAndPassword = async()=>{ sessionStorage.removeItem('regression-signed-out'); sessionStorage.setItem('regression-signed-in','1'); window.__setRegressionUser(identity); return {user:auth.currentUser}; };
         export const createUserWithEmailAndPassword = async()=>({user:auth.currentUser});
         export class GoogleAuthProvider {}
         export const signInWithPopup = async()=>({user:auth.currentUser});
@@ -54,18 +58,18 @@ function firebaseSource(identity) {
 
 async function scenario(options = {}) {
     const identity = options.email ? { uid: 'regression-owner', email: options.email, emailVerified: options.verified !== false } : null;
-    const store = { contacts: [], starts: [], pilots: [], unexpected: [], contactFails: false, access: Boolean(options.access), packetStatus: options.packetStatus || 'approved', signatureCalls: 0 };
+    const store = { contacts: [], starts: [], pilots: [], unexpected: [], contactFails: false, accessFails: false, access: Boolean(options.access), packetStatus: options.packetStatus || 'approved', signatureCalls: 0 };
     const context = await browser.newContext({ viewport: { width: options.width || 1440, height: 900 }, reducedMotion: 'reduce' });
     await context.route('**/*', async route => {
         const request = route.request(), url = new URL(request.url());
         const json = (body, status = 200) => route.fulfill({ status, json: body });
         if (url.pathname.endsWith('/firebase-app.js')) return route.fulfill({ contentType: 'text/javascript', body: 'export const initializeApp=()=>({});' });
         if (url.pathname.endsWith('/firebase-analytics.js')) return route.fulfill({ contentType: 'text/javascript', body: 'export const getAnalytics=()=>({});' });
-        if (url.pathname.endsWith('/firebase-auth.js')) return route.fulfill({ contentType: 'text/javascript', body: firebaseSource(identity) });
+        if (url.pathname.endsWith('/firebase-auth.js')) return route.fulfill({ contentType: 'text/javascript', body: firebaseSource(identity, options) });
         if (url.origin !== base.origin) return route.fulfill({ contentType: request.resourceType() === 'document' ? 'text/html' : request.resourceType() === 'stylesheet' ? 'text/css' : 'text/javascript', body: '' });
         if (!url.pathname.startsWith('/api/')) return route.continue();
         switch (url.pathname) {
-            case '/api/appeal-access': return json({ allowed: store.access, admin: ['admin', 'superadmin'].includes(options.role) });
+            case '/api/appeal-access': return store.accessFails ? json({ error: 'Test access service unavailable' }, 503) : json({ allowed: store.access, admin: ['admin', 'superadmin'].includes(options.role) });
             case '/api/addresses': return json([property]);
             case '/api/history': return json([]);
             case '/api/notifications':
@@ -172,6 +176,23 @@ test('home header and page fit narrow screens and navigation breakpoints', async
     } finally { await s.close(); }
 });
 
+test('landing waitlist sits below How Appeals Work with matching button dimensions', async () => {
+    const s = await scenario();
+    try {
+        await s.goto('/');
+        assert.equal(await s.page.locator('.waitlist-border-light, .waitlist-stat').count(), 0);
+        for (const width of [1440, 900, 390, 320]) {
+            await s.page.setViewportSize({ width, height: 900 });
+            const how = await s.page.locator('.hero-secondary-actions').getByRole('link', { name: 'How Appeals Work', exact: true }).boundingBox();
+            const waitlist = s.page.locator('.hero-secondary-actions').getByRole('link', { name: 'Appeal Waitlist', exact: true });
+            const box = await waitlist.boundingBox();
+            assert.ok(box.y >= how.y + how.height, `Waitlist must sit below How Appeals Work at ${width}px`);
+            assert.ok(Math.abs(box.width - how.width) <= 1 && Math.abs(box.height - how.height) <= 1, `Button dimensions differ at ${width}px`);
+            assert.equal(await waitlist.getAttribute('href'), '#contact');
+        }
+    } finally { await s.close(); }
+});
+
 test('dropdowns support hover, keyboard activation, and Escape including a hovered menu', async () => {
     const s = await scenario();
     try {
@@ -216,7 +237,7 @@ for (const account of [
         try {
             await s.goto('/');
             await s.page.locator('#address-list a').first().waitFor();
-            const free = s.page.locator('#address-list').getByRole('link', { name: 'Prepare my appeal · Free', exact: true });
+            const free = s.page.locator('#address-list').getByRole('link', { name: 'Prepare my appeal', exact: true });
             assert.equal(await free.count(), account.access ? 1 : 0);
             assert.equal(await s.page.locator('#address-list').getByRole('link', { name: 'Join appeal waitlist', exact: true }).count(), account.access ? 0 : 1);
             assert.equal(await s.page.locator('#my-packet-workspace').isVisible(), account.access);
@@ -336,4 +357,105 @@ test('invited owner starts a saved-property appeal and downloads before optional
         if (downloadDir) fs.rmSync(downloadDir, { recursive: true });
         await s.close();
     }
+});
+
+test('saved-property action preserves the signed-in session through delayed restoration', async () => {
+    const s = await scenario({ email: 'tester@example.com', access: true, restoreDelay: 400 });
+    try {
+        await s.goto('/login.html');
+        const prepare = s.page.locator('#address-list').getByRole('link', { name: 'Prepare my appeal', exact: true });
+        await prepare.waitFor();
+        await prepare.click();
+        await s.page.waitForURL('**/appeal-packet*id=free_fixture');
+        await s.page.getByRole('heading', { name: 'Submit it yourself · Free' }).waitFor();
+        assert.equal(await s.page.locator('#packet-session').textContent(), 'Signed in as tester@example.com');
+        assert.equal(await s.page.locator('#packet-sign-in').isVisible(), false);
+        assert.equal(s.store.starts.length, 1);
+        assert.equal(await s.page.evaluate(() => sessionStorage.getItem('regression-sign-outs')), null);
+    } finally { await s.close(); }
+});
+
+test('appeal startup shows loading until session restoration completes', async () => {
+    const s = await scenario({ email: 'tester@example.com', access: true, restoreDelay: 1200 });
+    try {
+        await s.goto('/appeal-packet.html');
+        assert.equal(await s.page.locator('#packet-session').textContent(), 'Restoring your session…');
+        assert.equal(await s.page.locator('#packet-sign-in').isVisible(), false);
+        assert.equal(await s.page.locator('#packet-orders').isVisible(), false);
+        await s.page.waitForFunction(() => document.getElementById('packet-session').textContent.includes('tester@example.com'));
+        await s.page.locator('#packet-property option[value="7"]').waitFor({ state: 'attached' });
+        assert.equal(await s.page.locator('#packet-property').isEnabled(), true);
+    } finally { await s.close(); }
+});
+
+test('stale email verification refreshes without signing the account out', async () => {
+    const s = await scenario({ email: 'tester@example.com', verified: false, refreshVerified: true, access: true });
+    try {
+        await s.goto('/appeal-packet.html?property=7');
+        await s.page.waitForURL('**/appeal-packet*id=free_fixture');
+        await s.page.getByRole('heading', { name: 'Submit it yourself · Free' }).waitFor();
+        assert.equal(await s.page.locator('#packet-sign-in').isVisible(), false);
+        assert.equal(await s.page.evaluate(() => sessionStorage.getItem('regression-sign-outs')), null);
+    } finally { await s.close(); }
+});
+
+test('unverified account remains signed in while protected appeal actions stay unavailable', async () => {
+    const s = await scenario({ email: 'tester@example.com', verified: false, access: true });
+    try {
+        await s.goto('/appeal-packet.html?property=7');
+        await s.page.waitForFunction(() => document.getElementById('packet-message').textContent.includes('Verify your email'));
+        assert.equal(await s.page.locator('#packet-orders').isVisible(), false);
+        assert.equal(await s.page.locator('#packet-sign-in').textContent(), 'Verify email');
+        assert.equal(s.store.starts.length, 0);
+        assert.equal(await s.page.evaluate(() => sessionStorage.getItem('regression-sign-outs')), null);
+        const result = await s.page.evaluate(async () => {
+            const { authFetch } = await import('/auth-client.js?v=20261103-session');
+            try { await authFetch('/api/addresses'); return 'unexpected access'; } catch (error) { return error.message; }
+        });
+        assert.match(result, /verify your email/i);
+        await s.goto('/login.html');
+        await s.page.getByRole('heading', { name: 'Email verification required', exact: true }).waitFor();
+        assert.equal(await s.page.evaluate(() => sessionStorage.getItem('regression-sign-outs')), null);
+    } finally { await s.close(); }
+});
+
+test('temporary access-service failure does not turn a signed-in account into a sign-in prompt', async () => {
+    const s = await scenario({ email: 'tester@example.com', access: true });
+    try {
+        s.store.accessFails = true;
+        await s.goto('/appeal-packet.html');
+        await s.page.waitForFunction(() => document.getElementById('packet-message').textContent.includes('Could not check appeal access'));
+        assert.equal(await s.page.locator('#packet-session').textContent(), 'Signed in as tester@example.com');
+        assert.equal(await s.page.locator('#packet-sign-in').isVisible(), false);
+        assert.equal(await s.page.locator('#packet-waitlist').isVisible(), false);
+        assert.equal(await s.page.evaluate(() => sessionStorage.getItem('regression-sign-outs')), null);
+    } finally { await s.close(); }
+});
+
+test('sign-in returns to the selected property and starts the appeal once', async () => {
+    const s = await scenario({ email: 'tester@example.com', startSignedOut: true, access: true });
+    try {
+        await s.goto('/appeal-packet.html?property=7');
+        await s.page.locator('#packet-sign-in').waitFor();
+        const returnUrl = new URL(await s.page.locator('#packet-sign-in').getAttribute('href'), base).searchParams.get('next');
+        assert.match(returnUrl, /^\/appeal-packet(?:\.html)?\?property=7$/);
+        await s.page.locator('#packet-sign-in').click();
+        await s.page.locator('#auth-form #email').fill('tester@example.com');
+        await s.page.locator('#auth-form #password').fill('synthetic-test-password');
+        assert.equal(await s.page.locator('#forgot-password-btn').textContent(), 'Forgot password?');
+        await s.page.locator('#auth-form').getByRole('button', { name: 'Sign In', exact: true }).click();
+        await s.page.waitForURL('**/appeal-packet*id=free_fixture');
+        await s.page.getByRole('heading', { name: 'Submit it yourself · Free' }).waitFor();
+        assert.equal(s.store.starts.length, 1);
+        assert.equal(s.store.starts[0].propertyId, 7);
+    } finally { await s.close(); }
+});
+
+test('sign-in ignores return URLs outside the site', async () => {
+    const s = await scenario({ email: 'tester@example.com', access: true });
+    try {
+        await s.goto('/login.html?next=https%3A%2F%2Fexample.invalid%2F');
+        await s.page.locator('#address-list').getByRole('link', { name: 'Prepare my appeal', exact: true }).waitFor();
+        assert.equal(new URL(s.page.url()).origin, base.origin);
+    } finally { await s.close(); }
 });

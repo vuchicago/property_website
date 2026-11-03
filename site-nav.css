@@ -55,7 +55,6 @@
     .nav-container { padding-inline: .7rem; }
 }
 @media (max-width: 360px) {
-    .waitlist-cta { min-width: 0; max-width: 100%; }
     .contact-item, .contact-details { min-width: 0; }
     .contact-details a { overflow-wrap: anywhere; }
     .calendar-preview, .deadline-dashboard { padding: .75rem; }

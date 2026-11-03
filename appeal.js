@@ -267,7 +267,7 @@ async function getSelectedAppealAddress() {
 }
 
 async function getCurrentAppealUser() {
-        const { auth, authFetch } = await import('./auth-client.js?v=20260524-auth-gate');
+        const { auth, authFetch } = await import('./auth-client.js?v=20261103-session');
         const user = auth.currentUser;
 
         if (!user) {
@@ -346,7 +346,7 @@ async function prefillCheckoutIdentity() {
                         return;
                 }
 
-                const { auth } = await import('./auth-client.js?v=20260524-auth-gate');
+                const { auth } = await import('./auth-client.js?v=20261103-session');
                 const displayName = String(auth.currentUser?.displayName || '').trim();
                 const parts = displayName.split(/\s+/).filter(Boolean);
                 if (parts.length >= 2) {
@@ -458,7 +458,7 @@ async function updateAppealAddressSuggestions(query, forceVisible = false) {
         suggestionsPanel.classList.add('is-visible');
 
         try {
-                const { authFetch } = await import('./auth-client.js?v=20260524-auth-gate');
+                const { authFetch } = await import('./auth-client.js?v=20261103-session');
                 const response = await authFetch(`/api/address-lookup?q=${encodeURIComponent(query)}&limit=5`);
                 if (!response.ok) {
                         const error = await response.json().catch(() => ({}));

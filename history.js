@@ -1,4 +1,4 @@
-import { auth, authFetch } from './auth-client.js';
+import { auth, authFetch } from './auth-client.js?v=20261103-session';
 
 let userAddresses = [];
 let allAppeals = [];
@@ -316,7 +316,7 @@ function renderAddressList() {
                                 ${addrObj.pin ? `<div class="text-xs text-muted">${String(addrObj.pin).includes(',') ? 'PINs' : 'PIN'} ${escapeHtml(addrObj.pin)}</div>` : ''}
                                 ${addrObj.propertyDetails?.mailingName ? `<div class="text-xs text-muted">${escapeHtml(addrObj.propertyDetails.mailingName)}</div>` : ''}
                                 <div class="text-xs text-muted">${appealCount} appeal(s)</div>
-                                ${freeAppealTester ? `<a class="btn btn-primary btn-sm" style="margin-top:.75rem" href="appeal-packet.html?property=${encodeURIComponent(addrObj.id)}">Prepare my appeal · Free</a>` : `<a class="btn btn-secondary btn-sm" style="margin-top:.75rem" href="#contact">Join appeal waitlist</a>`}
+                                ${freeAppealTester ? `<a class="btn btn-primary btn-sm" style="margin-top:.75rem" href="appeal-packet.html?property=${encodeURIComponent(addrObj.id)}">Prepare my appeal</a>` : `<a class="btn btn-secondary btn-sm" style="margin-top:.75rem" href="#contact">Join appeal waitlist</a>`}
                                 ${propertyStatus ? renderPropertyAppealStatus(propertyStatus) : ''}
                         </div>
                         ${canDelete ? `<button type="button" class="btn btn-secondary btn-sm delete-address-btn" data-address="${safeAddress}" data-property-key="${safePropertyKey}" aria-label="Delete ${safeAddress}">Delete</button>` : ''}
@@ -914,7 +914,7 @@ function renderAppeals(appeals, address) {
             <div style="text-align: center; padding: 2rem 0; color: var(--text-muted);">
                 <p>No appeals found for this property.</p>
                 <p class="text-sm text-muted">${freeAppealTester ? 'Prepare and download your Assessor appeal for free. Optional $49 fulfillment includes DocuSign, printing, mailing and tracking.' : 'Free appeal testing is currently by invitation. Anyone can join the waitlist.'}</p>
-                <button class="btn btn-primary appeal-again-btn" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">${freeAppealTester ? 'Prepare my appeal · Free' : 'Join appeal waitlist'}</button>
+                <button class="btn btn-primary appeal-again-btn" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">${freeAppealTester ? 'Prepare my appeal' : 'Join appeal waitlist'}</button>
                 ${uploadLegalFootnote()}
             </div>
         `;
@@ -959,7 +959,7 @@ function renderAppeals(appeals, address) {
                         const addr = e.currentTarget.dataset.address;
                         if (freeAppealTester) location.href = `appeal-packet.html?property=${encodeURIComponent(selectedProperty.id)}`;
                         else {
-                                const { openAppealModal } = await import('./appeal.js');
+                                const { openAppealModal } = await import('./appeal.js?v=20261103-session');
                                 openAppealModal(addr, selectedProperty);
                         }
                 });

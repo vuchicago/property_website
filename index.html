@@ -54,10 +54,10 @@
     <!-- Leaflet CSS for maps -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-    <link rel="stylesheet" href="site-1.css?v=20260522">
-    <link rel="stylesheet" href="site-2.css?v=20260522">
-    <link rel="stylesheet" href="site-3.css?v=20260522">
-    <link rel="stylesheet" href="site-4.css?v=20260522">
+    <link rel="stylesheet" href="site-1.css?v=20261103-session">
+    <link rel="stylesheet" href="site-2.css?v=20261103-session">
+    <link rel="stylesheet" href="site-3.css?v=20261103-session">
+    <link rel="stylesheet" href="site-4.css?v=20261103-session">
     <script type="application/ld+json">
         {
             "@context": "https://schema.org",
@@ -311,26 +311,10 @@
                             </svg>
                         </button>
                     </div>
-                    <a href="#why-appeal" class="btn btn-secondary">How Appeals Work</a>
-                </div>
-                <div class="hero-stats">
-                    <a href="#contact" class="stat stat-link waitlist-stat" aria-label="Join the property tax appeal waitlist">
-                        <svg class="waitlist-border-light" viewBox="0 0 100 100" preserveAspectRatio="none"
-                            aria-hidden="true">
-                            <defs>
-                                <linearGradient id="hero-waitlist-border-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                    <stop offset="0%" stop-color="#ec4899" />
-                                    <stop offset="24%" stop-color="#f59e0b" />
-                                    <stop offset="48%" stop-color="#22c55e" />
-                                    <stop offset="72%" stop-color="#06b6d4" />
-                                    <stop offset="100%" stop-color="#8b5cf6" />
-                                </linearGradient>
-                            </defs>
-                            <rect x="1" y="1" width="98" height="98" rx="7.5" ry="7.5" pathLength="100" />
-                        </svg>
-                        <span class="stat-number">Appeal Waitlist</span>
-                        <span class="stat-label">Click to Join the Waitlist</span>
-                    </a>
+                    <div class="hero-secondary-actions">
+                        <a href="#why-appeal" class="btn btn-secondary">How Appeals Work</a>
+                        <a href="#contact" class="btn btn-secondary">Appeal Waitlist</a>
+                    </div>
                 </div>
             </div>
             <div class="hero-visual animate-on-scroll delay-200">
@@ -820,30 +804,7 @@
                         </div>
                         <h3>Free Appeal Preparation</h3>
                         <p>Join the waitlist for access to the free appeal preparation pilot. No payment is required to join.</p>
-                        <a href="#contact" class="cta-btn pricing-cta waitlist-cta">
-                            <svg class="waitlist-border-light" viewBox="0 0 100 100" preserveAspectRatio="none"
-                                aria-hidden="true">
-                                <defs>
-                                    <linearGradient id="pricing-waitlist-border-gradient" x1="0%" y1="0%" x2="100%"
-                                        y2="100%">
-                                        <stop offset="0%" stop-color="#ec4899" />
-                                        <stop offset="24%" stop-color="#f59e0b" />
-                                        <stop offset="48%" stop-color="#22c55e" />
-                                        <stop offset="72%" stop-color="#06b6d4" />
-                                        <stop offset="100%" stop-color="#8b5cf6" />
-                                    </linearGradient>
-                                </defs>
-                                <rect x="1" y="1" width="98" height="98" rx="7.5" ry="7.5" pathLength="100" />
-                            </svg>
-                            <span class="waitlist-cta-text">
-                                <strong>Appeal Waitlist</strong>
-                                <span>Click to Join the Waitlist</span>
-                            </span>
-                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </a>
+                        <a href="#contact" class="btn btn-secondary pricing-cta">Appeal Waitlist</a>
                     </div>
                     <div class="testimonial-author">
                         <div class="author-avatar">Free</div>
@@ -1215,13 +1176,13 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script type="module" src="components.js"></script>
     <script type="module">
-        import { initAuthUI } from './auth-client.js?v=20261103-builder';
+        import { initAuthUI } from './auth-client.js?v=20261103-session';
         initAuthUI();
     </script>
-    <script type="module" src="appeal.js?v=20261103-packets"></script>
+    <script type="module" src="appeal.js?v=20261103-session"></script>
     <script src="appeal_deadlines.js?v=20261102-deadlines"></script>
     <script src="app.js?v=20260527-analyze-click"></script>
-    <script src="property-tax.js?v=20260527-radius-2mi"></script>
+    <script src="property-tax.js?v=20261103-session"></script>
     <script src="roi-calculator.js"></script>
     <script src="loan-tool.js"></script>
 </body>

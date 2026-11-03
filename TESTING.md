@@ -40,6 +40,8 @@ The runner detects Chrome on macOS and common Linux/Windows locations. Set `BROW
 
 Browser tests exercise the actual built HTML, CSS, navigation, authentication UI, and account scripts. They replace Firebase identity and every API response with fixtures and block other external requests. They check all shared headers at desktop, tablet, and mobile widths; the homepage down to 320px; hover and keyboard dropdown behavior; clean URL highlights; account and Partner Inbox menus; logout; public waitlist submission and retry; administrator tester management; restricted free workspace access; and a free packet download before optional fulfillment.
 
+Session checks include delayed Firebase restoration, navigation from a saved property to its appeal, refreshing stale email-verification state without signing out, retaining an unverified session while denying protected actions, service failures without a false sign-in prompt, and returning to the selected property after sign-in. External return URLs are rejected. The landing-page check verifies that Appeal Waitlist is below How Appeals Work with matching button dimensions.
+
 These browser fixtures do not test real Firebase login, provider credentials, live email delivery, the external ROI/loan iframe calculators, or an actual Stripe/DocuSign transaction. Complete the manual account and test-provider steps in [APPEAL_LOCAL_TESTING.md](APPEAL_LOCAL_TESTING.md) before releasing those integrations.
 
 ## Cloudflare Functions compilation
