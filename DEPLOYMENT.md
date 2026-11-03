@@ -281,7 +281,7 @@ Customer entry: `/appeal-packet.html`; admin entry: **Prepare packet** on each f
 Provision before enabling payments:
 
 1. Apply `migrations/0029_create_appeal_packets.sql` to the existing D1 database (after the earlier migrations). This creates new tables without changing existing appeals.
-2. Create the private R2 bucket `cookcounty-appeal-packets` and bind it as `APPEAL_PACKETS` in Pages, matching `wrangler.jsonc`. Keep public access disabled. Use a separate bucket for staging; never copy production evidence into test fixtures.
+2. Use the R2 bucket `cookcountystorage`, bound as `APPEAL_PACKETS` in Pages, matching `wrangler.jsonc`. The bucket was verified to exist on November 3, 2026. Keep public access disabled. No folders need to be created: the app writes object keys under `packets/` and `self-appeals/` on upload. Use a separate bucket for staging; never copy production evidence into test fixtures.
 3. Configure Stripe test credentials and `STRIPE_TEST_WEBHOOK_SECRET` for preview. The webhook now requires a valid signature and a timestamp within five minutes in every environment. Configure live keys and a live webhook secret separately before production activation.
 4. Set `DEPLOYMENT_READY=1` only after storage, migration, outbound notifications, and a complete Stripe test purchase have been verified. The checkout also requires the R2 binding and packet table. The R2 bucket must actually exist; a binding alone is insufficient operational verification.
 5. Test owner and admin accounts end to end before accepting live purchases. No real charge, email, DocuSign envelope, mailing or application deployment was performed while building this framework. The workflow migrations were subsequently applied as recorded below.

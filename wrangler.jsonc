@@ -27,7 +27,7 @@
         "r2_buckets": [
                 {
                         "binding": "APPEAL_PACKETS",
-                        "bucket_name": "cookcounty-appeal-packets"
+                        "bucket_name": "cookcountystorage"
                 }
         ],
         "observability": {
