@@ -1,7 +1,10 @@
 import { recordPaidAppeal } from './_appeals.js';
 import { getStripeConfig } from './_stripe.js';
+import { requireFirebaseUser, jsonResponse } from './_auth.js';
 
 export const onRequestGet = async (context) => {
+        const { user, response: authResponse } = await requireFirebaseUser(context.request);
+        if (authResponse) return authResponse;
         const stripe = getStripeConfig(context.env);
         const STRIPE_KEY = stripe.secretKey;
         const { searchParams } = new URL(context.request.url);
@@ -22,7 +25,7 @@ export const onRequestGet = async (context) => {
         }
 
         try {
-                const response = await fetch(`https://api.stripe.com/v1/checkout/sessions/${sessionId}`, {
+                const response = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, {
                         headers: {
                                 'Authorization': `Bearer ${STRIPE_KEY}`
                         }
@@ -33,10 +36,13 @@ export const onRequestGet = async (context) => {
                 if (!response.ok) {
                         throw new Error(session.error?.message || 'Failed to retrieve session');
                 }
+                if (session.client_reference_id !== user.uid) {
+                        return jsonResponse({ error: 'Checkout session not found.' }, 404);
+                }
 
                 let dbStatus = 'not_configured';
                 let emailStatus = 'skipped';
-                if (context.env.DB && (session.status === 'complete' || session.payment_status === 'paid')) {
+                if (context.env.DB && session.payment_status === 'paid') {
                         try {
                                 if (session.client_reference_id && session.metadata?.propertyAddress) {
                                         const result = await recordPaidAppeal(context.env, {
@@ -79,7 +85,7 @@ export const onRequestGet = async (context) => {
                         email_status: emailStatus,
                         stripe_mode: stripe.mode
                 }), {
-                        headers: { 'Content-Type': 'application/json' }
+                        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
                 });
 
         } catch (err) {

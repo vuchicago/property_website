@@ -3,6 +3,7 @@
         "compatibility_date": "2026-02-01",
         "pages_build_output_dir": "dist",
         "vars": {
+                "DOCUSIGN_ENV": "demo",
                 "INSURANCE_NOTIFICATION_EMAIL": "vnguyen1@amfam.com",
                 "CLOUDFLARE_DEEPSEEK_MODEL": "deepseek/deepseek-v4-flash",
                 "CLOUDFLARE_DEEPSEEK_TURN_MODEL": "deepseek/deepseek-v4-flash",
@@ -23,6 +24,12 @@
         "ai": {
                 "binding": "AI"
         },
+        "r2_buckets": [
+                {
+                        "binding": "APPEAL_PACKETS",
+                        "bucket_name": "cookcounty-appeal-packets"
+                }
+        ],
         "observability": {
                 "enabled": true
         }

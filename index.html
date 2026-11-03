@@ -520,6 +520,12 @@
         </div>
     </section>
 
+    <section class="container" style="padding: 2rem 1rem;">
+        <h2>Prepare your own appeal · $49</h2>
+        <p>We prepare your evidence packet. You review and sign, then authorize mailing once it is ready. This service does not include attorney representation.</p>
+        <a class="btn btn-primary" href="appeal-packet.html">Start or manage my packet</a>
+    </section>
+
     <!-- Appeal Deadlines -->
     <section id="deadlines" class="deadlines-section">
         <div class="container">
@@ -600,10 +606,11 @@
             <div class="deadlines-visual animate-on-scroll delay-200">
                 <div class="deadline-dashboard">
                     <div class="deadline-dashboard-header">
-                        <span>Deadline Dashboard</span>
+                        <span>Assessor Deadline Dashboard</span>
                         <strong id="appeal-deadline-count">0 upcoming</strong>
                     </div>
                     <div class="deadline-dashboard-list" id="appeal-deadline-list"></div>
+                    <p class="deadline-dashboard-empty">Source: <a href="https://rpie.cookcountyassessor.com/assessment-calendar-and-deadlines" target="_blank" rel="noopener noreferrer">Cook County Assessor</a> · Updated October 30, 2026. Board of Review deadlines are separate.</p>
                 </div>
             </div>
         </div>
@@ -1228,11 +1235,11 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script type="module" src="components.js"></script>
     <script type="module">
-        import { initAuthUI } from './auth-client.js?v=20260524-auth-gate';
+        import { initAuthUI } from './auth-client.js?v=20261103-self-appeal';
         initAuthUI();
     </script>
-    <script type="module" src="appeal.js?v=20260527-checkout-identity"></script>
-    <script src="appeal_deadlines.js?v=20260724-deadlines"></script>
+    <script type="module" src="appeal.js?v=20261103-packets"></script>
+    <script src="appeal_deadlines.js?v=20261102-deadlines"></script>
     <script src="app.js?v=20260527-analyze-click"></script>
     <script src="property-tax.js?v=20260527-radius-2mi"></script>
     <script src="roi-calculator.js"></script>

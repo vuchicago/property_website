@@ -53,7 +53,7 @@ export async function recordPaidAppeal(env, payment) {
         }
 
         const becamePaid = payment.paymentStatus === 'paid'
-                && (!existing || String(existing.payment_status || '').toLowerCase() !== 'paid');
+                && (!existing || !['paid', 'refunded'].includes(String(existing.payment_status || '').toLowerCase()));
         let emailStatus = becamePaid ? 'not_sent' : 'not_sent_existing_payment';
         if (becamePaid) {
                 try {
@@ -114,8 +114,9 @@ async function insertAppeal(env, payment) {
                          customer_email = excluded.customer_email,
                          property_key = excluded.property_key,
                          property_pin = excluded.property_pin,
-                         payment_intent_id = excluded.payment_intent_id,
-                         payment_status = excluded.payment_status,
+                         payment_intent_id = COALESCE(excluded.payment_intent_id, appeals.payment_intent_id),
+                         payment_amount = excluded.payment_amount,
+                         payment_status = CASE WHEN appeals.payment_status = 'refunded' THEN 'refunded' WHEN appeals.payment_status = 'paid' AND excluded.payment_status != 'refunded' THEN 'paid' ELSE excluded.payment_status END,
                          payment_date = excluded.payment_date`
                 )
                         .bind(
@@ -153,7 +154,7 @@ async function insertAppealWithLegacySchema(env, payment) {
                          ON CONFLICT(transaction_id) DO UPDATE SET
                          customer_name = excluded.customer_name,
                          customer_email = excluded.customer_email,
-                         payment_status = excluded.payment_status,
+                         payment_status = CASE WHEN appeals.payment_status = 'refunded' THEN 'refunded' WHEN appeals.payment_status = 'paid' AND excluded.payment_status != 'refunded' THEN 'paid' ELSE excluded.payment_status END,
                          payment_date = excluded.payment_date`
                 )
                         .bind(
@@ -176,7 +177,7 @@ async function insertAppealWithLegacySchema(env, payment) {
                          VALUES (?, ?, ?, ?, ?, ?)
                          ON CONFLICT(transaction_id) DO UPDATE SET
                          customer_email = excluded.customer_email,
-                         payment_status = excluded.payment_status`
+                         payment_status = CASE WHEN appeals.payment_status = 'refunded' THEN 'refunded' WHEN appeals.payment_status = 'paid' AND excluded.payment_status != 'refunded' THEN 'paid' ELSE excluded.payment_status END`
                 )
                         .bind(
                                 payment.transactionId,

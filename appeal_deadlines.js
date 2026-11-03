@@ -1,4 +1,6 @@
 // Current Cook County appeal calendar data used by the homepage deadline calendar.
+// Source: https://rpie.cookcountyassessor.com/assessment-calendar-and-deadlines
+// Source updated October 30, 2026; checked November 2, 2026.
 // Use ISO dates for posted windows. Use "N/A" when no current window is posted.
 window.APPEAL_DEADLINES = [
     { township: 'Oak Park', start: '2026-05-06', deadline: '2026-06-18' },
@@ -9,14 +11,14 @@ window.APPEAL_DEADLINES = [
     { township: 'Cicero', start: '2026-06-17', deadline: '2026-07-31' },
     { township: 'Stickney', start: '2026-06-29', deadline: '2026-08-12' },
     { township: 'Lyons', start: '2026-07-23', deadline: '2026-09-03' },
-    { township: 'Bremen', start: 'N/A', deadline: 'N/A' },
-    { township: 'Lemont', start: 'N/A', deadline: 'N/A' },
-    { township: 'Worth', start: 'N/A', deadline: 'N/A' },
-    { township: 'Calumet', start: 'N/A', deadline: 'N/A' },
-    { township: 'Proviso', start: 'N/A', deadline: 'N/A' },
-    { township: 'Orland', start: 'N/A', deadline: 'N/A' },
-    { township: 'Thornton', start: 'N/A', deadline: 'N/A' },
-    { township: 'Rich', start: 'N/A', deadline: 'N/A' },
+    { township: 'Bremen', start: '2026-08-12', deadline: '2026-09-24' },
+    { township: 'Lemont', start: '2026-08-17', deadline: '2026-09-29' },
+    { township: 'Worth', start: '2026-09-01', deadline: '2026-10-15' },
+    { township: 'Calumet', start: '2026-08-20', deadline: '2026-10-02' },
+    { township: 'Proviso', start: '2026-09-14', deadline: '2026-10-27' },
+    { township: 'Orland', start: '2026-09-24', deadline: '2026-11-06' },
+    { township: 'Thornton', start: '2026-10-08', deadline: '2026-11-23' },
+    { township: 'Rich', start: '2026-10-21', deadline: '2026-12-04' },
     { township: 'Bloom', start: 'N/A', deadline: 'N/A' },
     { township: 'New Trier', start: '2026-05-07', deadline: '2026-06-22' },
     { township: 'Norwood Park', start: '2026-04-13', deadline: '2026-05-26' },
@@ -27,16 +29,16 @@ window.APPEAL_DEADLINES = [
     { township: 'Elk Grove', start: '2026-06-22', deadline: '2026-08-04' },
     { township: 'West Chicago', start: '2026-07-10', deadline: '2026-08-21' },
     { township: 'Northfield', start: '2026-07-24', deadline: '2026-09-04' },
-    { township: 'Barrington', start: 'N/A', deadline: 'N/A' },
-    { township: 'Hyde Park', start: 'N/A', deadline: 'N/A' },
-    { township: 'Leyden', start: 'N/A', deadline: 'N/A' },
-    { township: 'Lake', start: 'N/A', deadline: 'N/A' },
-    { township: 'Wheeling', start: 'N/A', deadline: 'N/A' },
-    { township: 'Palatine', start: 'N/A', deadline: 'N/A' },
-    { township: 'Jefferson', start: 'N/A', deadline: 'N/A' },
-    { township: 'Schaumburg', start: 'N/A', deadline: 'N/A' },
-    { township: 'North Chicago', start: 'N/A', deadline: 'N/A' },
-    { township: 'Niles', start: 'N/A', deadline: 'N/A' },
-    { township: 'Hanover', start: 'N/A', deadline: 'N/A' },
-    { township: 'South Chicago', start: 'N/A', deadline: 'N/A' }
+    { township: 'Barrington', start: '2026-08-11', deadline: '2026-09-23' },
+    { township: 'Hyde Park', start: '2026-08-26', deadline: '2026-10-08' },
+    { township: 'Leyden', start: '2026-08-31', deadline: '2026-10-14' },
+    { township: 'Lake', start: '2026-09-16', deadline: '2026-10-29' },
+    { township: 'Wheeling', start: '2026-09-09', deadline: '2026-10-22' },
+    { township: 'Palatine', start: '2026-09-22', deadline: '2026-11-04' },
+    { township: 'Jefferson', start: '2026-09-29', deadline: '2026-11-12' },
+    { township: 'Schaumburg', start: '2026-10-06', deadline: '2026-11-19' },
+    { township: 'North Chicago', start: '2026-10-09', deadline: '2026-11-24' },
+    { township: 'Niles', start: '2026-10-20', deadline: '2026-12-03' },
+    { township: 'Hanover', start: '2026-10-22', deadline: '2026-12-07' },
+    { township: 'South Chicago', start: '2026-10-30', deadline: '2026-12-15' }
 ];

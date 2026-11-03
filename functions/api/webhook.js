@@ -8,57 +8,25 @@ export const onRequestPost = async (context) => {
         try {
                 const body = await context.request.text();
 
-                // --- Signature Verification (if webhook secret is configured) ---
-                let event;
-                if (WEBHOOK_SECRET) {
-                        const signature = context.request.headers.get('stripe-signature');
-                        if (!signature) {
-                                return new Response(JSON.stringify({ error: 'Missing stripe-signature header' }), {
-                                        status: 400,
-                                        headers: { 'Content-Type': 'application/json' }
-                                });
-                        }
-
-                        // Stripe signature verification without the SDK:
-                        // Parse the signature header
-                        const parts = signature.split(',').reduce((acc, part) => {
-                                const [key, value] = part.split('=');
-                                acc[key] = value;
-                                return acc;
-                        }, {});
-
-                        const timestamp = parts['t'];
-                        const expectedSig = parts['v1'];
-
-                        // Build the signed payload
-                        const signedPayload = `${timestamp}.${body}`;
-
-                        // Compute HMAC SHA-256
-                        const encoder = new TextEncoder();
-                        const key = await crypto.subtle.importKey(
-                                'raw',
-                                encoder.encode(WEBHOOK_SECRET),
-                                { name: 'HMAC', hash: 'SHA-256' },
-                                false,
-                                ['sign']
-                        );
-                        const mac = await crypto.subtle.sign('HMAC', key, encoder.encode(signedPayload));
-                        const computedSig = Array.from(new Uint8Array(mac))
-                                .map(b => b.toString(16).padStart(2, '0'))
-                                .join('');
-
-                        if (computedSig !== expectedSig) {
-                                return new Response(JSON.stringify({ error: 'Invalid signature' }), {
-                                        status: 400,
-                                        headers: { 'Content-Type': 'application/json' }
-                                });
-                        }
-
-                        event = JSON.parse(body);
-                } else {
-                        // No webhook secret configured — accept the event as-is (dev/testing mode)
-                        event = JSON.parse(body);
+                if (!WEBHOOK_SECRET) {
+                        return new Response(JSON.stringify({ error: 'Webhook verification is not configured' }), { status: 503 });
                 }
+                const signature = context.request.headers.get('stripe-signature') || '';
+                const fields = signature.split(',').map(part => part.trim().split('='));
+                const timestamp = fields.find(([key]) => key === 't')?.[1];
+                const signatures = fields.filter(([key, value]) => key === 'v1' && /^[a-f0-9]{64}$/i.test(value || '')).map(([, value]) => value);
+                if (!/^\d+$/.test(timestamp || '') || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) {
+                        return new Response(JSON.stringify({ error: 'Invalid or expired webhook timestamp' }), { status: 400 });
+                }
+                const encoder = new TextEncoder();
+                const key = await crypto.subtle.importKey('raw', encoder.encode(WEBHOOK_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+                let verified = false;
+                for (const candidate of signatures) {
+                        const bytes = Uint8Array.from(candidate.match(/../g), pair => parseInt(pair, 16));
+                        if (await crypto.subtle.verify('HMAC', key, bytes, encoder.encode(`${timestamp}.${body}`))) verified = true;
+                }
+                if (!verified) return new Response(JSON.stringify({ error: 'Invalid webhook signature' }), { status: 400 });
+                const event = JSON.parse(body);
 
                 if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
                         const session = event.data.object;

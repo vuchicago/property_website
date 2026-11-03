@@ -118,6 +118,7 @@ async function loadPendingAppeals() {
                                         <td><span class="status-badge status-pending">${escapeHtml(appeal.appeal_status || 'Pending')}</span></td>
                                         <td>${renderPartnerSelect(appeal)}</td>
                                         <td class="action-btns">
+                                                <a class="btn btn-secondary btn-sm" href="appeal-packet.html?id=${encodeURIComponent(appeal.transaction_id)}">Prepare packet</a>
                                                 <button class="btn-sm btn-primary action-btn" data-id="${escapeHtml(appeal.transaction_id)}" data-action="Finished">Mark Finished</button>
                                                 <button class="btn-sm btn-secondary action-btn" data-id="${escapeHtml(appeal.transaction_id)}" data-action="Denied" style="background:var(--error-bg);color:var(--error);">Mark Denied</button>
                                         </td>

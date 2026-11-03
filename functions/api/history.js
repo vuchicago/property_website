@@ -63,6 +63,7 @@ export const onRequestGet = async (context) => {
 
 function paymentStatusLabel(status) {
         const normalized = String(status || '').toLowerCase();
+        if (normalized === 'free') return 'Free preparation';
         if (normalized === 'refunded') return 'Refunded';
         if (normalized === 'expired') return 'Expired';
         if (normalized === 'failed') return 'Failed';

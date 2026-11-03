@@ -1,0 +1,139 @@
+import { authFetch, onAuthUserChanged } from './auth-client.js';
+
+const labels = { intake: 'Your information', preparing: 'Preparing packet', review: 'Review packet', approved: 'Ready for signature', awaiting_signature: 'Awaiting signatures', signed: 'Signed', mailed: 'Mailed', delivered: 'Delivered by carrier', filed: 'County filing confirmed' };
+const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const message = (text, error = false) => { const el = document.getElementById('packet-message'); el.textContent = text; el.dataset.error = error; };
+const input = (name, label, type = 'text', value = '', extra = '') => `<label>${label}<input name="${name}" type="${type}" value="${escape(value)}" required ${extra}></label>`;
+const check = (name, label) => `<label><input type="checkbox" name="${name}" required>${label}</label>`;
+const notes = (name, label, value = '') => `<label>${label}<textarea name="${name}" required maxlength="10000">${escape(value)}</textarea></label>`;
+const file = (label = 'PDF document', evidence = false) => `<label>${label}<input name="file" type="file" accept="${evidence ? '.pdf,.jpg,.jpeg,.png' : '.pdf'}" required></label><p class="packet-muted">Maximum 15 MB. Remove Social Security and financial account numbers before uploading.</p>`;
+const form = (action, title, fields, button) => `<form class="packet-card" data-action="${action}"><h2>${title}</h2>${fields}<button class="btn btn-primary" type="submit">${button}</button></form>`;
+let selectedId = new URLSearchParams(location.search).get('id');
+let current;
+
+document.getElementById('packet-start').addEventListener('click', async event => {
+    const button=event.currentTarget;button.disabled=true;
+    try {const response=await authFetch('/api/packet-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({propertyId:Number(document.getElementById('packet-property').value)})});const result=await response.json();if(!response.ok)throw new Error(result.error);location.href=result.url;}catch(e){message(e.message,true);}finally{button.disabled=false;}
+});
+onAuthUserChanged(async user => {
+    document.getElementById('packet-workspace').hidden = true;
+    if (!user || !user.emailVerified) {
+        current = null;
+        document.getElementById('order-list').replaceChildren();
+        document.getElementById('packet-workspace').replaceChildren();
+        message('Sign in with a verified email to continue.'); return;
+    }
+    try {
+        const addresses=await authFetch('/api/addresses'); if(!addresses.ok)throw new Error('Could not load saved properties.');
+        const properties=await addresses.json();
+        document.getElementById('packet-property').innerHTML='<option value="">Choose a saved property</option>'+properties.map(p=>`<option value="${Number(p.id)}">${escape(p.address)}</option>`).join('');
+        const response = await authFetch('/api/history');
+        if (!response.ok) throw new Error('Could not load your orders.');
+        const orders = await response.json();
+        document.getElementById('order-list').innerHTML = orders.filter(order => order.id.startsWith('free_')).map(order => `<p><a href="appeal-packet.html?id=${encodeURIComponent(order.id)}">${escape(order.propertyAddress)} — open packet</a></p>`).join('') || '<p>No free workspaces yet. Add a property in My account, then start here.</p>';
+        if (selectedId) await load(); else message('Choose a workspace above or start free preparation.');
+    } catch (error) { message(error.message, true); }
+});
+
+async function load() {
+    const response = await authFetch(`/api/packet?id=${encodeURIComponent(selectedId)}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Could not load packet.');
+    current = data;
+    if(data.packetId)selectedId=data.packetId;
+    render();
+    message('Packet loaded.');
+}
+
+function render() {
+    const { appeal, state: s, isAdmin, isOwner, storageReady, events, fulfillmentPaid, signature } = current;
+    const free=selectedId.startsWith('free_');
+    const editable = free || appeal.payment_status === 'paid';
+    const intake = s.intake || {};
+    let html = `<section class="packet-card"><h2>${escape(appeal.property_address)}</h2><p>PIN: ${escape(appeal.property_pin || 'Confirm all PINs during preparation')} · Payment: ${free ? (fulfillmentPaid ? 'Fulfillment paid · preparation free' : 'Free preparation') : escape(appeal.payment_status)}</p><ol class="packet-steps">${Object.entries(labels).map(([key, label]) => `<li ${key === s.status ? 'aria-current="step"' : ''}>${label}</li>`).join('')}</ol><p><strong>${labels[s.status]}</strong> · Packet version ${s.version}</p><p class="packet-muted">A signed packet or postal tracking number is not confirmation that the county has filed your appeal.</p></section>`;
+    if (!storageReady) html += '<p>Document uploads are not available yet. Please contact us before sending sensitive documents.</p>';
+    if (intake.ownerName) html += `<section class="packet-card"><h2>Owner instructions</h2><dl><dt>Owner</dt><dd>${escape(intake.ownerName)}</dd><dt>Agency / tax year</dt><dd>${escape(intake.agency.replaceAll('_', ' '))} / ${intake.taxYear}</dd><dt>Mailing address</dt><dd>${escape(intake.mailingAddress)}</dd><dt>Reason</dt><dd>${escape(intake.reason)}</dd></dl><pre>${escape(intake.explanation)}</pre></section>`;
+    if (isOwner && editable && ['intake', 'preparing'].includes(s.status)) {
+        html += form('intake', 'Tell us about your appeal', `${input('ownerName', 'Legal owner name', 'text', intake.ownerName || appeal.customer_name)}${input('mailingAddress', 'Your complete mailing address', 'text', intake.mailingAddress)}<div class="packet-grid"><label>Appeal agency<select name="agency"><option value="assessor" ${intake.agency === 'assessor' ? 'selected' : ''}>Cook County Assessor</option></select></label>${input('taxYear', 'Assessment tax year', 'number', intake.taxYear || new Date().getFullYear(), 'min="2020" max="2100"')}</div><label>Reason<select name="reason">${[['uniformity','Similar properties assessed lower'],['overvaluation','Market value is too high'],['characteristics','Property description is incorrect']].map(([value,label]) => `<option value="${value}" ${intake.reason === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>${notes('explanation', 'Your chosen argument, requested value, related PINs and supporting facts.', intake.explanation)}${check('individualOwner', 'The property is titled in my individual name. I will review and sign my own appeal.')}${check('noExistingAppeal', 'I have checked for existing appeals and representation; there is no conflicting filing or engagement.')}`, 'Save information');
+    }
+    html += `<section class="packet-card"><h2>Documents</h2>${s.documents.map(doc => `<div class="packet-document"><span>${escape(doc.name)}<br><small>${escape(doc.kind.replaceAll('_',' '))} · version ${doc.version}</small></span><button type="button" class="btn btn-secondary" data-document="${doc.id}">Download</button></div>`).join('') || '<p>No documents uploaded yet.</p>'}</section>`;
+    if (editable && storageReady && ['intake','preparing'].includes(s.status)) html += form('evidence', 'Add supporting evidence', file('Property photos, sales documents, appraisal, or other evidence', true), 'Upload evidence');
+    if (isOwner && editable && s.status === 'review') html += form('approve', 'Review your prepared packet', `<p>Download the current packet above and check every field and supporting document. Contact us for corrections before approving.</p>${check('confirmed','I reviewed this packet version and confirm that its information is accurate. I selected my appeal grounds and requested value. This approval is not my appeal signature.')}`, 'Approve packet for signing');
+    if (s.status === 'awaiting_signature') html += '<section class="packet-card"><h2>Sign your documents</h2><p>Use the invitation sent directly by DocuSign. After all required signers complete it, we will verify and upload the signed packet and completion certificate.</p></section>';
+    if (isOwner && editable && s.status === 'signed' && !s.mailingConsent) html += form('authorize_mail', 'Authorize mailing', `<p>Download and review the signed packet above. We will check the agency’s filing requirements before dispatch. The $49 fulfillment price includes DocuSign signing, printing, assembly, postage and tracking.</p>${check('confirmed','I authorize Cook County Tax Compare to mail this signed packet version as instructed. I understand that mailing does not guarantee timely county filing or a reduced assessment.')}`, 'Authorize mailing this packet');
+    if (s.delivery) html += `<section class="packet-card"><h2>Postal delivery</h2><p>Carrier delivery recorded ${escape(s.delivery.deliveredOn)}. This is not county filing confirmation.</p></section>`;
+    if (s.mailingConsent) html += '<section class="packet-card"><p>You authorized mailing this signed packet. Awaiting dispatch or delivery confirmation.</p></section>';
+    if (s.mailing) html += `<section class="packet-card"><h2>Mailing record</h2><p>${escape(s.mailing.carrier)} · ${escape(s.mailing.tracking)} · Mailed ${escape(s.mailing.mailedOn)}</p><pre>${escape(s.mailing.recipient)}</pre><p>Recorded filing deadline: ${escape(s.mailing.filingDeadline)}</p></section>`;
+    if (s.filing) html += `<section class="packet-card"><h2>County confirmation</h2><p>Docket: ${escape(s.filing.docket)} · Confirmed ${escape(s.filing.confirmedOn)}</p></section>`;
+    if (isOwner && free && s.status==='preparing' && storageReady) html += form('packet','Upload your assembled packet',`<p>Use current official forms and your selected evidence. Downloading your packet is free.</p>${file('Complete packet PDF')}`,'Save packet for review');
+    if (isOwner && free && ['review','approved'].includes(s.status) && !signature) html += form('revise','Make corrections','<p>Return to preparation; approval resets.</p>','Edit my packet');
+    if (isOwner && free && s.status==='approved' && !fulfillmentPaid) html += form('purchase','Optional DocuSign + print and mail · $49',`<p>You can download your packet above and submit it yourself for free. Fulfillment includes DocuSign signing, printing, assembly, postage and tracking for this version. It does not guarantee county acceptance or a reduction.</p><p>Demo pilot: signature acceptance is assumed for testing and has not been confirmed by the Assessor. Demo signing cannot be dispatched as a real appeal.</p>${check('fulfillmentAccepted','I choose the optional $49 fulfillment service for this approved packet version.')}`,'Continue to fulfillment checkout');
+    if (free && fulfillmentPaid) html += `<section class="packet-card"><h2>DocuSign signing included</h2><p>${signature ? `Envelope status: ${escape(signature.status)} · ${escape(signature.environment)}` : 'The fulfillment desk will check signature placement and send your invitation.'}</p><p>Use the signing link delivered by DocuSign to your verified account email. Signed files and the completion certificate will appear here after synchronization.</p></section>`;
+    if (free && signature?.envelope_id && ['approved','awaiting_signature','signed'].includes(s.status)) html += form('ds_sync','Check signing status','<p>Checks are limited to once every 15 minutes. Completed documents are retrieved directly from DocuSign.</p>','Check DocuSign');
+    if (isAdmin && editable) html += adminForms(s, storageReady, free, fulfillmentPaid, signature);
+    html += `<section class="packet-card"><h2>Activity</h2><ul>${events.map(event => `<li>${escape(event.created_at)} UTC — ${escape(event.action.replaceAll('_',' '))}: ${escape(labels[event.status])}</li>`).join('') || '<li>Workspace created. Intake has not been submitted.</li>'}</ul></section>`;
+    const workspace = document.getElementById('packet-workspace');
+    workspace.innerHTML = html; workspace.hidden = false;
+    workspace.querySelectorAll('form').forEach(el => el.addEventListener('submit', submit));
+    workspace.querySelectorAll('[data-document]').forEach(el => el.addEventListener('click', () => download(el.dataset.document)));
+}
+
+function adminForms(s, storageReady, free, paid, signature) {
+    let html = '<section class="packet-card"><h2>Preparation desk</h2><p>Prepare the packet using current official forms and the customer’s evidence. For paid fulfillment, create a DocuSign draft, preview signature positions in your DocuSign account, then send through this service. Standard signing does not notarize documents.</p></section>';
+    if (s.status === 'preparing' && storageReady) html += form('packet', 'Upload packet for owner review', file('Complete prepared packet PDF'), 'Publish packet for review');
+    if (['review','approved','awaiting_signature','signed'].includes(s.status) && (!free || !signature || signature.status==='voided')) html += form('revise','Return packet for corrections', `${s.envelopeId ? check('envelopeVoided','I voided the previous DocuSign envelope so it cannot be used for the revised packet.') : ''}<p>Previous approval and mailing authorization will be cleared. The customer must review the new version.</p>`, 'Return to preparation');
+    if (!free && s.status === 'approved') html += form('request_signature','Record DocuSign invitation', `${input('envelopeId','Envelope ID from DocuSign')}${notes('reviewNotes','Agency acceptance and notarization review')}${check('acceptanceChecked','I checked acceptance of the signature method and any notarization requirement, and sent the approved packet to the correct owner in DocuSign.')}`, 'Record signature request');
+    if (!free && s.status === 'awaiting_signature') {
+        html += `<section class="packet-card"><p>DocuSign envelope: ${escape(s.envelopeId)}</p></section>`;
+        if (storageReady) html += form('signed_packet','Upload completed signed packet',file(),'Upload signed packet') + form('certificate','Upload DocuSign completion certificate',file(),'Upload certificate');
+        html += form('confirm_signed','Verify completed signatures',check('completionVerified','I verified the completed envelope, signer identities, correct packet version, and any required notarization against the uploaded documents.'),'Mark signatures verified');
+    }
+    if (s.status === 'signed' && s.mailingConsent && storageReady && (!free || (paid && signature?.environment==='production'))) html += form('mail','Record dispatched mailing', `${input('recipient','Receiving agency and full mailing address')}${input('carrier','Carrier / service', 'text', 'USPS Certified Mail')}${input('tracking','Tracking number')}<div class="packet-grid">${input('mailedOn','Actual mailing date','date')}${input('filingDeadline','Verified filing deadline','date')}</div>${notes('reviewNotes','Source and review of current mailing, timeliness, copies, signature, and representation requirements')}${file('Postal acceptance / mailing proof PDF')}${check('rulesChecked','I verified the current requirements and mailed the authorized, signed packet with all required copies. I checked whether receipt or postmark controls timeliness.')}`, 'Record mailing');
+    if (s.status === 'mailed' && storageReady) html += form('delivered','Record carrier delivery',`${input('deliveredOn','Actual delivery date','date')}${file('Carrier delivery proof PDF')}`,'Record delivery');
+    if (['mailed','delivered'].includes(s.status) && storageReady) html += form('filed','Record official county filing confirmation', `${input('docket','County docket or filing confirmation number')}${input('confirmedOn','County confirmation date','date')}${file('Official county confirmation PDF (not postal delivery tracking)')}`, 'Confirm county filing');
+    if (free && paid && s.status==='approved' && !signature) html += form('ds_create','Create DocuSign demo draft',`${notes('positions','Signature positions as JSON: [{"page":1,"x":100,"y":500}]','[{"page":1,"x":100,"y":500}]')}${check('placementReviewed','I checked every signature field on the approved PDF; the coordinates above match its pages.')}${check('noNotaryRequired','This packet requires no notarization and only the account owner must sign. Other packets are outside this integrated signing flow.')}`,'Create signing draft');
+    if (free && signature?.status==='creating') html += form('ds_recover','Recover uncertain draft creation','<p>Find the original envelope by its stored transaction ID; do not create a duplicate.</p>','Recover envelope');
+    if (free && paid && ['created','send_uncertain'].includes(signature?.status)) html += form('ds_send','Send DocuSign invitation',`<p>Envelope: ${escape(signature.envelope_id)}. Preview the draft in your DocuSign account before sending.</p>${check('previewConfirmed','I previewed the exact envelope and verified every signature position and the owner recipient.')}`,'Send signing invitation');
+    if (free && signature?.envelope_id && !['completed','voided'].includes(signature.status)) html += form('ds_void','Void envelope before corrections','<p>This cancels the existing signing request in DocuSign.</p>','Void envelope');
+    return html;
+}
+
+async function submit(event) {
+    event.preventDefault();
+    const el = event.currentTarget, button = el.querySelector('button[type=submit]');
+    button.disabled = true;
+    try {
+        const values = new FormData(el), data = { action: el.dataset.action, revision: current.revision };
+        for (const [key,value] of values) if (key !== 'file') data[key] = value;
+        el.querySelectorAll('[type=checkbox]').forEach(box => data[box.name] = box.checked);
+        if (data.taxYear) data.taxYear = Number(data.taxYear);
+        if(data.action==='purchase' || data.action.startsWith('ds_')) {
+            const signing=data.action.startsWith('ds_');
+            if(signing){data.action=data.action.slice(3);if(data.positions)data.positions=JSON.parse(data.positions);}
+            const response=await authFetch(signing?'/api/packet-signature':'/api/create-checkout-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...data,packetId:selectedId})});
+            const result=await response.json();if(!response.ok)throw new Error(result.error);
+            if(result.url){location.href=result.url;return;}await load();message(result.message||'Saved.');return;
+        }
+        let body, headers;
+        if (values.get('file')) {
+            const upload = values.get('file');
+            if (upload.size > 15 * 1024 * 1024) throw new Error('Please choose a file under 15 MB.');
+            body = new FormData(); body.set('data',JSON.stringify(data)); body.set('file',upload);
+        } else { body = JSON.stringify(data); headers = { 'Content-Type':'application/json' }; }
+        const response = await authFetch(`/api/packet?id=${encodeURIComponent(selectedId)}`, { method:'POST',headers,body });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Could not save.');
+        await load(); message('Saved.');
+    } catch (error) { message(error.message,true); }
+    finally { button.disabled = false; }
+}
+
+async function download(id) {
+    try {
+        const response = await authFetch(`/api/packet?id=${encodeURIComponent(selectedId)}&document=${encodeURIComponent(id)}`);
+        if (!response.ok) throw new Error('Could not download the document.');
+        const url = URL.createObjectURL(await response.blob()), link = document.createElement('a');
+        link.href = url; link.download = current.state.documents.find(doc => doc.id === id)?.name || 'document.pdf'; link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) { message(error.message, true); }
+}

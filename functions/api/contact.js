@@ -1,7 +1,6 @@
 import { sendNotificationEmail } from './_email.js';
 
 const ADMIN_EMAIL = 'vu@cookcountytaxcompare.com';
-const INSURANCE_EMAIL = 'vnguyen1@amfam.com';
 
 export const onRequestPost = async (context) => {
         let savedMessageId = null;
@@ -98,11 +97,9 @@ export const onRequestPost = async (context) => {
                         message || 'No message provided'
                 ].join('\n');
 
-                const to = isInsuranceInquiry
-                        ? (context.env.INSURANCE_NOTIFICATION_EMAIL || INSURANCE_EMAIL)
-                        : isPartnershipInquiry
-                                ? (context.env.PARTNERSHIP_NOTIFICATION_EMAIL || ADMIN_EMAIL)
-                                : (context.env.ADMIN_NOTIFICATION_EMAIL || ADMIN_EMAIL);
+                // Keep every website inquiry in the same inbox, including waitlist,
+                // partnership, and insurance submissions.
+                const to = ADMIN_EMAIL;
                 const usesCloudflareEmailApi = Boolean(
                         context.env.CLOUDFLARE_EMAIL_API_TOKEN && context.env.CLOUDFLARE_ACCOUNT_ID
                 );

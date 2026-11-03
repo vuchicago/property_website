@@ -199,11 +199,20 @@ export const onRequestDelete = async (context) => {
                         }, 400);
                 }
 
+                const selfAppealTable = await context.env.DB.prepare(
+                        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'self_appeal_cases'"
+                ).first();
+                const selfAppealGuard = selfAppealTable
+                        ? ' AND NOT EXISTS (SELECT 1 FROM self_appeal_cases WHERE self_appeal_cases.customer_id = user_addresses.customer_id AND self_appeal_cases.address_id = user_addresses.id)'
+                        : '';
                 const result = await context.env.DB.prepare(
-                        propertyKey
+                        (propertyKey
                                 ? "DELETE FROM user_addresses WHERE customer_id = ? AND property_key = ?"
-                                : "DELETE FROM user_addresses WHERE customer_id = ? AND address = ?"
+                                : "DELETE FROM user_addresses WHERE customer_id = ? AND address = ?") + selfAppealGuard
                 ).bind(user.uid, propertyKey || address).run();
+                if (!result.meta?.changes && selfAppealTable) {
+                        return jsonResponse({ error: 'Property was not deleted. Properties with saved self-appeal work must be retained.' }, 409);
+                }
 
                 return jsonResponse({
                         success: true,

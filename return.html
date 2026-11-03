@@ -4,7 +4,7 @@
 <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Appeal Submitted - Cook County Tax Compare</title>
+        <title>Packet Preparation - Cook County Tax Compare</title>
         <link rel="icon" href="/favicon.ico" sizes="any">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32">
@@ -27,7 +27,7 @@
         </div>
 
         <script type="module">
-                import { auth } from './auth-client.js';
+                import { authFetch } from './auth-client.js';
 
                 document.addEventListener('DOMContentLoaded', async () => {
                         const statusDiv = document.getElementById('status');
@@ -42,27 +42,11 @@
                                 // 1. Verify Payment & Record in D1 (Backend)
                                 let data = { status: 'unknown' };
 
-                                if (sessionId.startsWith('mock_session_')) {
-                                        // Mock verification for local testing
-                                        data = {
-                                                status: 'complete',
-                                                payment_status: 'paid',
-                                                metadata: { propertyAddress: '123 Mock St (Local Test)' },
-                                                amount_total: 9900,
-                                                db_status: 'mock_recorded'
-                                        };
-                                        // Simulate delay
-                                        await new Promise(r => setTimeout(r, 800));
-                                } else {
-                                        // Real backend verification
-                                        const res = await fetch(`/api/session-status?session_id=${sessionId}`);
-                                        if (!res.ok) {
-                                                throw new Error(`Verification API failed: ${res.status}`);
-                                        }
-                                        data = await res.json();
-                                }
+                                const res = await authFetch(`/api/session-status?session_id=${encodeURIComponent(sessionId)}`);
+                                if (!res.ok) throw new Error(`Verification API failed: ${res.status}`);
+                                data = await res.json();
 
-                                if (data.status === 'complete' || data.payment_status === 'paid') {
+                                if (data.payment_status === 'paid') {
 
                                         const dbWarning = data.db_status && data.db_status.startsWith('error')
                                                 ? `<p style="color: var(--error);">Payment succeeded, but saving the appeal failed: ${escapeHtml(data.db_status)}</p>`
@@ -70,19 +54,18 @@
 
                                         statusDiv.innerHTML = `
         <h2 style="color: var(--success); margin-bottom: 1rem;">Payment Successful!</h2>
-        <p class="lead">Your appeal for <strong>${data.metadata?.propertyAddress || 'your property'}</strong> has been
-                submitted.</p>
-        <p class="lead" style="font-size: 0.9em; color: #666;">Ref: ${sessionId}</p>
+        <p class="lead">Your DocuSign, print-and-mail order for <strong>${escapeHtml(data.metadata?.propertyAddress || 'your property')}</strong> has been received.</p>
+        <p class="lead" style="font-size: 0.9em; color: #666;">Ref: ${escapeHtml(sessionId)}</p>
         ${dbWarning}
-        <p>We have recorded your request and are processing it.</p>
+        <p>Next, complete DocuSign signing and review the signed packet before authorizing mailing. Your appeal has not been filed with the county.</p>
         <div style="margin-top: 2rem;">
-                <a href="login.html" class="btn btn-primary" style="margin-right: 1rem;">Go to Dashboard</a>
+                <a href="appeal-packet.html?id=${encodeURIComponent(data.metadata?.packetId || sessionId)}" class="btn btn-primary" style="margin-right: 1rem;">Continue to My Packet</a>
         </div>
         `;
 
                                 } else {
                                         statusDiv.innerHTML = `<h2>Payment Incomplete</h2>
-        <p>Status: ${data.status}</p>`;
+        <p>Status: ${escapeHtml(data.status)}</p>`;
                                 }
 
                         } catch (err) {

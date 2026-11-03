@@ -193,7 +193,7 @@ CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id
 CLOUDFLARE_EMAIL_API_TOKEN=your_email_sending_api_token
 ADMIN_NOTIFICATION_EMAIL=vu@cookcountytaxcompare.com
 NOTIFICATION_FROM_EMAIL="Cook County Tax Compare <notifications@inquiry.cookcountytaxcompare.com>"
-APPEAL_HELP_AMOUNT_CENTS=9900
+
 DEPLOYMENT_READY=0
 STRIPE_CHECKOUT_DOMAIN=https://your-preview-or-production-domain.example
 STRIPE_MODE=auto
@@ -205,7 +205,7 @@ STRIPE_LIVE_PUBLISHABLE_KEY=pk_live_...
 STRIPE_LIVE_WEBHOOK_SECRET=whsec_...
 ```
 
-If Cloudflare requires the destination to be a verified destination address, set `ADMIN_NOTIFICATION_EMAIL` to your verified personal email instead. You can still use `NOTIFICATION_FROM_EMAIL="Cook County Tax Compare <notifications@inquiry.cookcountytaxcompare.com>"`.
+All contact, waitlist, partnership, and insurance form notifications go to `vu@cookcountytaxcompare.com`, with every submitted form field and the visitor's email as Reply-To. Contact form recipients are not overridden by `ADMIN_NOTIFICATION_EMAIL`, `PARTNERSHIP_NOTIFICATION_EMAIL`, or `INSURANCE_NOTIFICATION_EMAIL`. Configure Cloudflare Email Routing to forward this inbox to the verified destination `vuchicago@gmail.com`. Outbound Email Sending must also be configured; inbound forwarding alone cannot send form notifications. Submissions are backed up in `contact_messages`, including email delivery errors.
 
 For Resend instead, set:
 
@@ -213,13 +213,13 @@ For Resend instead, set:
 RESEND_API_KEY=your_resend_api_key
 ADMIN_NOTIFICATION_EMAIL=vu@cookcountytaxcompare.com
 NOTIFICATION_FROM_EMAIL="Cook County Tax Compare <alerts@yourdomain.com>"
-APPEAL_HELP_AMOUNT_CENTS=9900
+
 DEPLOYMENT_READY=0
 STRIPE_CHECKOUT_DOMAIN=https://your-preview-or-production-domain.example
 ```
 
 `CLOUDFLARE_EMAIL_API_TOKEN` must be a Cloudflare API token with permission to send emails. `ADMIN_NOTIFICATION_EMAIL` defaults to `vu@cookcountytaxcompare.com` if it is not set. With Resend, `NOTIFICATION_FROM_EMAIL` should be a sender address verified in Resend for production delivery. With Cloudflare Email Sending, it must be an address on the outbound email domain. The default Cloudflare sender is `notifications@inquiry.cookcountytaxcompare.com`.
-`APPEAL_HELP_AMOUNT_CENTS` controls the Stripe Checkout amount for appeal help. Use cents, so `99` is $0.99 and `9900` is $99.00. Decimal dollar values such as `0.99` are also accepted and converted to cents.
+Optional DocuSign, print-and-mail fulfillment is fixed at $49 (4900 cents) in `functions/api/_packet_pricing.js`, including postage. Preparation and unsigned downloads are free. Legacy `APPEAL_HELP_AMOUNT_CENTS` values do not override this price.
 `DEPLOYMENT_READY` controls whether appeal submissions use Stripe Checkout or the waitlist. Use `0` while appeals are not ready. Set `DEPLOYMENT_READY=1` only when Stripe payment, webhook secrets, and appeal operations are ready. The code also accepts `true`, `yes`, and `on`.
 `STRIPE_CHECKOUT_DOMAIN` is optional. If it is not set, Stripe returns to the same Production, Stage, or preview origin that created the checkout session. Only set it when you intentionally want to force a specific return domain. Do not set Stage to the Production domain.
 `STRIPE_MODE` can be `auto`, `test`, or `live`. In `auto`, Cloudflare Pages preview branches use Stripe test keys and the production branch uses live keys. The production branch defaults to `Production`; set `PRODUCTION_BRANCH` if your production branch has a different name.
@@ -272,3 +272,37 @@ The `.gitignore` file excludes:
 ## Continuous Deployment
 
 Every push to your configured branch will automatically trigger a new deployment on Cloudflare Pages.
+
+
+## Free Assessor preparation and optional $49 fulfillment
+
+Customer entry: `/appeal-packet.html`; admin entry: **Prepare packet** on each fulfillment order, resolved to its free workspace. Existing attorney-partner waitlist marketing remains separate. Checkout sells optional $49 DocuSign, print-and-mail fulfillment; preparation and unsigned downloads are free.
+
+Provision before enabling payments:
+
+1. Apply `migrations/0029_create_appeal_packets.sql` to the existing D1 database (after the earlier migrations). This creates new tables without changing existing appeals.
+2. Create the private R2 bucket `cookcounty-appeal-packets` and bind it as `APPEAL_PACKETS` in Pages, matching `wrangler.jsonc`. Keep public access disabled. Use a separate bucket for staging; never copy production evidence into test fixtures.
+3. Configure Stripe test credentials and `STRIPE_TEST_WEBHOOK_SECRET` for preview. The webhook now requires a valid signature and a timestamp within five minutes in every environment. Configure live keys and a live webhook secret separately before production activation.
+4. Set `DEPLOYMENT_READY=1` only after storage, migration, outbound notifications, and a complete Stripe test purchase have been verified. The checkout also requires the R2 binding and packet table. The R2 bucket must actually exist; a binding alone is insufficient operational verification.
+5. Test owner and admin accounts end to end before accepting live purchases. No real charge, email, DocuSign envelope, mailing or application deployment was performed while building this framework. The workflow migrations were subsequently applied as recorded below.
+
+Current workflow: free saved-property workspace → owner intake and evidence → owner/admin uploads assembled official PDF → owner approves → optional $49 fulfillment checkout → confirmed payment → integrated DocuSign draft/preview/send → server retrieves completed signed PDF and certificate → owner mailing consent → actual dispatch proof → separate carrier-delivery record → official county filing confirmation.
+
+The new service is Assessor-only. Fulfillment includes signing, printing, assembly, postage and tracking. Existing paid packet records retain their legacy manual controls; new `free_` cases cannot use manual API actions to forge DocuSign completion. Preparation and downloads remain free even without a purchase. New packet versions require a new version-linked fulfillment purchase in this framework; resolve/refund an unfulfilled purchase before asking customers to repurchase after corrections. Do not advertise unlimited revisions under one purchase until version-transfer support is implemented.
+
+**Migration applied:** the user authorized schema review and migration on November 3, 2026. Migrations 0029–0031 were validated and applied to remote `appeal_db`; see [APPEAL_WORKFLOW_SCHEMA.md](APPEAL_WORKFLOW_SCHEMA.md) for constraints, checks and recovery bookmark. No application deployment was performed. Migration 0031 links Stripe orders to approved packet versions and stores DocuSign envelopes/operation state. See [DOCUSIGN_INTEGRATION.md](DOCUSIGN_INTEGRATION.md) for the demo setup, JWT consent, secrets and recovery instructions.
+
+DocuSign acceptance is assumed for the design at the user's direction; it is not established by the integration. No automatic notarization is provided. Actual dispatch still requires review of mailing address, copies and filing deadline rules. Demo envelopes cannot be dispatched through this workflow. No provider credentials, real envelopes, charges or county submissions were used in automated tests.
+
+References checked November 3, 2026:
+- https://rpie.cookcountyassessor.com/official-appeal-rules-cook-county-assessor (Rules 2, 5, 6, 10)
+- https://www.cookcountyassessoril.gov/faq/how-can-i-file-appeal
+- https://www.cookcountyboardofreview.com/board-review-official-rules (Rules 1, 5–8, 16)
+- https://www.docusign.com/blog/developers/dsdev-common-api-tasks-downloading-documents
+
+Validation: `node --test tests/packet-*.test.mjs`. This uses local fixtures and never sends real messages or charges a card. Complete provider integration and production smoke tests after configuration. Legacy supporting documents remain on the property dashboard; customers should upload the documents for this particular appeal into the packet workspace.
+
+
+## Personal self-appeal pilot
+
+See [SELF_APPEAL_PROCESS.md](SELF_APPEAL_PROCESS.md) for the user process and document checklist. Apply `migrations/0030_create_self_appeal_cases.sql` before using the new saved-property action. It is restricted on the server to the verified `vuchicago@gmail.com` pilot and that user's own saved address IDs; no payment is required. Checklist progress is independent of the optional fulfillment workflow. Configure `APPEAL_PACKETS` for uploads; progress and notes do not require storage. Existing self-appeal cases prevent deleting their saved property. The site's checklist does not execute signatures, notarize documents, or submit anything to the county.

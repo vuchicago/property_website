@@ -51,6 +51,15 @@ export async function loadAppealHistory(userOverride = null) {
         renderAccountInbox();
         renderCompletedAppealsPanel();
         renderAddressList();
+        let packetLink = document.getElementById('my-packet-workspace');
+        if (!packetLink) {
+                packetLink = document.createElement('a');
+                packetLink.id = 'my-packet-workspace';
+                packetLink.className = 'btn btn-secondary';
+                packetLink.href = 'appeal-packet.html';
+                packetLink.textContent = 'My appeal packets';
+                document.getElementById('user-dashboard')?.prepend(packetLink);
+        }
 }
 
 async function fetchAddresses() {
@@ -300,6 +309,7 @@ function renderAddressList() {
                                 ${addrObj.pin ? `<div class="text-xs text-muted">${String(addrObj.pin).includes(',') ? 'PINs' : 'PIN'} ${escapeHtml(addrObj.pin)}</div>` : ''}
                                 ${addrObj.propertyDetails?.mailingName ? `<div class="text-xs text-muted">${escapeHtml(addrObj.propertyDetails.mailingName)}</div>` : ''}
                                 <div class="text-xs text-muted">${appealCount} appeal(s)</div>
+                                ${dashboardUser?.email?.toLowerCase() === 'vuchicago@gmail.com' ? `<a class="btn btn-secondary btn-sm" style="margin-top:.75rem" href="self-appeal.html?property=${encodeURIComponent(addrObj.id)}">Self-appeal this property</a>` : ''}
                                 ${propertyStatus ? renderPropertyAppealStatus(propertyStatus) : ''}
                         </div>
                         ${canDelete ? `<button type="button" class="btn btn-secondary btn-sm delete-address-btn" data-address="${safeAddress}" data-property-key="${safePropertyKey}" aria-label="Delete ${safeAddress}">Delete</button>` : ''}
@@ -313,7 +323,7 @@ function renderAddressList() {
         // Add click event listeners
         listContainer.querySelectorAll('.address-item').forEach(item => {
                 item.addEventListener('click', (e) => {
-                        if (e.target.closest('.delete-address-btn')) {
+                        if (e.target.closest('.delete-address-btn, a')) {
                                 return;
                         }
 

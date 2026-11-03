@@ -91,6 +91,10 @@ function createAppealModalHTML() {
                         <input type="checkbox" id="appeal-name-confirmed">
                         <span>This is my legal name for the appeal paperwork and signature request.</span>
                     </label>
+                    <label class="appeal-confirmation">
+                        <input type="checkbox" id="packet-service-accepted">
+                        <span>Preparation is free. Optional $49 fulfillment includes DocuSign signing, printing, assembly, postage and tracking.</span>
+                    </label>
                 </div>
                 <div class="modal-actions">
                     <button type="submit" class="btn btn-primary btn-full" id="pay-appeal-btn">
@@ -183,32 +187,23 @@ async function refreshAppealModeText(propertyAddress = '') {
         const confirmationInput = document.getElementById('appeal-name-confirmed');
 
         if (config.deploymentReady) {
-                if (title) title.textContent = 'Appeal Your Property Tax';
+                if (title) title.textContent = 'Prepare Your Own Appeal';
                 if (subtitle) {
                         subtitle.textContent = propertyAddress
-                                ? 'This appeal will use the property already saved in your account.'
-                                : "Enter your property address to start the appeal process. We'll handle the rest.";
+                                ? 'Prepare and download your Assessor packet for free. Optional DocuSign, print and mail fulfillment is $49.'
+                                : 'Start free preparation using a property saved in your account.';
                 }
                 if (button) {
-                        button.innerHTML = `Pay ${formatPaymentAmount(config.appealHelpAmountCents)} & Submit Appeal`;
+                        button.innerHTML = 'Start Free Preparation';
                         button.disabled = false;
                 }
                 if (note) {
-                        const paymentModeText = config.stripeMode === 'test'
-                                ? 'Stripe test mode. Use test card 4242 4242 4242 4242.'
-                                : 'Secure payment via Stripe';
-                        note.innerHTML = `
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                                </svg>
-                                ${paymentModeText}
-                        `;
+                        note.textContent = 'Preparation and downloads are free. Optional $49 fulfillment includes DocuSign, printing and postage.';
                 }
-                if (checkoutFields) checkoutFields.hidden = false;
-                firstNameInput?.setAttribute('required', 'required');
-                lastNameInput?.setAttribute('required', 'required');
-                confirmationInput?.setAttribute('required', 'required');
+                if (checkoutFields) checkoutFields.hidden = true;
+                firstNameInput?.removeAttribute('required');
+                lastNameInput?.removeAttribute('required');
+                confirmationInput?.removeAttribute('required');
                 await prefillCheckoutIdentity();
                 return;
         }
@@ -341,62 +336,7 @@ async function handleAppealWaitlist() {
         }
 }
 
-async function handleAppealPayment(config = {}) {
-        const address = await getSelectedAppealAddress();
-        if (!address) return;
-
-        const authContext = await getCurrentAppealUser();
-        if (!authContext) return;
-
-        const identity = getCheckoutIdentity();
-        if (!identity) return;
-
-        const { authFetch } = authContext;
-        const btn = document.getElementById('pay-appeal-btn');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = 'Processing...';
-        btn.disabled = true;
-
-        try {
-                const response = await authFetch('/api/create-checkout-session', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                                propertyAddress: address,
-                                propertyKey: selectedAppealPropertyContext?.property_key || selectedAppealPropertyContext?.propertyKey || '',
-                                propertyPin: selectedAppealPropertyContext?.pin || selectedAppealPropertyContext?.propertyDetails?.pin || '',
-                                customerFirstName: identity.firstName,
-                                customerLastName: identity.lastName,
-                                customerPhone: identity.phone,
-                                contractNameConfirmed: true
-                        })
-                });
-
-                if (!response.ok) {
-                        const text = await response.text();
-                        let errorMessage = text || response.statusText;
-                        try {
-                                errorMessage = JSON.parse(text).error || errorMessage;
-                        } catch (e) {
-                                // Keep raw text for non-JSON responses.
-                        }
-                        throw new Error(errorMessage);
-                }
-
-                const data = await response.json();
-                if (data.url) {
-                        window.location.href = data.url;
-                        return;
-                }
-
-                throw new Error('No checkout URL returned');
-        } catch (error) {
-                console.error('Payment initiation failed:', error);
-                alert('Failed to start payment: ' + error.message);
-                btn.innerHTML = originalText || `Pay ${formatPaymentAmount(config.appealHelpAmountCents)} & Submit Appeal`;
-                btn.disabled = false;
-        }
-}
+async function handleAppealPayment(config = {}) { window.location.href = 'appeal-packet.html'; }
 
 async function prefillCheckoutIdentity() {
         try {
@@ -445,6 +385,11 @@ function getCheckoutIdentity() {
                 return null;
         }
 
+        if (!document.getElementById('packet-service-accepted')?.checked) {
+                alert('Please confirm individual ownership and the fulfillment terms.');
+                document.getElementById('packet-service-accepted')?.focus();
+                return null;
+        }
         return { firstName, lastName, phone };
 }
 
@@ -457,7 +402,7 @@ async function getAppealConfig() {
                                 deploymentReady: Boolean(config.deploymentReady),
                                 appealHelpAmountCents: Number.isInteger(Number(config.appealHelpAmountCents))
                                         ? Number(config.appealHelpAmountCents)
-                                        : 9900,
+                                        : 4900,
                                 stripeMode: config.stripeMode === 'live' ? 'live' : 'test'
                         }));
         }
