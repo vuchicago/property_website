@@ -6,7 +6,8 @@ export const onRequestPost = async (context) => {
         let savedMessageId = null;
 
         try {
-                const { name, email, phone, propertyAddress, message, inquiryType, insuranceTypes, firmName } = await context.request.json();
+                const { name, email, phone, propertyAddress: rawPropertyAddress, message, inquiryType, insuranceTypes, firmName } = await context.request.json();
+                const propertyAddress = String(rawPropertyAddress || '').trim();
 
                 const inquiryKind = String(inquiryType || '').toLowerCase();
                 const isInsuranceInquiry = inquiryKind === 'insurance';

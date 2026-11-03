@@ -1989,11 +1989,6 @@ ol {
     flex-wrap: wrap;
 }
 
-/* Waitlist CTA is parked for later. Remove this rule to restore it. */
-.hero-stats,
-.pricing-cta.waitlist-cta {
-    display: none;
-}
 
 .stat {
     text-align: left;
@@ -5282,7 +5277,13 @@ textarea {
     .why-appeal .container,
     .deadlines-section .container,
     .contact-section .container {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .deadlines-content,
+    .deadlines-visual,
+    .deadline-dashboard {
+        min-width: 0;
     }
 
     .waitlist-offer-grid {
@@ -6000,3 +6001,4 @@ textarea {
         color: black !important;
     }
 }
+#my-packet-workspace[hidden], #packet-orders[hidden], #packet-waitlist[hidden] { display: none !important; }

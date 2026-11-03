@@ -20,7 +20,7 @@ function signed() {
 }
 const mail = { action: 'mail', rulesChecked: true, recipient: 'Verified agency mailing address', carrier: 'USPS', tracking: 'TEST123', mailedOn: '2026-11-03', filingDeadline: '2026-11-06', reviewNotes: 'Reviewed official instructions, copies, timeliness and ministerial mailing eligibility.', document: doc('mailing_proof') };
 
-test('price is $49, independent of legacy $99 configuration', () => assert.equal(MAIL_FULFILLMENT_AMOUNT_CENTS, 4900));
+test('fulfillment price is fixed at $49', () => assert.equal(MAIL_FULFILLMENT_AMOUNT_CENTS, 4900));
 test('complete preparation, signing, consent, mailing and county confirmation', () => {
     let s = signed();
     assert.equal(s.status, 'signed');

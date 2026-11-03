@@ -1,0 +1,339 @@
+// Browser tests run only against a local server. Firebase and every API call are fixtures.
+const { test, before, after } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+const base = new URL(process.env.APPEAL_TEST_BASE_URL || 'http://127.0.0.1:8788');
+assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(base.hostname), 'Browser regression tests require a loopback server.');
+let chromium;
+try { ({ chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core')); }
+catch { throw new Error('Install playwright-core locally, or set PLAYWRIGHT_MODULE to an installed Playwright module. See TESTING.md.'); }
+const installedChrome = [
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser',
+    ...(process.env.PROGRAMFILES ? [path.join(process.env.PROGRAMFILES, 'Google/Chrome/Application/chrome.exe')] : [])
+].find(candidate => fs.existsSync(candidate));
+let browser;
+before(async () => {
+    const response = await fetch(base).catch(() => null);
+    assert.ok(response?.ok, 'Start ./scripts/appeal-local.sh in another terminal before running browser tests.');
+    browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_EXECUTABLE || installedChrome ? { executablePath: process.env.BROWSER_EXECUTABLE || installedChrome } : {}) });
+});
+after(async () => { await browser?.close(); });
+
+const property = { id: 7, address: '123 TEST AVE SKOKIE', pin: '00000000000001', property_key: 'test-property' };
+const menus = {
+    Products: [['Property Tax Tool', 'property-tax.html'], ['ROI Tool', 'roi-calculator.html'], ['Loan Tool', 'loan-tool.html']],
+    Solutions: [['Insurance', 'insurance.html'], ['How Taxes Work', 'how-property-taxes-work.html'], ['FAQ', 'index.html#faq']],
+    Company: [['Partners', 'partners.html'], ['Contact', 'index.html#contact']]
+};
+
+function firebaseSource(identity) {
+    return `
+        const callbacks = new Set();
+        const identity = ${JSON.stringify(identity)};
+        const makeUser = value => value ? {...value, reload: async()=>{}, getIdToken: async()=> 'regression-token', providerData: []} : null;
+        const subscribe = callback => { callbacks.add(callback); queueMicrotask(()=>callback(auth.currentUser)); return ()=>callbacks.delete(callback); };
+        const auth = { currentUser: sessionStorage.getItem('regression-signed-out') ? null : makeUser(identity), onAuthStateChanged: subscribe };
+        window.__setRegressionUser = value => { auth.currentUser = makeUser(value); for(const callback of callbacks) queueMicrotask(()=>callback(auth.currentUser)); };
+        export const getAuth = ()=>auth;
+        export const onAuthStateChanged = (auth, callback)=>subscribe(callback);
+        export const signOut = async()=>{ sessionStorage.setItem('regression-signed-out','1'); window.__setRegressionUser(null); };
+        export const browserLocalPersistence = {};
+        export const setPersistence = async()=>{};
+        export const signInWithEmailAndPassword = async()=>({user:auth.currentUser});
+        export const createUserWithEmailAndPassword = async()=>({user:auth.currentUser});
+        export class GoogleAuthProvider {}
+        export const signInWithPopup = async()=>({user:auth.currentUser});
+        export const sendEmailVerification = async()=>{};
+        export const sendPasswordResetEmail = async()=>{};
+    `;
+}
+
+async function scenario(options = {}) {
+    const identity = options.email ? { uid: 'regression-owner', email: options.email, emailVerified: options.verified !== false } : null;
+    const store = { contacts: [], starts: [], pilots: [], unexpected: [], contactFails: false, access: Boolean(options.access), packetStatus: options.packetStatus || 'approved', signatureCalls: 0 };
+    const context = await browser.newContext({ viewport: { width: options.width || 1440, height: 900 }, reducedMotion: 'reduce' });
+    await context.route('**/*', async route => {
+        const request = route.request(), url = new URL(request.url());
+        const json = (body, status = 200) => route.fulfill({ status, json: body });
+        if (url.pathname.endsWith('/firebase-app.js')) return route.fulfill({ contentType: 'text/javascript', body: 'export const initializeApp=()=>({});' });
+        if (url.pathname.endsWith('/firebase-analytics.js')) return route.fulfill({ contentType: 'text/javascript', body: 'export const getAnalytics=()=>({});' });
+        if (url.pathname.endsWith('/firebase-auth.js')) return route.fulfill({ contentType: 'text/javascript', body: firebaseSource(identity) });
+        if (url.origin !== base.origin) return route.fulfill({ contentType: request.resourceType() === 'document' ? 'text/html' : request.resourceType() === 'stylesheet' ? 'text/css' : 'text/javascript', body: '' });
+        if (!url.pathname.startsWith('/api/')) return route.continue();
+        switch (url.pathname) {
+            case '/api/appeal-access': return json({ allowed: store.access, admin: ['admin', 'superadmin'].includes(options.role) });
+            case '/api/addresses': return json([property]);
+            case '/api/history': return json([]);
+            case '/api/notifications':
+            case '/api/admin/notifications': return json({ notifications: [] });
+            case '/api/admin/roles': return options.role ? json(url.searchParams.has('checkRoleOnly') ? { role: options.role } : { roles: [] }) : json({ error: 'Unauthorized' }, 403);
+            case '/api/admin/partners': return json({ partners: [] });
+            case '/api/admin/appeals':
+            case '/api/partner/appeals': return json([]);
+            case '/api/admin/appeal-pilots': {
+                if (request.method() === 'POST') {
+                    const data = request.postDataJSON();
+                    store.pilots = [{ email: data.email, active: Number(data.active), invited_by: options.email }];
+                    return json({ success: true });
+                }
+                return json({ pilots: store.pilots });
+            }
+            case '/api/property/suggest': return json({ suggestions: [] });
+            case '/api/address-lookup': return json([]);
+            case '/api/contact':
+                store.contacts.push(request.postDataJSON());
+                return store.contactFails ? json({ error: 'Test submission failure' }, 503) : json({ success: true, captured: true, emailSent: false });
+            case '/api/packet-start':
+                store.starts.push(request.postDataJSON());
+                return json({ id: 'free_fixture', url: 'appeal-packet.html?id=free_fixture' });
+            case '/api/packet': {
+                if (!store.access) return json({ error: 'Free appeal testing is currently by invitation.' }, 403);
+                if (url.searchParams.has('document')) return route.fulfill({ contentType: 'application/pdf', body: '%PDF-1.7\nRegression test fixture\n%%EOF' });
+                return json({
+                    appeal: { customer_name: 'Test Owner', property_address: property.address, payment_status: 'free' },
+                    state: { status: store.packetStatus, version: 1, taxYear: 2026, documents: [{ id: 'prepared', kind: 'packet', version: 1, name: 'test-appeal.pdf' }], propertySnapshot: { address: property.address, pin: property.pin } },
+                    revision: 0, events: [], isOwner: true, isAdmin: Boolean(options.role === 'admin'), storageReady: true, fulfillmentPaid: false
+                });
+            }
+            case '/api/packet-signature': store.signatureCalls++; return json({ error: 'Payment required' }, 402);
+            default: store.unexpected.push(`${request.method()} ${url.pathname}`); return json({ error: 'Unexpected regression test API' }, 501);
+        }
+    });
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    page.setDefaultTimeout(7000);
+    return {
+        page, store,
+        goto: route => page.goto(new URL(route, base).href, { waitUntil: 'load' }),
+        async close() {
+            await context.close();
+            assert.deepEqual(errors, [], 'Browser JavaScript errors');
+            assert.deepEqual(store.unexpected, [], 'Unmocked API requests');
+        }
+    };
+}
+
+async function assertHeader(page, width) {
+    await page.locator('.mobile-nav-group').first().waitFor({ state: 'attached' });
+    const bounds = await page.evaluate(() => {
+        const rect = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { left: r.left, right: r.right }; };
+        return { logo: rect('.navbar .logo'), links: rect('.nav-links'), actions: rect('.nav-actions'), header: rect('.nav-container') };
+    });
+    assert.ok(bounds.header.left >= 0 && bounds.header.right <= width + 1, `Header exceeds ${width}px`);
+    assert.ok(bounds.logo.right <= (width > 860 ? bounds.links.left : bounds.actions.left) + 1, `Logo overlaps navigation at ${width}px`);
+    assert.ok(bounds.actions.right <= width + 1, `Actions exceed ${width}px`);
+    if (width > 860) {
+        assert.ok(bounds.links.right <= bounds.actions.left + 1, `Menus overlap actions at ${width}px`);
+        for (const [label, links] of Object.entries(menus)) {
+            const trigger = page.locator('.nav-links').getByRole('button', { name: label, exact: true });
+            assert.equal(await trigger.isVisible(), true);
+            const actual = await trigger.locator('..').locator('.nav-dropdown-menu a').evaluateAll(items => items.map(a => [a.textContent, a.getAttribute('href')]));
+            assert.deepEqual(actual, links);
+        }
+    } else {
+        assert.equal(await page.locator('.nav-links').isVisible(), false);
+        await page.getByRole('button', { name: 'Open menu', exact: true }).click();
+        assert.equal(await page.locator('.mobile-menu').isVisible(), true);
+        assert.equal(await page.locator('.mobile-nav-group').count(), 3);
+        await page.keyboard.press('Escape');
+        assert.equal(await page.getByRole('button', { name: 'Open menu', exact: true }).getAttribute('aria-expanded'), 'false');
+    }
+}
+
+for (const route of ['/', '/property-tax.html', '/roi-calculator.html', '/loan-tool.html', '/insurance.html', '/how-property-taxes-work.html', '/partners.html', '/about-cook-county-tax-compare.html', '/privacy-policy.html', '/cook-county-property-tax-appeal.html', '/admin.html']) {
+    test(`shared navigation remains usable on desktop, tablet, and mobile: ${route}`, async () => {
+        const s = await scenario();
+        try {
+            await s.goto(route);
+            for (const width of [1440, 900, 390]) {
+                await s.page.setViewportSize({ width, height: 900 });
+                await assertHeader(s.page, width);
+            }
+        } finally { await s.close(); }
+    });
+}
+
+test('home header and page fit narrow screens and navigation breakpoints', async () => {
+    const s = await scenario();
+    try {
+        await s.goto('/');
+        for (const width of [1150, 1100, 1024, 861, 860, 768, 320]) {
+            await s.page.setViewportSize({ width, height: 900 });
+            await assertHeader(s.page, width);
+            assert.ok(await s.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Page overflows at ${width}px`);
+        }
+        await s.page.locator('#theme-toggle').click();
+        await assertHeader(s.page, 320);
+    } finally { await s.close(); }
+});
+
+test('dropdowns support hover, keyboard activation, and Escape including a hovered menu', async () => {
+    const s = await scenario();
+    try {
+        await s.goto('/');
+        const trigger = s.page.getByRole('button', { name: 'Products', exact: true });
+        const menu = s.page.locator('#site-nav-menu-0');
+        await trigger.hover();
+        assert.equal(await trigger.getAttribute('aria-expanded'), 'true');
+        assert.equal(await menu.evaluate(el => getComputedStyle(el).pointerEvents), 'auto');
+        await s.page.keyboard.press('Escape');
+        assert.equal(await menu.evaluate(el => getComputedStyle(el).pointerEvents), 'none');
+        await s.page.mouse.move(0, 850);
+        await trigger.focus();
+        await s.page.keyboard.press('Enter');
+        assert.equal(await trigger.getAttribute('aria-expanded'), 'true');
+        await s.page.keyboard.press('Tab');
+        assert.equal(await s.page.evaluate(() => document.activeElement.textContent), 'Property Tax Tool');
+        await s.page.keyboard.press('Escape');
+        assert.equal(await trigger.evaluate(el => document.activeElement === el), true);
+        assert.equal(await menu.evaluate(el => getComputedStyle(el).pointerEvents), 'none');
+    } finally { await s.close(); }
+});
+
+test('current product and company pages remain marked active on clean URLs', async () => {
+    const s = await scenario();
+    try {
+        for (const [route, label] of [['/property-tax/', 'Property Tax Tool'], ['/partners/', 'Partners']]) {
+            await s.goto(route);
+            assert.equal(await s.page.locator('.nav-links').getByRole('link', { name: label, exact: true }).getAttribute('aria-current'), 'page');
+        }
+    } finally { await s.close(); }
+});
+
+for (const account of [
+    { label: 'member', email: 'member@example.com', access: false },
+    { label: 'invited tester', email: 'tester@example.com', access: true },
+    { label: 'partner', email: 'partner@example.com', role: 'partner', access: false, workspace: 'Partner Inbox' },
+    { label: 'administrator', email: 'vuchicago@gmail.com', role: 'superadmin', access: true, workspace: 'Admin' }
+]) {
+    test(`account actions and free appeal visibility: ${account.label}`, async () => {
+        const s = await scenario(account);
+        try {
+            await s.goto('/');
+            await s.page.locator('#address-list a').first().waitFor();
+            const free = s.page.locator('#address-list').getByRole('link', { name: 'Prepare my appeal · Free', exact: true });
+            assert.equal(await free.count(), account.access ? 1 : 0);
+            assert.equal(await s.page.locator('#address-list').getByRole('link', { name: 'Join appeal waitlist', exact: true }).count(), account.access ? 0 : 1);
+            assert.equal(await s.page.locator('#my-packet-workspace').isVisible(), account.access);
+            for (const width of [1440, 900, 390]) {
+                await s.page.setViewportSize({ width, height: 900 });
+                await assertHeader(s.page, width);
+                if (width > 860) await s.page.getByRole('button', { name: 'Account menu' }).click();
+                else await s.page.getByRole('button', { name: 'Open menu', exact: true }).click();
+                const scope = s.page.locator(width > 860 ? '.account-menu .nav-dropdown-menu' : '.mobile-menu');
+                assert.equal(await scope.getByRole('link', { name: 'My Account', exact: true }).isVisible(), true);
+                assert.equal(await scope.getByRole('link', { name: 'Logout', exact: true }).isVisible(), true);
+                if (account.workspace) await scope.getByRole('link', { name: account.workspace, exact: true }).waitFor();
+                else assert.equal(await scope.locator('[data-role-workspace], [data-mobile-workspace] a').count(), 0);
+                await s.page.keyboard.press('Escape');
+            }
+        } finally { await s.close(); }
+    });
+}
+
+test('logout clears signed-in actions and hides the account dashboard', async () => {
+    const s = await scenario({ email: 'member@example.com' });
+    try {
+        await s.goto('/');
+        await s.page.getByRole('button', { name: 'Account menu' }).click();
+        await s.page.locator('.account-menu').getByRole('link', { name: 'Logout', exact: true }).click();
+        await s.page.locator('.header-login').waitFor();
+        assert.equal(await s.page.locator('#user-dashboard').isVisible(), false);
+        assert.equal(await s.page.locator('.account-menu').count(), 0);
+    } finally { await s.close(); }
+});
+
+for (const email of [null, 'member@example.com']) {
+    test(`public waitlist submits without phone or a selected suggestion: ${email ? 'signed in' : 'anonymous'}`, async () => {
+        const s = await scenario({ email, width: 390 });
+        try {
+            await s.goto('/#contact');
+            await s.page.locator('#name').fill('Test Owner');
+            await s.page.locator('#email').fill('owner@example.com');
+            await s.page.locator('#property-address-contact').fill(property.address);
+            const sent = s.page.waitForResponse(response => new URL(response.url()).pathname === '/api/contact');
+            await s.page.locator('#contact-form').getByRole('button', { name: 'Join Waitlist' }).click();
+            await sent;
+            await s.page.waitForFunction(() => document.getElementById('name').value === '');
+            assert.equal(s.store.contacts.length, 1);
+            assert.equal(s.store.contacts[0].propertyAddress, property.address);
+            assert.equal(s.store.contacts[0].phone, '');
+            assert.equal(s.store.contacts[0].inquiryType, 'property-tax-waitlist');
+        } finally { await s.close(); }
+    });
+}
+
+test('failed waitlist submission preserves details and permits retry', async () => {
+    const s = await scenario();
+    try {
+        s.store.contactFails = true;
+        await s.goto('/#contact');
+        await s.page.locator('#name').fill('Test Owner');
+        await s.page.locator('#email').fill('owner@example.com');
+        await s.page.locator('#property-address-contact').fill(property.address);
+        await s.page.locator('#contact-form').getByRole('button', { name: 'Join Waitlist' }).click();
+        await s.page.getByText('Test submission failure', { exact: true }).waitFor();
+        assert.equal(await s.page.locator('#name').inputValue(), 'Test Owner');
+        assert.equal(await s.page.locator('#contact-form button').isEnabled(), true);
+    } finally { await s.close(); }
+});
+
+test('administrator can grant, pause, and restore tester access', async () => {
+    const s = await scenario({ email: 'admin@example.com', role: 'admin', access: true });
+    try {
+        await s.goto('/admin.html');
+        await s.page.getByRole('button', { name: 'Free Appeal Testers', exact: true }).click();
+        await s.page.locator('#pilot-email').fill('tester@example.com');
+        await s.page.getByRole('button', { name: 'Grant Test Access' }).click();
+        await s.page.locator('#pilot-access-list').getByRole('button', { name: 'Pause', exact: true }).waitFor();
+        assert.equal(s.store.pilots[0].active, 1);
+        await s.page.getByRole('button', { name: 'Pause', exact: true }).click();
+        await s.page.getByRole('button', { name: 'Restore', exact: true }).waitFor();
+        assert.equal(s.store.pilots[0].active, 0);
+        await s.page.getByRole('button', { name: 'Restore', exact: true }).click();
+        await s.page.getByRole('button', { name: 'Pause', exact: true }).waitFor();
+        assert.equal(s.store.pilots[0].active, 1);
+    } finally { await s.close(); }
+});
+
+test('uninvited account gets the waitlist instead of free preparation controls', async () => {
+    const s = await scenario({ email: 'member@example.com' });
+    try {
+        await s.goto('/appeal-packet.html');
+        await s.page.waitForFunction(() => document.getElementById('packet-message').textContent.includes('invitation'));
+        assert.equal(await s.page.locator('#packet-orders').isVisible(), false);
+        assert.equal(await s.page.locator('#packet-waitlist').isVisible(), true);
+        assert.equal(s.store.starts.length, 0);
+    } finally { await s.close(); }
+});
+
+test('invited owner starts a saved-property appeal and downloads before optional fulfillment', async () => {
+    const s = await scenario({ email: 'tester@example.com', access: true });
+    let downloadDir;
+    try {
+        await s.goto('/appeal-packet.html?property=7');
+        await s.page.waitForURL('**/appeal-packet*id=free_fixture');
+        await s.page.getByRole('heading', { name: 'Submit it yourself · Free' }).waitFor();
+        assert.equal(s.store.starts.length, 1);
+        assert.equal(s.store.starts[0].propertyId, 7);
+        assert.equal(s.store.starts[0].taxYear, new Date().getFullYear());
+        assert.equal(await s.page.locator('[data-action="purchase"]').getByRole('heading').textContent(), 'Optional DocuSign + print and mail · $49');
+        const downloading = s.page.waitForEvent('download');
+        await s.page.getByRole('button', { name: 'Download', exact: true }).click();
+        const download = await downloading;
+        assert.equal(download.suggestedFilename(), 'test-appeal.pdf');
+        downloadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cookcounty-download-'));
+        const target = path.join(downloadDir, download.suggestedFilename());
+        await download.saveAs(target);
+        assert.ok(fs.readFileSync(target, 'utf8').startsWith('%PDF-'));
+        assert.equal(s.store.signatureCalls, 0);
+    } finally {
+        if (downloadDir) fs.rmSync(downloadDir, { recursive: true });
+        await s.close();
+    }
+});

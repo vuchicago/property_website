@@ -1,7 +1,7 @@
 import { requireFirebaseUser } from './_auth.js';
 import { CHECKED_ON, DEFAULT_PROFILE, checklist, cleanProfile } from '../../self-appeal-checklist.js';
+import { appealAccess } from './_appeal_access.js';
 
-const PILOT_EMAIL = 'vuchicago@gmail.com';
 const json = (data, status = 200) => new Response(JSON.stringify(data), {status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
 export async function onRequest(context) {
     let uploadedKey, committed = false;
@@ -9,8 +9,8 @@ export async function onRequest(context) {
         if (!['GET','POST'].includes(context.request.method)) return json({error:'Method not allowed'},405);
         const {user,response} = await requireFirebaseUser(context.request);
         if (response) return response;
-        if ((user.email || '').toLowerCase() !== PILOT_EMAIL) return json({error:'Self-appeal is currently a private account pilot.'},403);
         if (!context.env.DB) return json({error:'Database is not configured.'},503);
+        if (!(await appealAccess(context.env.DB,user)).allowed) return json({error:'Self-appeal testing is currently by invitation.'},403);
         const url = new URL(context.request.url);
         const addressId = Number(url.searchParams.get('property'));
         const agency = url.searchParams.get('agency') || 'assessor';

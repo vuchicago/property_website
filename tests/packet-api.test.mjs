@@ -73,7 +73,7 @@ test('checkout status requires ownership; complete but unpaid never records paym
     assert.equal(result.status,200);assert.equal((await result.json()).payment_status,'unpaid');
 });
 test('checkout charges exactly $49 and records service consent metadata', async () => {
-    const environment = {DEPLOYMENT_READY:'1',APPEAL_PACKETS:{async head(){return null;}},DOCUSIGN_INTEGRATION_KEY:'fixture',DOCUSIGN_USER_ID:'fixture',DOCUSIGN_ACCOUNT_ID:'fixture',DOCUSIGN_PRIVATE_KEY:'fixture',STRIPE_MODE:'test',STRIPE_TEST_SECRET_KEY:'sk_test_fixture',STRIPE_TEST_WEBHOOK_SECRET:'whsec_fixture',APPEAL_HELP_AMOUNT_CENTS:9900,DB:{prepare(sql){return {bind(){return this;},async first(){
+    const environment = {DEPLOYMENT_READY:'1',APPEAL_PACKETS:{async head(){return null;}},DOCUSIGN_INTEGRATION_KEY:'fixture',DOCUSIGN_USER_ID:'fixture',DOCUSIGN_ACCOUNT_ID:'fixture',DOCUSIGN_PRIVATE_KEY:'fixture',STRIPE_MODE:'test',STRIPE_TEST_SECRET_KEY:'sk_test_fixture',STRIPE_TEST_WEBHOOK_SECRET:'whsec_fixture',DB:{prepare(sql){return {bind(){return this;},async first(){
         if(sql.includes('FROM appeals WHERE'))return {customer_id:'owner',property_address:'123 Test',property_key:'test-key'};
         if(sql.includes('FROM appeal_packets'))return {revision:2,state_json:JSON.stringify({status:'approved',version:1,approval:{version:1},intake:{agency:'assessor',ownerName:'Test Owner'}})};
         return null;
@@ -94,7 +94,7 @@ test('return-page refresh cannot restore refunded orders to paid or re-notify ad
 
 test('free preparation remains editable without payment, while signing and mailing are gated',async()=>{
     const environment=env();const original=environment.DB.prepare;
-    environment.DB.prepare=sql=>{if(sql.includes('FROM appeals '))return {bind(){return this;},async first(){return {transaction_id:'free_test',customer_id:'owner',payment_status:'free'};}};return original(sql);};
+    environment.DB.prepare=sql=>{if(sql.includes('FROM appeal_pilot_access'))return {bind(){return this;},async first(){return {active:1};}};if(sql.includes('FROM appeals '))return {bind(){return this;},async first(){return {transaction_id:'free_test',customer_id:'owner',payment_status:'free'};}};return original(sql);};
     const req=async input=>new Request('https://example.com/api/packet?id=free_test',{method:'POST',headers:{Authorization:`Bearer ${await token('owner')}`,'Content-Type':'application/json'},body:JSON.stringify(input)});
     const intake={action:'intake',revision:0,agency:'assessor',taxYear:2026,ownerName:'Owner',mailingAddress:'123 Test',reason:'uniformity',explanation:'My facts',individualOwner:true,noExistingAppeal:true};
     assert.equal((await onRequest({request:await req(intake),env:environment})).status,200);
@@ -106,6 +106,7 @@ test('starting an appeal checks saved-property ownership and resumes the existin
     const {onRequestPost:start}=await import('../functions/api/packet-start.js');
     let writes=0;
     const db={prepare(sql){let args;return{bind(...v){args=v;return this;},async first(){
+        if(sql.includes('FROM appeal_pilot_access'))return {active:1};
         if(sql.includes('FROM user_addresses'))return args[1]==='owner'?{id:7,address:'123 Test',property_key:'key'}:null;
         if(sql.includes('JOIN appeal_packets'))return {transaction_id:'free_existing',state_json:JSON.stringify({status:'preparing',propertySnapshot:{propertyId:7}}),revision:2};
         return null;
@@ -114,4 +115,41 @@ test('starting an appeal checks saved-property ownership and resumes the existin
     assert.equal((await start(await make('stranger'))).status,404);
     const response=await start(await make('owner'));
     assert.equal(response.status,200);assert.equal((await response.json()).id,'free_existing');assert.equal(writes,0);
+});
+
+test('uninvited account cannot open an existing free workspace',async()=>{
+    const environment=env();const original=environment.DB.prepare;
+    environment.DB.prepare=sql=>sql.includes('FROM appeals ')
+      ? {bind(){return this;},async first(){return {transaction_id:'free_test',customer_id:'owner',payment_status:'free'};}}
+      : original(sql);
+    const response=await onRequest({request:new Request('https://example.com/api/packet?id=free_test',{headers:{Authorization:`Bearer ${await token('owner')}`}}),env:environment});
+    assert.equal(response.status,403);
+});
+
+test('administrators grant and pause tester access while other accounts cannot manage invitations',async()=>{
+    const {onRequest:manage}=await import('../functions/api/admin/appeal-pilots.js');
+    const {appealAccess}=await import('../functions/api/_appeal_access.js');
+    const pilots=new Map();
+    const db={prepare(sql){let args=[];return{bind(...values){args=values;return this;},async run(){
+        if(sql.includes('INSERT INTO appeal_pilot_access'))pilots.set(args[0],{email:args[0],active:args[1],invited_by:args[2]});
+        return {meta:{changes:1}};
+    },async all(){
+        if(sql.includes('FROM admins WHERE email'))return {results:args[0]==='admin@example.com'?[{role:'admin'}]:[]};
+        if(sql.includes('FROM appeal_pilot_access'))return {results:[...pilots.values()]};
+        return {results:[]};
+    },async first(){
+        if(sql.includes('FROM admins'))return null;
+        if(sql.includes('FROM appeal_pilot_access'))return pilots.get(args[0]) || null;
+        return null;
+    }};}};
+    const request=async(uid,body=null)=>new Request('https://example.com/api/admin/appeal-pilots',{method:body?'POST':'GET',headers:{Authorization:`Bearer ${await token(uid)}`,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+    assert.equal((await manage({request:await request('outsider',{email:'tester@example.com',active:true}),env:{DB:db}})).status,403);
+    assert.equal((await manage({request:await request('admin',{email:'bad',active:true}),env:{DB:db}})).status,400);
+    assert.equal((await manage({request:await request('admin',{email:'TESTER@example.com',active:true}),env:{DB:db}})).status,200);
+    assert.equal((await appealAccess(db,{email:'tester@example.com',emailVerified:true})).allowed,true);
+    assert.equal((await appealAccess(db,{email:'tester@example.com',emailVerified:false})).allowed,false);
+    assert.equal((await manage({request:await request('admin',{email:'tester@example.com',active:false}),env:{DB:db}})).status,200);
+    assert.equal((await appealAccess(db,{email:'tester@example.com',emailVerified:true})).allowed,false);
+    const list=await manage({request:await request('admin'),env:{DB:db}});
+    assert.equal((await list.json()).pilots[0].active,0);
 });

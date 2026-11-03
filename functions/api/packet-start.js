@@ -1,11 +1,13 @@
 import { requireFirebaseUser, jsonResponse } from './_auth.js';
 import { propertySnapshot } from './_packet_preparation.js';
 import { initialPacket } from './_packet_workflow.js';
+import { appealAccess } from './_appeal_access.js';
 export async function onRequestPost({request, env}) {
     const {user,response} = await requireFirebaseUser(request);
     if (response) return response;
     try {
         if (!env.DB) return jsonResponse({error:'Database is not configured.'},503);
+        if (!(await appealAccess(env.DB,user)).allowed) return jsonResponse({error:'Free appeal testing is currently by invitation. You can join the public waitlist.'},403);
         const {propertyId, taxYear = new Date().getUTCFullYear()} = await request.json();
         if (!Number.isInteger(taxYear) || taxYear < 2020 || taxYear > new Date().getUTCFullYear()+1) return jsonResponse({error:"Choose an assessment year."},400);
         if (!Number.isInteger(propertyId) || propertyId < 1) return jsonResponse({error:'Choose a saved property.'},400);

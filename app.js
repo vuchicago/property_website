@@ -6,7 +6,6 @@ let homeSuggestionAbort = null;
 
 document.addEventListener('DOMContentLoaded', function () {
     initThemeToggle();
-    initMobileMenu();
     initScrollAnimations();
     initNavigation();
     initAppealDeadlineCalendar();
@@ -717,11 +716,10 @@ function validateContactForm(form) {
     const address = addressInput?.value.trim() || '';
 
     emailInput?.setCustomValidity(isValidEmail(email) ? '' : 'Enter a valid email address.');
-    phoneInput?.setCustomValidity(isValidPhone(phone) ? '' : 'Enter a valid 10-digit phone number.');
+    phoneInput?.setCustomValidity(!phone || isValidPhone(phone) ? '' : 'Enter a valid 10-digit phone number.');
 
     if (addressInput) {
-        const hasSelectedAddress = selectedContactProperty?.address === address;
-        addressInput.setCustomValidity(hasSelectedAddress ? '' : 'Choose a property address from the suggestions.');
+        addressInput.setCustomValidity(address ? '' : 'Enter the property address.');
     }
 
     if (!form.checkValidity()) {

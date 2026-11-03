@@ -213,6 +213,8 @@
                         }
                 }
         </style>
+    <link rel="stylesheet" href="site-nav.css?v=20261103-header">
+    <script defer src="site-nav.js?v=20261103-header"></script>
 </head>
 
 <body>
@@ -229,9 +231,11 @@
                                 </div>
                                 <span>Cook County<br><span class="logo-accent">Tax Compare</span></span>
                         </a>
-                        <ul class="nav-links">
-                                <li><a href="index.html">Home</a></li>
-                        </ul>
+                        <ul class="nav-links" id="nav-links">
+                <li class="nav-dropdown"><button type="button" class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="site-nav-menu-0">Products <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><div class="nav-dropdown-menu" id="site-nav-menu-0"><a href="property-tax.html">Property Tax Tool</a><a href="roi-calculator.html">ROI Tool</a><a href="loan-tool.html">Loan Tool</a></div></li>
+                <li class="nav-dropdown"><button type="button" class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="site-nav-menu-1">Solutions <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><div class="nav-dropdown-menu" id="site-nav-menu-1"><a href="insurance.html">Insurance</a><a href="how-property-taxes-work.html">How Taxes Work</a><a href="index.html#faq">FAQ</a></div></li>
+                <li class="nav-dropdown"><button type="button" class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="site-nav-menu-2">Company <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><div class="nav-dropdown-menu" id="site-nav-menu-2"><a href="partners.html">Partners</a><a href="index.html#contact">Contact</a></div></li>
+            </ul>
                         <div class="nav-actions">
                                 <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
                                         <svg class="sun-icon" viewBox="0 0 24 24" fill="none"
@@ -261,6 +265,7 @@
                         <div class="admin-nav">
                                 <button class="admin-tab active" data-tab="appeals">Pending Appeals</button>
                                 <button class="admin-tab" data-tab="history">Search User History</button>
+                                <button class="admin-tab" data-tab="pilot-access" id="pilot-access-tab" style="display:none;">Free Appeal Testers</button>
                                 <button class="admin-tab" data-tab="roles" id="roles-tab" style="display: none;">Role
                                         Management</button>
                         </div>
@@ -327,6 +332,17 @@
                                                         </tbody>
                                                 </table>
                                         </div>
+                                </div>
+
+                                <div id="pilot-access" class="tab-content">
+                                        <h3>Free Appeal Testers</h3>
+                                        <p>Invite a verified account by email. You can pause or restore access here. Everyone can still <a href="index.html#contact">join the public waitlist</a>.</p>
+                                        <form id="pilot-access-form" class="admin-search-form">
+                                                <div class="input-group"><label for="pilot-email">Account email</label><input id="pilot-email" type="email" required placeholder="tester@example.com"></div>
+                                                <button type="submit" class="btn btn-primary">Grant Test Access</button>
+                                        </form>
+                                        <p id="pilot-access-message" role="status" aria-live="polite"></p>
+                                        <div style="overflow-x:auto"><table class="pending-list"><thead><tr><th>Email</th><th>Access</th><th>Invited by</th><th>Action</th></tr></thead><tbody id="pilot-access-list"></tbody></table></div>
                                 </div>
 
                                 <!-- Roles Tab -->

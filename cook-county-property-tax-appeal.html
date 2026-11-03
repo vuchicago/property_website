@@ -17,6 +17,8 @@
     <link rel="stylesheet" href="site-2.css?v=20260522">
     <link rel="stylesheet" href="site-3.css?v=20260522">
     <link rel="stylesheet" href="site-4.css?v=20260522">
+    <link rel="stylesheet" href="site-nav.css?v=20261103-header">
+    <script defer src="site-nav.js?v=20261103-header"></script>
 </head>
 
 <body>
@@ -31,26 +33,10 @@
                 </div>
                 <span>Cook County<br><span class="logo-accent">Tax Compare</span></span>
             </a>
-            <ul class="nav-links">
-                <li><a href="index.html">Home</a></li>
-                <li><a href="property-tax.html">Property Tax Tool</a></li>
-                <li><a href="insurance.html">Insurance</a></li>
-                <li><a href="partners.html">Partners</a></li>
-                <li class="nav-dropdown">
-                    <button type="button" class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">
-                        <span>Resources</span>
-                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round" />
-                        </svg>
-                    </button>
-                    <div class="nav-dropdown-menu">
-                        <a href="roi-calculator.html">ROI Calculator</a>
-                        <a href="loan-tool.html">Loan Tool</a>
-                        <a href="index.html#faq">FAQ</a>
-                        <a href="index.html#contact">Contact</a>
-                    </div>
-                </li>
+            <ul class="nav-links" id="nav-links">
+                <li class="nav-dropdown"><button type="button" class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="site-nav-menu-0">Products <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><div class="nav-dropdown-menu" id="site-nav-menu-0"><a href="property-tax.html">Property Tax Tool</a><a href="roi-calculator.html">ROI Tool</a><a href="loan-tool.html">Loan Tool</a></div></li>
+                <li class="nav-dropdown"><button type="button" class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="site-nav-menu-1">Solutions <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><div class="nav-dropdown-menu" id="site-nav-menu-1"><a href="insurance.html">Insurance</a><a href="how-property-taxes-work.html">How Taxes Work</a><a href="index.html#faq">FAQ</a></div></li>
+                <li class="nav-dropdown"><button type="button" class="nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="site-nav-menu-2">Company <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><div class="nav-dropdown-menu" id="site-nav-menu-2"><a href="partners.html">Partners</a><a href="index.html#contact">Contact</a></div></li>
             </ul>
         </div>
     </nav>
@@ -81,7 +67,7 @@
                 <article class="dashboard-card">
                     <h2>3. Decide How To File</h2>
                     <p>You can file directly with Cook County for free. If you want help organizing the appeal request,
-                        Cook County Tax Compare offers optional assisted appeal help for $99.</p>
+                        Invited testers can prepare and download an appeal packet for free. Optional DocuSign, printing and mailing fulfillment costs $49.</p>
                     <a href="index.html#pricing" class="btn btn-secondary">View Appeal Help</a>
                 </article>
                 <article class="dashboard-card">

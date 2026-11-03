@@ -9,6 +9,7 @@ let currentSuggestions = [];
 let selectedAddressForImage = '';
 let selectedPinForImage = '';
 let dashboardUser = null;
+let freeAppealTester = false;
 let accountNotifications = [];
 const CURRENT_TAX_YEAR = 2024;
 const CURRENT_STATE_EQUALIZER = 3.0355;
@@ -21,6 +22,11 @@ export async function loadAppealHistory(userOverride = null) {
         const user = userOverride || auth.currentUser;
         if (!user) return;
         dashboardUser = user;
+        freeAppealTester = false;
+        try {
+                const access = await authFetch('/api/appeal-access');
+                if (access.ok) freeAppealTester = Boolean((await access.json()).allowed);
+        } catch (error) { console.warn('Appeal access is unavailable:', error); }
 
         setupAddAddressForm();
         setupPropertyImageUpload();
@@ -60,6 +66,7 @@ export async function loadAppealHistory(userOverride = null) {
                 packetLink.textContent = 'My appeal packets';
                 document.getElementById('user-dashboard')?.prepend(packetLink);
         }
+        packetLink.hidden = !freeAppealTester;
 }
 
 async function fetchAddresses() {
@@ -309,7 +316,7 @@ function renderAddressList() {
                                 ${addrObj.pin ? `<div class="text-xs text-muted">${String(addrObj.pin).includes(',') ? 'PINs' : 'PIN'} ${escapeHtml(addrObj.pin)}</div>` : ''}
                                 ${addrObj.propertyDetails?.mailingName ? `<div class="text-xs text-muted">${escapeHtml(addrObj.propertyDetails.mailingName)}</div>` : ''}
                                 <div class="text-xs text-muted">${appealCount} appeal(s)</div>
-                                <a class="btn btn-primary btn-sm" style="margin-top:.75rem" href="appeal-packet.html?property=${encodeURIComponent(addrObj.id)}">Prepare my appeal · Free</a>
+                                ${freeAppealTester ? `<a class="btn btn-primary btn-sm" style="margin-top:.75rem" href="appeal-packet.html?property=${encodeURIComponent(addrObj.id)}">Prepare my appeal · Free</a>` : `<a class="btn btn-secondary btn-sm" style="margin-top:.75rem" href="#contact">Join appeal waitlist</a>`}
                                 ${propertyStatus ? renderPropertyAppealStatus(propertyStatus) : ''}
                         </div>
                         ${canDelete ? `<button type="button" class="btn btn-secondary btn-sm delete-address-btn" data-address="${safeAddress}" data-property-key="${safePropertyKey}" aria-label="Delete ${safeAddress}">Delete</button>` : ''}
@@ -906,8 +913,8 @@ function renderAppeals(appeals, address) {
                 historyContainer.innerHTML = `
             <div style="text-align: center; padding: 2rem 0; color: var(--text-muted);">
                 <p>No appeals found for this property.</p>
-                <p class="text-sm text-muted">Prepare and download your Assessor appeal for free. Optional $49 fulfillment includes DocuSign, printing, mailing and tracking.</p>
-                <button class="btn btn-primary appeal-again-btn" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Prepare my appeal · Free</button>
+                <p class="text-sm text-muted">${freeAppealTester ? 'Prepare and download your Assessor appeal for free. Optional $49 fulfillment includes DocuSign, printing, mailing and tracking.' : 'Free appeal testing is currently by invitation. Anyone can join the waitlist.'}</p>
+                <button class="btn btn-primary appeal-again-btn" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">${freeAppealTester ? 'Prepare my appeal · Free' : 'Join appeal waitlist'}</button>
                 ${uploadLegalFootnote()}
             </div>
         `;
@@ -941,7 +948,7 @@ function renderAppeals(appeals, address) {
             `;
                 });
                 html += '</ul>';
-                html += `<button class="btn btn-secondary appeal-again-btn btn-full" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">Open self-appeal workspace</button>`;
+                html += `<button class="btn btn-secondary appeal-again-btn btn-full" data-address="${escapeHtml(address)}" style="margin-top: 1rem;">${freeAppealTester ? 'Open self-appeal workspace' : 'Join appeal waitlist'}</button>`;
                 html += uploadLegalFootnote();
                 historyContainer.innerHTML = html;
         }
@@ -950,7 +957,11 @@ function renderAppeals(appeals, address) {
         historyContainer.querySelectorAll('.appeal-again-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                         const addr = e.currentTarget.dataset.address;
-                        location.href = `appeal-packet.html?property=${encodeURIComponent(selectedProperty.id)}`;
+                        if (freeAppealTester) location.href = `appeal-packet.html?property=${encodeURIComponent(selectedProperty.id)}`;
+                        else {
+                                const { openAppealModal } = await import('./appeal.js');
+                                openAppealModal(addr, selectedProperty);
+                        }
                 });
         });
 }

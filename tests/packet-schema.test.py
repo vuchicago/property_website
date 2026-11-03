@@ -14,7 +14,7 @@ class PacketSchema(unittest.TestCase):
         INSERT INTO appeals VALUES('free_case','owner',0,'free');
         INSERT INTO appeals VALUES('cs_order','owner',4900,'unpaid');
         INSERT INTO appeals VALUES('cs_other','other',4900,'paid');''')
-        for n in ['0029_create_appeal_packets.sql','0030_create_self_appeal_cases.sql','0031_create_packet_fulfillment.sql']:
+        for n in ['0029_create_appeal_packets.sql','0030_create_self_appeal_cases.sql','0031_create_packet_fulfillment.sql','0032_create_appeal_pilot_access.sql']:
             self.db.executescript((ROOT/'migrations'/n).read_text())
         self.state={'status':'review','version':1,'intake':{'agency':'assessor'},'documents':[{'id':'pdf','key':'private/original','version':1}]}
         self.db.execute('INSERT INTO appeal_packets(transaction_id,state_json) VALUES(?,?)',('free_case',json.dumps(self.state)))
@@ -59,4 +59,16 @@ class PacketSchema(unittest.TestCase):
     def test_existing_data_untouched_and_foreign_keys_clean(self):
         self.assertEqual(self.db.execute('SELECT count(*) FROM appeals').fetchone()[0],3)
         self.assertEqual(self.db.execute('PRAGMA foreign_key_check').fetchall(),[])
+    def test_tester_email_is_unique_case_insensitive_and_state_is_boolean(self):
+        self.db.execute("INSERT INTO appeal_pilot_access(email,invited_by) VALUES('Tester@Example.com','admin@example.com')")
+        self.assertEqual(self.db.execute("SELECT active FROM appeal_pilot_access WHERE email='tester@example.com'").fetchone()[0],1)
+        with self.assertRaises(sqlite3.IntegrityError):self.db.execute("INSERT INTO appeal_pilot_access(email,invited_by) VALUES('TESTER@example.com','admin@example.com')")
+        for state in [2,-1,None]:
+            with self.assertRaises(sqlite3.IntegrityError):self.db.execute('UPDATE appeal_pilot_access SET active=?',(state,))
+    def test_tester_pause_restore_and_repeated_migration_preserve_data(self):
+        self.db.execute("INSERT INTO appeal_pilot_access(email,invited_by,active) VALUES('tester@example.com','admin@example.com',0)")
+        self.db.executescript((ROOT/'migrations/0032_create_appeal_pilot_access.sql').read_text())
+        self.assertEqual(self.db.execute('SELECT active FROM appeal_pilot_access').fetchone()[0],0)
+        self.db.execute("INSERT INTO appeal_pilot_access(email,invited_by,active) VALUES('TESTER@example.com','other-admin@example.com',1) ON CONFLICT(email) DO UPDATE SET active=excluded.active,invited_by=excluded.invited_by")
+        self.assertEqual(self.db.execute('SELECT count(*),active,invited_by FROM appeal_pilot_access').fetchone(),(1,1,'other-admin@example.com'))
 if __name__=='__main__':unittest.main()

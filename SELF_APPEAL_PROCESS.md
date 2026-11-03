@@ -76,7 +76,7 @@ The checklist is a reviewed baseline, not yet a finalized property-specific fili
 7. Export your preparation summary or print it as a PDF. This summary is a working index, not a substitute for an official complaint.
 8. Submit the official application yourself, then upload the county receipt and record its reference/date. Upload the decision when received.
 
-The pilot is limited by verified account email and by ownership of the saved property record. There is no admin impersonation, email-account access, automatic county submission, or automatic DocuSign signing in this personal flow.
+The pilot is limited to verified administrator or invited account emails and by ownership of the saved property record. Administrators grant, pause and restore pilot access in the dashboard. There is no admin impersonation, email-account access, automatic county submission, or automatic DocuSign signing in this personal flow.
 
 ## Before choosing a route
 

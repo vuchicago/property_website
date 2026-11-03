@@ -44,6 +44,9 @@ async function checkAccountAccess() {
                 await loadAdminNotifications();
                 setupHistorySearch();
                 await loadPendingAppeals();
+                document.getElementById('pilot-access-tab').style.display = 'block';
+                setupPilotAccess();
+                await loadPilotAccess();
 
                 if (currentRole === 'superadmin') {
                         document.getElementById('roles-tab').style.display = 'block';
@@ -80,6 +83,47 @@ function setupTabs() {
                         document.getElementById(tab.dataset.tab).classList.add('active');
                 });
         });
+}
+
+function setupPilotAccess() {
+        const form = document.getElementById('pilot-access-form');
+        if (form.dataset.bound) return;
+        form.dataset.bound = 'true';
+        form.addEventListener('submit', async event => {
+                event.preventDefault();
+                const button = form.querySelector('button');
+                button.disabled = true;
+                try {
+                        await updatePilotAccess(form.querySelector('#pilot-email').value, true);
+                        form.reset();
+                        document.getElementById('pilot-access-message').textContent = 'Access granted. Share the sign-in link with this tester; the site does not send an invitation email.';
+                } catch (error) {
+                        document.getElementById('pilot-access-message').textContent = error.message;
+                } finally { button.disabled = false; }
+        });
+}
+
+async function updatePilotAccess(email, active) {
+        const response = await authFetch('/api/admin/appeal-pilots', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({email,active})
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Could not update access.');
+        await loadPilotAccess();
+}
+
+async function loadPilotAccess() {
+        const tbody = document.getElementById('pilot-access-list');
+        const response = await authFetch('/api/admin/appeal-pilots');
+        if (!response.ok) { tbody.innerHTML = '<tr><td colspan="4">Pilot access is unavailable. Apply migration 0032 to this environment.</td></tr>'; return; }
+        const {pilots} = await response.json();
+        tbody.innerHTML = pilots.map(p => `<tr><td>${escapeHtml(p.email)}</td><td>${p.active ? 'Active' : 'Paused'}</td><td>${escapeHtml(p.invited_by)}</td><td><button type="button" class="btn btn-secondary btn-sm" data-pilot-email="${escapeHtml(p.email)}" data-pilot-active="${p.active ? '0' : '1'}">${p.active ? 'Pause' : 'Restore'}</button></td></tr>`).join('') || '<tr><td colspan="4">No testers invited yet.</td></tr>';
+        tbody.querySelectorAll('[data-pilot-email]').forEach(button => button.addEventListener('click', async () => {
+                button.disabled = true;
+                try { await updatePilotAccess(button.dataset.pilotEmail,button.dataset.pilotActive==='1'); }
+                catch(error) { document.getElementById('pilot-access-message').textContent = error.message; button.disabled = false; }
+        }));
 }
 
 async function loadPartners() {

@@ -242,7 +242,6 @@ export const initAuthUI = () => {
 };
 
 const updateNavigation = (user) => {
-        updateDesktopNavForAuth(user);
         updateAiSalesVisibility(user);
 
         // Desktop Nav Action Button
@@ -297,103 +296,37 @@ const updateAiSalesVisibility = (user) => {
 };
 
 const updateAuthButton = (container, user) => {
-        container.innerHTML = ''; // Clear current
-
-        if (user) {
-                // User is logged in
-                import('./appeal.js?v=20261103-packets').then(module => {
-                        window.openAppealModal = module.openAppealModal;
-                });
-
-                // Create Appeal Button
-                const appealBtn = document.createElement('a');
-                appealBtn.href = "#";
-                appealBtn.className = "cta-btn"; // Use same style as original "Get Started"
-                appealBtn.style.marginRight = "10px";
-                appealBtn.innerHTML = `
-            <span>Appeal Now</span>
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-        `;
-                appealBtn.onclick = (e) => {
-                        e.preventDefault();
-                        if (window.openAppealModal) window.openAppealModal();
-                };
-
-                // Create Account History Button
-                const historyBtn = document.createElement('a');
-                historyBtn.href = "login.html";
-                historyBtn.className = "btn btn-sm btn-secondary account-nav-btn";
-                historyBtn.style.marginLeft = "0.5rem";
-                historyBtn.innerHTML = `
-                        <span>My Account</span>
-                        <small>${escapeHtml(user.email || 'Signed in')}</small>
-                `;
-                historyBtn.onclick = (e) => {
-                        const dashboard = document.getElementById('user-dashboard');
-                        if (dashboard) {
-                                e.preventDefault();
-                                dashboard.scrollIntoView({ behavior: 'smooth' });
-                        }
-                };
-
-                if (String(user.email || '').trim().toLowerCase() === 'vuchicago@gmail.com') {
-                        const adminBtn = document.createElement('a');
-                        adminBtn.href = "admin.html";
-                        adminBtn.className = "btn btn-sm btn-secondary";
-                        adminBtn.style.marginLeft = "0.5rem";
-                        adminBtn.textContent = "Admin";
-                        container.appendChild(adminBtn);
-                }
-                appendWorkspaceButtonForRole(container);
-
-                // Create Logout Button (smaller or icon?)
-                const logoutBtn = document.createElement('a');
-                logoutBtn.href = "#";
-                logoutBtn.className = "btn btn-sm btn-secondary";
-                logoutBtn.style.marginLeft = "0.5rem";
-                logoutBtn.textContent = "Logout";
-                logoutBtn.onclick = (e) => window.handleLogout(e);
-
-                container.style.display = 'flex';
-                container.style.alignItems = 'center';
-
-                container.appendChild(appealBtn);
-                container.appendChild(historyBtn);
-                container.appendChild(logoutBtn);
-
-        } else {
-                // User is logged out - Show "Login" (formerly Get Started functionality)
-                container.innerHTML = `
-            <a href="login.html" class="cta-btn">
-                <span>Login</span>
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-            </a>
-        `;
+        container.replaceChildren();
+        if (!user) {
+                container.innerHTML = '<a href="login.html" class="header-login">Sign in</a>';
+                return;
         }
+        const menu = document.createElement('div');
+        menu.className = 'nav-dropdown account-menu';
+        menu.innerHTML = `<button type="button" class="nav-dropdown-trigger account-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu-links" aria-label="Account menu"><span class="account-avatar" aria-hidden="true">${escapeHtml((user.email || 'A').charAt(0).toUpperCase())}</span><span>Account</span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><div class="nav-dropdown-menu" id="account-menu-links"><a href="index.html#user-dashboard">My Account</a><a href="#" data-sign-out>Logout</a></div>`;
+        menu.querySelector('[data-sign-out]').addEventListener('click', event => window.handleLogout(event));
+        container.append(menu);
+        appendWorkspaceButtonForRole(menu, user);
 };
 
-async function appendWorkspaceButtonForRole(container) {
+async function appendWorkspaceButtonForRole(menu, user) {
+        const links = menu.querySelector('.nav-dropdown-menu');
+        if (String(user.email || '').trim().toLowerCase() === 'vuchicago@gmail.com') {
+                links.querySelector('[data-sign-out]').insertAdjacentHTML('beforebegin', '<a href="admin.html" data-role-workspace>Admin</a>');
+                return;
+        }
         try {
                 const response = await authFetch('/api/admin/roles?checkRoleOnly=true');
-                if (!response.ok) return;
-
+                if (!response.ok || !menu.isConnected) return;
                 const data = await response.json();
-                if (!data.role || container.querySelector('[data-role-workspace]')) return;
-                if (data.role === 'superadmin' && String(auth.currentUser?.email || '').trim().toLowerCase() === 'vuchicago@gmail.com') return;
-
-                const workspaceBtn = document.createElement('a');
-                workspaceBtn.href = 'admin.html';
-                workspaceBtn.className = 'btn btn-sm btn-secondary';
-                workspaceBtn.style.marginLeft = '0.5rem';
-                workspaceBtn.dataset.roleWorkspace = 'true';
-                workspaceBtn.textContent = data.role === 'partner' ? 'Partner Inbox' : 'Admin';
-                container.insertBefore(workspaceBtn, container.lastElementChild);
+                if (!data.role || links.querySelector('[data-role-workspace]')) return;
+                const link = document.createElement('a');
+                link.href = 'admin.html';
+                link.dataset.roleWorkspace = 'true';
+                link.textContent = data.role === 'partner' ? 'Partner Inbox' : 'Admin';
+                links.querySelector('[data-sign-out]').before(link);
         } catch (error) {
-                console.warn('Could not load workspace role:', error);
+                console.warn('Could not load account role:', error);
         }
 }
 
@@ -406,73 +339,27 @@ function escapeHtml(value) {
                 .replace(/'/g, '&#039;');
 }
 
-const updateDesktopNavForAuth = (user) => {
-        const navLinks = document.getElementById('nav-links');
-        if (!navLinks) return;
-
-        const resourcesMenu = navLinks.querySelector('.nav-dropdown-menu');
-        navLinks.querySelectorAll('[data-auth-hidden]').forEach(item => item.removeAttribute('data-auth-hidden'));
-        resourcesMenu?.querySelectorAll('[data-auth-added]').forEach(item => item.remove());
-
-        if (!user) return;
-
-        [
-                ['insurance.html', 'Insurance'],
-                ['partners.html', 'Partners']
-        ].forEach(([href, label]) => {
-                const link = Array.from(navLinks.querySelectorAll(`a[href="${href}"]`))
-                        .find(item => !item.closest('.nav-dropdown-menu'));
-                link?.closest('li')?.setAttribute('data-auth-hidden', 'true');
-
-                if (resourcesMenu && !resourcesMenu.querySelector(`a[href="${href}"]`)) {
-                        const resourceLink = document.createElement('a');
-                        resourceLink.href = href;
-                        resourceLink.textContent = label;
-                        resourceLink.setAttribute('data-auth-added', 'true');
-                        resourcesMenu.prepend(resourceLink);
-                }
-        });
-};
-
 const updateMobileMenu = (ulElement, user) => {
         if (!ulElement) return;
-        document.getElementById('mobile-workspace-link')?.remove();
-        let li = document.getElementById('mobile-auth-link');
-        if (!li) {
-                li = document.createElement('li');
-                li.id = 'mobile-auth-link';
-                ulElement.appendChild(li);
+        ulElement.querySelectorAll('.mobile-auth-item').forEach(item => item.remove());
+        if (!user) {
+                ulElement.insertAdjacentHTML('beforeend', '<li class="mobile-auth-item"><a href="login.html">Sign in</a></li>');
+                return;
         }
-
-        li.innerHTML = '';
-        if (user) {
-                li.innerHTML = `<a href="#" onclick="window.handleLogout(event)">Logout (${user.email})</a>`;
-                // Add appeal link to mobile menu too if desired
-                const appealLi = document.createElement('li');
-                appealLi.innerHTML = `<a href="#" onclick="import('./appeal.js?v=20261103-packets').then(m=>m.openAppealModal())">Appeal Now</a>`;
-                ulElement.insertBefore(appealLi, li);
-                appendMobileWorkspaceLink(ulElement, li);
-        } else {
-                li.innerHTML = `<a href="login.html">Login</a>`;
+        ulElement.insertAdjacentHTML('beforeend', `<li class="mobile-auth-item mobile-account-heading">Account</li><li class="mobile-auth-item"><a href="index.html#user-dashboard">My Account</a></li><li class="mobile-auth-item" data-mobile-workspace></li><li class="mobile-auth-item"><a href="#" data-mobile-logout>Logout</a></li>`);
+        ulElement.querySelector('[data-mobile-logout]')?.addEventListener('click', event => window.handleLogout(event));
+        const workspace = ulElement.querySelector('[data-mobile-workspace]');
+        const primary = String(user.email || '').trim().toLowerCase() === 'vuchicago@gmail.com';
+        if (primary) workspace.innerHTML = '<a href="admin.html">Admin</a>';
+        else {
+                authFetch('/api/admin/roles?checkRoleOnly=true').then(async response => {
+                        if (!response.ok || !workspace.isConnected) return;
+                        const data = await response.json();
+                        if (data.role) { workspace.innerHTML = `<a href="admin.html">${data.role === 'partner' ? 'Partner Inbox' : 'Admin'}</a>`; workspace.hidden = false; }
+                }).catch(error => console.warn('Could not load mobile account role:', error));
         }
+        if (!primary) workspace.hidden = true;
 };
-
-async function appendMobileWorkspaceLink(ulElement, beforeEl) {
-        try {
-                const response = await authFetch('/api/admin/roles?checkRoleOnly=true');
-                if (!response.ok || document.getElementById('mobile-workspace-link')) return;
-
-                const data = await response.json();
-                if (!data.role) return;
-
-                const workspaceLi = document.createElement('li');
-                workspaceLi.id = 'mobile-workspace-link';
-                workspaceLi.innerHTML = `<a href="admin.html">${data.role === 'partner' ? 'Partner Inbox' : 'Admin'}</a>`;
-                ulElement.insertBefore(workspaceLi, beforeEl);
-        } catch (error) {
-                console.warn('Could not add mobile workspace link:', error);
-        }
-}
 
 // Global logout handler for onclick attribute
 window.handleLogout = async (e) => {

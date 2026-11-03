@@ -3,6 +3,7 @@ import { evidenceCategories } from '../../packet-requirements.js';
 import { requireFirebaseUser } from './_auth.js';
 import { paidFulfillment, isFreePacket } from './_fulfillment.js';
 import { initialPacket, transitionPacket } from './_packet_workflow.js';
+import { appealAccess } from './_appeal_access.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 const FILE_ACTIONS = new Set(['evidence', 'packet', 'signed_packet', 'certificate', 'mail', 'delivered', 'filed']);
@@ -53,6 +54,7 @@ export async function onRequest(context) {
         const free = isFreePacket(transactionId);
         const fulfillment = free ? await paidFulfillment(db,transactionId,state.version,appeal.customer_id) : null;
         const signature = free ? await db.prepare('SELECT envelope_id, status, environment FROM packet_signatures WHERE packet_id = ? AND packet_version = ?').bind(transactionId,state.version).first() : null;
+        if (free && !fulfillment && !(await appealAccess(db,user)).allowed) return json({error:'Free appeal testing is currently by invitation. You can join the public waitlist.'},403);
 
         if (context.request.method === 'GET') {
             const documentId = url.searchParams.get('document');

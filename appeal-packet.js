@@ -24,11 +24,24 @@ onAuthUserChanged(async user => {
     document.getElementById('packet-workspace').hidden = true;
     if (!user || !user.emailVerified) {
         current = null;
+        selectedId = null;
         document.getElementById('order-list').replaceChildren();
+        document.getElementById('packet-property').innerHTML='<option value="">Sign in to load properties</option>';
+        document.getElementById('packet-orders').hidden=true;
+        document.getElementById('packet-waitlist').hidden=false;
         document.getElementById('packet-workspace').replaceChildren();
         message('Sign in with a verified email to continue.'); return;
     }
     try {
+        const accessResponse=await authFetch('/api/appeal-access');
+        const access=accessResponse.ok ? await accessResponse.json() : {allowed:false};
+        document.getElementById('packet-orders').hidden=!access.allowed;
+        document.getElementById('packet-waitlist').hidden=access.allowed || Boolean(selectedId);
+        if(!access.allowed){
+            if(selectedId) await load();
+            else message('Free appeal testing is currently by invitation.');
+            return;
+        }
         const addresses=await authFetch('/api/addresses'); if(!addresses.ok)throw new Error('Could not load saved properties.');
         const properties=await addresses.json();
         document.getElementById('packet-property').innerHTML='<option value="">Choose a saved property</option>'+properties.map(p=>`<option value="${Number(p.id)}">${escape(p.address)}</option>`).join('');

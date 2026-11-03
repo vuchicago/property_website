@@ -1,0 +1,63 @@
+/* Shared navigation overrides loaded after the core site styles. */
+#my-packet-workspace[hidden], #packet-orders[hidden], #packet-waitlist[hidden] { display: none !important; }
+/* Compact shared site header */
+.nav-container { gap: clamp(1rem, 2vw, 2rem); }
+.nav-container .logo { flex: 0 0 auto; white-space: nowrap; }
+.nav-links { flex: 0 1 auto; gap: clamp(.5rem, 1.5vw, 1.4rem); justify-content: center; }
+.nav-links .nav-dropdown-trigger { border-radius: 10px; padding: .65rem .8rem; font-weight: 600; }
+.nav-links .nav-dropdown-trigger:hover,
+.nav-links .nav-dropdown-trigger.active,
+.nav-dropdown.is-open > .nav-dropdown-trigger { background: var(--primary-subtle); }
+.nav-dropdown.is-open > .nav-dropdown-menu { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+.nav-dropdown:focus-within:not(.is-open):not(:hover) > .nav-dropdown-menu { opacity: 0; pointer-events: none; transform: translate(-50%, 8px); }
+.nav-actions { margin-left: auto; gap: .55rem; }
+#auth-action-container { flex: 0 0 auto; overflow: visible; }
+.header-login { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: .5rem 1rem; border: 1px solid var(--dark-200); border-radius: 10px; color: var(--dark-900); font-weight: 600; white-space: nowrap; }
+.header-login:hover { border-color: var(--primary); color: var(--primary); }
+.account-menu { position: relative; }
+.account-trigger { display: inline-flex; align-items: center; gap: .5rem; padding: .35rem .6rem; border: 1px solid var(--dark-200); border-radius: 12px; color: var(--dark-900); font-weight: 600; white-space: nowrap; }
+.account-trigger svg { width: 15px; height: 15px; }
+.account-avatar { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--primary-subtle); color: var(--primary); font-size: .82rem; }
+.account-menu .nav-dropdown-menu { left: auto; right: 0; min-width: 180px; background: var(--white); transform: translateY(8px); }
+.account-menu:hover .nav-dropdown-menu,
+.account-menu:focus-within .nav-dropdown-menu,
+.account-menu.is-open .nav-dropdown-menu { transform: translateY(0); }
+.account-menu:focus-within:not(.is-open):not(:hover) .nav-dropdown-menu { transform: translateY(8px); }
+.nav-dropdown.is-dismissed .nav-dropdown-menu { opacity: 0; pointer-events: none; transform: translate(-50%, 8px); }
+.account-menu.is-dismissed .nav-dropdown-menu { transform: translateY(8px); }
+.nav-dropdown-menu { background: var(--white); border-color: var(--dark-200); }
+.nav-dropdown-menu a { white-space: nowrap; }
+.mobile-menu { max-height: calc(100dvh - 68px); overflow-y: auto; }
+.mobile-nav-group { display: grid; gap: .1rem; border-bottom: 1px solid var(--dark-100); padding: .7rem 0; }
+.mobile-nav-group > span,
+.mobile-account-heading { color: var(--dark-500); font-size: .72rem; font-weight: 800; letter-spacing: .08em; padding: .45rem 1rem; text-transform: uppercase; }
+.mobile-nav-group a { padding: .7rem 1rem; }
+.mobile-auth-item { list-style: none; }
+.mobile-auth-item[hidden] { display: none; }
+@media (max-width: 1100px) { .nav-actions > .cta-btn { display: none; } }
+@media (min-width: 861px) {
+    .nav-links { display: flex; }
+    .mobile-toggle { display: none; }
+}
+@media (max-width: 860px) {
+    .nav-links { display: none; }
+    .mobile-toggle { display: flex; width: 40px; height: 40px; align-items: center; justify-content: center; padding: 9px; border: 1px solid var(--dark-200); border-radius: 10px; flex: 0 0 auto; }
+    .nav-container { gap: .65rem; padding: .65rem max(1rem, var(--container-padding)); }
+    .nav-container .logo { font-size: .76rem; }
+    .logo-icon { width: 36px; height: 36px; flex: 0 0 36px; }
+    #auth-action-container { display: none !important; }
+    .nav-actions { flex: 0 0 auto; gap: .4rem; }
+    .nav-actions .theme-toggle { width: 40px; height: 40px; flex: 0 0 auto; }
+    .mobile-menu { padding: .75rem 1rem; }
+}
+@media (max-width: 360px) {
+    .nav-container .logo { font-size: .68rem; gap: .45rem; }
+    .nav-container { padding-inline: .7rem; }
+}
+@media (max-width: 360px) {
+    .waitlist-cta { min-width: 0; max-width: 100%; }
+    .contact-item, .contact-details { min-width: 0; }
+    .contact-details a { overflow-wrap: anywhere; }
+    .calendar-preview, .deadline-dashboard { padding: .75rem; }
+    .calendar-grid { gap: 2px; }
+}
