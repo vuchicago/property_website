@@ -24,6 +24,7 @@ before(async () => {
 after(async () => { await browser?.close(); });
 
 const property = { id: 7, address: '123 TEST AVE SKOKIE', pin: '00000000000001', property_key: 'test-property' };
+const suggestedProperty = { id: 900002, address: '125 TEST AVE SKOKIE', pin: '00000000000002', propertyKey: '125 TEST AVE SKOKIE|pin:00000000000002' };
 const menus = {
     Products: [['Property Tax Tool', 'property-tax.html'], ['ROI Tool', 'roi-calculator.html'], ['Loan Tool', 'loan-tool.html']],
     Solutions: [['Insurance', 'insurance.html'], ['How Taxes Work', 'how-property-taxes-work.html'], ['FAQ', 'index.html#faq']],
@@ -59,9 +60,23 @@ function firebaseSource(identity, options = {}) {
 async function scenario(options = {}) {
     const identity = options.email ? { uid: 'regression-owner', email: options.email, emailVerified: options.verified !== false } : null;
     const store = { contacts: [], starts: [], pilots: [], unexpected: [], requests: [], contactFails: false, accessFails: false, addressesFailsLeft: 0, startFailsLeft: 0, packetFailsLeft: 0, historyFails: false, historyRequests: 0, access: Boolean(options.access), packetStatus: options.packetStatus || 'approved', signatureCalls: 0 };
-    let releaseHistory;
-    const historyGate = new Promise(resolve => { releaseHistory = resolve; if (!options.holdHistory) resolve(); });
-    const historyResponses = [];
+    store.addresses = [...(options.properties || [property])];
+    store.addressPosts = [];
+    store.lookups = [];
+    store.summaryRequests = 0;
+    const gates = {}, releases = [], pendingResponses = [];
+    for (const name of ['History','Roles','Access','Properties']) {
+        gates[name] = new Promise(resolve => {
+            store[`release${name}`] = resolve;
+            releases.push(resolve);
+            if (!options[`hold${name}`]) resolve();
+        });
+    }
+    const deferred = (name, action) => {
+        const response = gates[name].then(action);
+        pendingResponses.push(response);
+        return response;
+    };
     const context = await browser.newContext({ viewport: { width: options.width || 1440, height: 900 }, reducedMotion: 'reduce' });
     await context.route('**/*', async route => {
         const request = route.request(), url = new URL(request.url());
@@ -73,19 +88,31 @@ async function scenario(options = {}) {
         if (!url.pathname.startsWith('/api/')) return route.continue();
         store.requests.push(url.pathname + url.search);
         switch (url.pathname) {
-            case '/api/appeal-access': return store.accessFails ? json({ error: 'Test access service unavailable' }, 503) : json({ allowed: store.access, admin: ['admin', 'superadmin'].includes(options.role) });
-            case '/api/addresses':
+            case '/api/appeal-access': return deferred('Access', () => store.accessFails ? json({ error: 'Test access service unavailable' }, 503) : json({ allowed: store.access, admin: ['admin', 'superadmin'].includes(options.role) }));
+            case '/api/addresses': {
+                if (request.method() === 'POST') {
+                    const entry = request.postDataJSON();
+                    store.addressPosts.push(entry);
+                    let saved = store.addresses.find(row => row.property_key === entry.propertyKey);
+                    if (!saved) {
+                        saved = { id: Math.max(7,...store.addresses.map(row => row.id)) + 1, address: entry.address, property_key: entry.propertyKey };
+                        store.addresses.unshift(saved);
+                    }
+                    return json({ success: true, savedProperty: saved, property: suggestedProperty });
+                }
                 if (store.addressesFailsLeft > 0) { store.addressesFailsLeft--; return json({ error: 'Test property loading failure' }, 503); }
-                return json([property]);
+                const rows = JSON.parse(JSON.stringify(store.addresses));
+                if (url.searchParams.has('propertyId')) return json(rows.filter(row => String(row.id) === url.searchParams.get('propertyId')).map(row => ({...row, propertyDetails:{recordId:900002,taxableValue:21000,homeSize:1450,yearBuilt:1965,townshipName:'Niles'}})));
+                if (url.searchParams.get('summary') === '1') { store.summaryRequests++; return deferred('Properties', () => json(rows)); }
+                return json(rows);
+            }
             case '/api/history': {
                 store.historyRequests++;
-                const response = historyGate.then(() => store.historyFails ? json({ error: 'Test history failure' }, 503) : json([]));
-                historyResponses.push(response);
-                return response;
+                return deferred('History', () => store.historyFails ? json({ error: 'Test history failure' }, 503) : json([]));
             }
             case '/api/notifications':
             case '/api/admin/notifications': return json({ notifications: [] });
-            case '/api/admin/roles': return options.role ? json(url.searchParams.has('checkRoleOnly') ? { role: options.role } : { roles: [] }) : json({ error: 'Unauthorized' }, 403);
+            case '/api/admin/roles': return deferred('Roles', () => options.role ? json(url.searchParams.has('checkRoleOnly') ? { role: options.role } : { roles: [] }) : json({ error: 'Unauthorized' }, 403));
             case '/api/admin/partners': return json({ partners: [] });
             case '/api/admin/appeals':
             case '/api/partner/appeals': return json([]);
@@ -98,7 +125,7 @@ async function scenario(options = {}) {
                 return json({ pilots: store.pilots });
             }
             case '/api/property/suggest': return json({ suggestions: [] });
-            case '/api/address-lookup': return json([]);
+            case '/api/address-lookup': store.lookups.push(url.searchParams.get('q')); return json({suggestions:[suggestedProperty]});
             case '/api/contact':
                 store.contacts.push(request.postDataJSON());
                 return store.contactFails ? json({ error: 'Test submission failure' }, 503) : json({ success: true, captured: true, emailSent: false });
@@ -110,9 +137,10 @@ async function scenario(options = {}) {
                 if (!store.access) return json({ error: 'Free appeal testing is currently by invitation.' }, 403);
                 if (url.searchParams.has('document')) return route.fulfill({ contentType: 'application/pdf', body: '%PDF-1.7\nRegression test fixture\n%%EOF' });
                 if (store.packetFailsLeft > 0) { store.packetFailsLeft--; return json({ error: 'Test packet loading failure' }, 503); }
+                const chosen = store.addresses.find(row => row.id === store.starts.at(-1)?.propertyId) || property;
                 return json({
-                    appeal: { customer_name: 'Test Owner', property_address: property.address, payment_status: 'free' },
-                    state: { status: store.packetStatus, version: 1, taxYear: 2026, documents: [{ id: 'prepared', kind: 'packet', version: 1, name: 'test-appeal.pdf' }], propertySnapshot: { address: property.address, pin: property.pin } },
+                    appeal: { customer_name: 'Test Owner', property_address: chosen.address, payment_status: 'free' },
+                    state: { status: store.packetStatus, version: 1, taxYear: 2026, documents: [{ id: 'prepared', kind: 'packet', version: 1, name: 'test-appeal.pdf' }], propertySnapshot: { address: chosen.address, pin: chosen.pin || suggestedProperty.pin } },
                     revision: 0, events: [], isOwner: true, isAdmin: Boolean(options.role === 'admin'), storageReady: true, fulfillmentPaid: false
                 });
             }
@@ -128,8 +156,8 @@ async function scenario(options = {}) {
         page, store,
         goto: route => page.goto(new URL(route, base).href, { waitUntil: 'load' }),
         async close() {
-            releaseHistory();
-            await Promise.allSettled(historyResponses);
+            releases.forEach(release => release());
+            await Promise.allSettled(pendingResponses);
             await context.close();
             assert.deepEqual(errors, [], 'Browser JavaScript errors');
             assert.deepEqual(store.unexpected, [], 'Unmocked API requests');
@@ -430,7 +458,7 @@ test('unverified account remains signed in while protected appeal actions stay u
         assert.equal(s.store.starts.length, 0);
         assert.equal(await s.page.evaluate(() => sessionStorage.getItem('regression-sign-outs')), null);
         const result = await s.page.evaluate(async () => {
-            const { authFetch } = await import('/auth-client.js?v=20261103-session');
+            const { authFetch } = await import('/auth-client.js?v=20261103-account');
             try { await authFetch('/api/addresses'); return 'unexpected access'; } catch (error) { return error.message; }
         });
         assert.match(result, /verify your email/i);
@@ -585,4 +613,87 @@ test('property selection stays locked while the appeal start request is pending'
         await s.page.getByRole('heading', { name: 'Submit it yourself · Free' }).waitFor();
         assert.equal(s.store.starts.length, 1);
     } finally { release(); await s.close(); }
+});
+
+test('account properties and live address suggestions do not wait for role or appeal-access checks', async () => {
+    const s = await scenario({ email:'tester@example.com', access:true, holdRoles:true, holdAccess:true });
+    try {
+        await s.goto('/login.html');
+        await s.page.locator('#address-list').getByText(property.address,{exact:true}).waitFor();
+        assert.equal(await s.page.locator('#new-property-address').isEnabled(), true);
+        await s.page.locator('#new-property-address').fill('125 TEST');
+        await s.page.getByRole('option',{name:/125 TEST AVE SKOKIE/}).waitFor();
+        assert.deepEqual(s.store.lookups,['125 TEST']);
+        assert.equal(s.store.addressPosts.length,0);
+    } finally { await s.close(); }
+});
+
+test('adding a property survives an older pending list response, reload, and appeal preparation', async () => {
+    const s = await scenario({ email:'tester@example.com', access:true, holdProperties:true });
+    try {
+        await s.goto('/login.html');
+        await s.page.locator('#user-dashboard').waitFor();
+        await s.page.locator('#new-property-address').fill('125 TEST');
+        await s.page.getByRole('option',{name:/125 TEST AVE SKOKIE/}).click();
+        await s.page.locator('#add-address-btn').click();
+        await s.page.locator('#address-list').getByText(suggestedProperty.address,{exact:true}).waitFor();
+        assert.deepEqual(s.store.addressPosts,[{address:suggestedProperty.address,propertyKey:suggestedProperty.propertyKey}]);
+        assert.equal(s.store.lookups.length,1,'Selecting a result must not reopen lookup on focus');
+        s.store.releaseProperties();
+        await s.page.locator('#address-list').getByText(property.address,{exact:true}).waitFor();
+        await s.page.locator('#address-list').getByText(suggestedProperty.address,{exact:true}).waitFor();
+        assert.ok(s.store.summaryRequests>=2,'A stale list must be refreshed after a concurrent property save');
+        await s.page.evaluate(()=>{for(const key of Object.keys(localStorage)) if(key.startsWith('ctc-dashboard:')) localStorage.removeItem(key);});
+        await s.page.reload({waitUntil:'load'});
+        const added = s.page.locator('.address-item').filter({hasText:suggestedProperty.address});
+        await added.getByRole('link',{name:'Prepare my appeal',exact:true}).click();
+        await s.page.getByRole('heading',{name:suggestedProperty.address,exact:true}).waitFor();
+        assert.equal(s.store.starts.at(-1).propertyId,8,'Appeal must use the saved account property ID, not the public lookup ID');
+        assert.equal(s.store.addressPosts.length,1);
+    } finally { await s.close(); }
+});
+
+test('Enter selects an address suggestion before a second Enter adds the property', async () => {
+    const s = await scenario({email:'tester@example.com',access:true});
+    try {
+        await s.goto('/login.html');
+        await s.page.locator('#new-property-address').fill('125 TEST');
+        await s.page.getByRole('option',{name:/125 TEST AVE SKOKIE/}).waitFor();
+        await s.page.locator('#new-property-address').press('Enter');
+        assert.equal(await s.page.locator('#new-property-address').inputValue(),suggestedProperty.address);
+        assert.equal(await s.page.locator('#add-address-btn').isEnabled(),true);
+        assert.equal(s.store.addressPosts.length,0);
+        await s.page.locator('#new-property-address').press('Enter');
+        await s.page.locator('#address-list').getByText(suggestedProperty.address,{exact:true}).waitFor();
+        assert.equal(s.store.addressPosts.length,1);
+        assert.equal(await s.page.locator('#property-address-suggestions').isVisible(),false);
+    } finally { await s.close(); }
+});
+
+test('account property failures show retry instead of claiming there are no saved addresses', async () => {
+    const s = await scenario({email:'tester@example.com',access:true});
+    try {
+        s.store.addressesFailsLeft=1;
+        await s.goto('/login.html');
+        await s.page.getByRole('button',{name:'Retry properties',exact:true}).waitFor();
+        assert.match(await s.page.locator('#property-list-status').textContent(),/Could not load/);
+        assert.equal(await s.page.getByText('No addresses added yet.',{exact:true}).count(),0);
+        await s.page.getByRole('button',{name:'Retry properties',exact:true}).click();
+        await s.page.locator('#address-list').getByText(property.address,{exact:true}).waitFor();
+        assert.equal(await s.page.locator('#auth-container').isVisible(),false);
+    } finally { await s.close(); }
+});
+
+test('account loads property details only when that saved property is selected', async () => {
+    const s = await scenario({email:'tester@example.com',access:true});
+    try {
+        await s.goto('/login.html');
+        const title = s.page.locator('#address-list').getByText(property.address,{exact:true});
+        await title.waitFor();
+        assert.equal(s.store.requests.some(url=>url.includes('propertyId=')),false);
+        await title.click();
+        await s.page.locator('#selected-property-details').getByText('Assessed Value',{exact:true}).waitFor();
+        assert.ok(s.store.requests.includes('/api/addresses?propertyId=7'));
+        assert.ok(!s.store.requests.includes('/api/addresses'));
+    } finally { await s.close(); }
 });

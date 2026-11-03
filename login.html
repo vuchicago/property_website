@@ -507,17 +507,17 @@
 
                                         <form id="add-address-form" style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
                                                 <div class="address-search-wrap">
-                                                        <input type="text" id="new-property-address" placeholder="Enter Cook County, IL address" required
+                                                        <input type="text" id="new-property-address" disabled role="combobox" aria-expanded="false" placeholder="Enter Cook County, IL address" required
                                                                 autocomplete="off" aria-autocomplete="list" aria-controls="property-address-suggestions"
                                                                 style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
                                                         <div id="property-address-suggestions" class="address-suggestions" role="listbox"></div>
                                                 </div>
-                                                <button type="submit" class="btn btn-primary" id="add-address-btn"
+                                                <button type="submit" class="btn btn-primary" id="add-address-btn" disabled
                                                         style="padding: 0.5rem 1rem;">Add</button>
                                         </form>
 
                                         <ul id="address-list" class="address-list"
-                                                style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem;"></ul>
+                                                style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem;"><li class="text-sm text-muted">Loading saved properties…</li></ul>
                                 </div>
 
                                 <div class="appeal-details-panel dashboard-card" style="flex: 2; min-width: 300px; display: none;"
@@ -585,7 +585,8 @@
 
         <!-- Auth Logic Script -->
         <script type="module">
-                import { auth, authFetch, loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, refreshCurrentUser, resetPasswordForEmail } from './auth-client.js?v=20261103-session';
+                import { auth, authFetch, loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, refreshCurrentUser, resetPasswordForEmail } from './auth-client.js?v=20261103-account';
+                import { loadAppealHistory } from './history.js?v=20261103-account';
 
                 const form = document.getElementById('auth-form');
                 const emailInput = document.getElementById('email');
@@ -775,7 +776,7 @@
                 });
 
                 addAppealBtn.addEventListener('click', async () => {
-                        const { openAppealModal } = await import('./appeal.js?v=20261103-session');
+                        const { openAppealModal } = await import('./appeal.js?v=20261103-account');
                         openAppealModal();
                 });
 
@@ -793,14 +794,15 @@
                                 window.location.replace(returnTo);
                                 return;
                         }
+                        const user = userForDashboard || auth.currentUser;
+                        const loading = loadAppealHistory(user);
                         authContainer.style.display = 'none';
                         dashboard.style.display = 'block';
                         pendingVerificationEmail = '';
                         hideVerificationPanel();
                         clearVerificationReturnFlag();
-                        await updateAdminWorkspaceButton(userForDashboard || auth.currentUser);
-                        const { loadAppealHistory } = await import('./history.js?v=20261103-session');
-                        await loadAppealHistory(userForDashboard || auth.currentUser);
+                        void updateAdminWorkspaceButton(user);
+                        await loading;
                 }
 
                 async function updateAdminWorkspaceButton(user = null) {

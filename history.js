@@ -1,4 +1,4 @@
-import { auth, authFetch } from './auth-client.js?v=20261103-session';
+import { auth, authFetch } from './auth-client.js?v=20261103-account';
 
 let userAddresses = [];
 let allAppeals = [];
@@ -6,6 +6,9 @@ let lookupTimer = null;
 let selectedAddressSuggestion = '';
 let selectedPropertyKeySuggestion = '';
 let currentSuggestions = [];
+let lookupAbort = null;
+let lookupRevision = 0;
+let activeSuggestionIndex = -1;
 let selectedAddressForImage = '';
 let selectedPinForImage = '';
 let dashboardUser = null;
@@ -18,65 +21,161 @@ const DASHBOARD_CACHE_VERSION = '20260522-appeal-window';
 const MAX_SUPPORTING_DOCUMENTS = 5;
 const SUPPORTING_DOCUMENT_ACCEPT = 'application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp,.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp';
 
+let dashboardRevision = 0;
+let dashboardLoading = null;
+let accessReady = false;
+let propertiesReady = false;
+let propertyMutationRevision = 0;
+let selectedDetailsRevision = 0;
+let selectedPropertyId = null;
+const loadedDetails = new Set();
+
 export async function loadAppealHistory(userOverride = null) {
         const user = userOverride || auth.currentUser;
         if (!user) return;
+        if (dashboardLoading?.uid === user.uid) return dashboardLoading.promise;
+        const revision = ++dashboardRevision;
+        if (dashboardUser?.uid !== user.uid) {
+                userAddresses = [];
+                allAppeals = [];
+                accountNotifications = [];
+                loadedDetails.clear();
+                propertyMutationRevision = 0;
+                selectedAddressForImage = '';
+                selectedPropertyId = null;
+                selectedAddressSuggestion = '';
+                selectedPropertyKeySuggestion = '';
+                cancelAddressLookup();
+                hideAddressSuggestions('property-address-suggestions');
+                const input = document.getElementById('new-property-address');
+                if (input) input.value = '';
+        }
         dashboardUser = user;
         freeAppealTester = false;
-        try {
-                const access = await authFetch('/api/appeal-access');
-                if (access.ok) freeAppealTester = Boolean((await access.json()).allowed);
-        } catch (error) { console.warn('Appeal access is unavailable:', error); }
+        accessReady = false;
+        const promise = initializeDashboard(user, revision);
+        dashboardLoading = {uid:user.uid,promise};
+        try { await promise; }
+        finally { if (dashboardLoading?.promise === promise) dashboardLoading = null; }
+}
 
+async function initializeDashboard(user, revision) {
+        // Bind the address field before starting any network requests.
         setupAddAddressForm();
         setupPropertyImageUpload();
         setupGovernmentIdUpload();
         setupSupportingDocumentsUpload();
         setupCompletedAppealsPanel();
         setupAccountInbox();
-        renderAccountSummary(user);
-
+        setupPropertyRetry();
         const hadCache = loadDashboardCache(user.uid);
-        if (hadCache) {
+        propertiesReady = hadCache && userAddresses.length > 0;
+        renderAccountSummary(user);
+        updatePacketWorkspaceLink();
+        if (propertiesReady) renderAddressList();
+        else renderAddressLoadingState();
+
+        // Role checks, history, and messages must never block the property list.
+        void loadDashboardAccess(user, revision);
+        void fetchAppeals(revision).then(() => {
+                if (!dashboardIsCurrent(user.uid, revision)) return;
                 renderAccountSummary(user);
+                renderCompletedAppealsPanel();
                 renderAddressList();
-        } else {
-                renderAddressLoadingState();
-        }
-
-        await fetchAddresses();
-        saveDashboardCache(user.uid);
-        renderAccountSummary(user);
-        renderAddressList();
-
-        await fetchAppeals();
-        await fetchAccountNotifications();
-        saveDashboardCache(user.uid);
-
-        renderAccountSummary(user);
-        renderAccountInbox();
-        renderCompletedAppealsPanel();
-        renderAddressList();
-        let packetLink = document.getElementById('my-packet-workspace');
-        if (!packetLink) {
-                packetLink = document.createElement('a');
-                packetLink.id = 'my-packet-workspace';
-                packetLink.className = 'btn btn-secondary';
-                packetLink.href = 'appeal-packet.html';
-                packetLink.textContent = 'My appeal packets';
-                document.getElementById('user-dashboard')?.prepend(packetLink);
-        }
-        packetLink.hidden = !freeAppealTester;
+                const selected = userAddresses.find(row => Number(row.id) === selectedPropertyId);
+                if (selected && loadedDetails.has(`${user.uid}:${selected.id}`)) renderSelectedAddress(selected);
+                saveDashboardCache(user.uid);
+        });
+        void fetchAccountNotifications(revision).then(() => {
+                if (dashboardIsCurrent(user.uid, revision)) renderAccountInbox();
+        });
+        await fetchAddresses(revision);
 }
 
-async function fetchAddresses() {
+function dashboardIsCurrent(uid, revision) {
+        return Boolean(uid) && revision === dashboardRevision && dashboardUser?.uid === uid && auth.currentUser?.uid === uid;
+}
+
+async function loadDashboardAccess(user, revision) {
         try {
-                const response = await dashboardAuthFetch('/api/addresses');
-                if (!response.ok) throw new Error('Failed to fetch addresses');
-                userAddresses = await response.json();
+                const response = await dashboardAuthFetch('/api/appeal-access');
+                const allowed = response.ok && Boolean((await response.json()).allowed);
+                if (!dashboardIsCurrent(user.uid, revision)) return;
+                freeAppealTester = allowed;
         } catch (error) {
-                console.error("Error fetching addresses:", error);
+                if (!dashboardIsCurrent(user.uid, revision)) return;
+                console.warn('Appeal access is unavailable:', error);
         }
+        if (!dashboardIsCurrent(user.uid, revision)) return;
+        accessReady = true;
+        updatePacketWorkspaceLink();
+        renderAddressList();
+        const selected = userAddresses.find(row => Number(row.id) === selectedPropertyId);
+        if (selected) renderAppeals(appealsForProperty(selected), selected.address);
+}
+
+function updatePacketWorkspaceLink() {
+        let link = document.getElementById('my-packet-workspace');
+        if (!link) {
+                link = document.createElement('a');
+                link.id = 'my-packet-workspace';
+                link.className = 'btn btn-secondary';
+                link.href = 'appeal-packet.html';
+                link.textContent = 'My appeal packets';
+                document.getElementById('user-dashboard')?.prepend(link);
+        }
+        link.hidden = !accessReady || !freeAppealTester;
+        link.style.display = link.hidden ? 'none' : '';
+}
+
+function setupPropertyRetry() {
+        const list = document.getElementById('address-list');
+        if (!list) return;
+        if (!document.getElementById('property-list-status')) {
+                const panel = document.createElement('div');
+                panel.innerHTML = '<p id="property-list-status" role="status" aria-live="polite"></p><button type="button" class="btn btn-secondary btn-sm" id="property-list-retry" style="display:none" hidden>Retry properties</button>';
+                list.before(panel);
+        }
+        const button = document.getElementById('property-list-retry');
+        if (!button.dataset.bound) {
+                button.dataset.bound = 'true';
+                button.addEventListener('click', () => { void fetchAddresses(); });
+        }
+}
+
+async function fetchAddresses(revision = dashboardRevision) {
+        const uid = dashboardUser?.uid;
+        const mutationRevision = propertyMutationRevision;
+        const status = document.getElementById('property-list-status');
+        const retry = document.getElementById('property-list-retry');
+        if (retry) { retry.disabled = true; retry.hidden = true; retry.style.display = 'none'; }
+        if (status) status.textContent = 'Loading saved properties…';
+        try {
+                const response = await dashboardAuthFetch('/api/addresses?summary=1');
+                if (!response.ok) throw new Error('Could not load your saved properties.');
+                const rows = await response.json();
+                if (!Array.isArray(rows)) throw new Error('Could not read your saved properties.');
+                if (!dashboardIsCurrent(uid, revision)) return false;
+                if (mutationRevision !== propertyMutationRevision) {
+                        void fetchAddresses(revision);
+                        return false;
+                }
+                const previous = new Map(userAddresses.map(row => [Number(row.id),row]));
+                userAddresses = rows.map(row => ({...previous.get(Number(row.id)),...row}));
+                propertiesReady = true;
+                if (status) status.textContent = '';
+                if (retry) retry.hidden = true;
+                saveDashboardCache(uid);
+                renderAccountSummary(dashboardUser);
+                renderAddressList();
+                return true;
+        } catch (error) {
+                if (!dashboardIsCurrent(uid, revision)) return false;
+                if (status) status.textContent = userAddresses.length ? 'Could not refresh saved properties. Your previously loaded properties are still shown.' : 'Could not load your saved properties. Try again.';
+                if (!userAddresses.length) document.getElementById('address-list')?.replaceChildren();
+                if (retry) { retry.hidden = false; retry.style.display = ''; }
+                return false;
+        } finally { if (retry && dashboardIsCurrent(uid, revision)) retry.disabled = false; }
 }
 
 function dashboardCacheKey(uid) {
@@ -115,41 +214,33 @@ function saveDashboardCache(uid) {
 }
 
 async function dashboardAuthFetch(url, options = {}) {
-        if (!dashboardUser) {
-                return authFetch(url, options);
-        }
-
-        const user = auth.currentUser || dashboardUser;
-        const token = await user.getIdToken();
-        const headers = new Headers(options.headers || {});
-        headers.set('Authorization', `Bearer ${token}`);
-        headers.set('X-Firebase-Auth', token);
-
-        return fetch(url, {
-                ...options,
-                headers
-        });
+        if (dashboardUser && auth.currentUser?.uid !== dashboardUser.uid) throw new Error('Your account changed. Please reopen My Account.');
+        const signal = options.signal || (typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(15000) : undefined);
+        return authFetch(url, {...options, signal});
 }
 
-async function fetchAppeals() {
+async function fetchAppeals(revision = dashboardRevision) {
+        const uid = dashboardUser?.uid;
         try {
                 const response = await dashboardAuthFetch('/api/history');
                 if (!response.ok) throw new Error('Failed to fetch appeals');
-                allAppeals = await response.json();
+                const rows = await response.json();
+                if (dashboardIsCurrent(uid, revision)) allAppeals = rows;
         } catch (error) {
                 console.error("Error fetching appeals:", error);
         }
 }
 
-async function fetchAccountNotifications() {
+async function fetchAccountNotifications(revision = dashboardRevision) {
+        const uid = dashboardUser?.uid;
         try {
                 const response = await dashboardAuthFetch('/api/notifications');
                 if (!response.ok) throw new Error('Failed to fetch notifications');
                 const data = await response.json();
-                accountNotifications = Array.isArray(data.notifications) ? data.notifications : [];
+                if (dashboardIsCurrent(uid, revision)) accountNotifications = Array.isArray(data.notifications) ? data.notifications : [];
         } catch (error) {
                 console.error('Error fetching account notifications:', error);
-                accountNotifications = [];
+                if (dashboardIsCurrent(uid, revision)) accountNotifications = [];
         }
 }
 
@@ -290,6 +381,7 @@ function renderCompletedAppealsPanel() {
 function renderAddressList() {
         const listContainer = document.getElementById('address-list');
         if (!listContainer) return;
+        if (!propertiesReady && userAddresses.length === 0) return;
 
         if (userAddresses.length === 0) {
                 listContainer.innerHTML = '<li class="text-sm text-muted">No addresses added yet.</li>';
@@ -316,7 +408,7 @@ function renderAddressList() {
                                 ${addrObj.pin ? `<div class="text-xs text-muted">${String(addrObj.pin).includes(',') ? 'PINs' : 'PIN'} ${escapeHtml(addrObj.pin)}</div>` : ''}
                                 ${addrObj.propertyDetails?.mailingName ? `<div class="text-xs text-muted">${escapeHtml(addrObj.propertyDetails.mailingName)}</div>` : ''}
                                 <div class="text-xs text-muted">${appealCount} appeal(s)</div>
-                                ${freeAppealTester ? `<a class="btn btn-primary btn-sm" style="margin-top:.75rem" href="appeal-packet.html?property=${encodeURIComponent(addrObj.id)}">Prepare my appeal</a>` : `<a class="btn btn-secondary btn-sm" style="margin-top:.75rem" href="#contact">Join appeal waitlist</a>`}
+                                ${!accessReady ? `<span class="text-sm text-muted">Checking appeal access…</span>` : freeAppealTester ? `<a class="btn btn-primary btn-sm" style="margin-top:.75rem" href="appeal-packet.html?property=${encodeURIComponent(addrObj.id)}">Prepare my appeal</a>` : `<a class="btn btn-secondary btn-sm" style="margin-top:.75rem" href="#contact">Join appeal waitlist</a>`}
                                 ${propertyStatus ? renderPropertyAppealStatus(propertyStatus) : ''}
                         </div>
                         ${canDelete ? `<button type="button" class="btn btn-secondary btn-sm delete-address-btn" data-address="${safeAddress}" data-property-key="${safePropertyKey}" aria-label="Delete ${safeAddress}">Delete</button>` : ''}
@@ -440,6 +532,7 @@ async function deleteAddress(address, propertyKey) {
                         return;
                 }
 
+                propertyMutationRevision++;
                 await fetchAddresses();
                 if (dashboardUser) saveDashboardCache(dashboardUser.uid);
                 renderAccountSummary(dashboardUser || auth.currentUser);
@@ -462,8 +555,34 @@ function showEmptyDetailsPanel() {
         }
 }
 
-function selectAddress(propertyKey) {
-        const selectedAddress = userAddresses.find(item => (item.property_key || item.propertyKey || item.address) === propertyKey);
+async function selectAddress(propertyKey) {
+        const selected = userAddresses.find(item => (item.property_key || item.propertyKey || item.address) === propertyKey);
+        if (!selected) return;
+        selectedPropertyId = Number(selected.id);
+        const uid = dashboardUser?.uid;
+        const revision = ++selectedDetailsRevision;
+        const cacheKey = `${uid}:${selected.id}`;
+        if (!loadedDetails.has(cacheKey)) {
+                document.getElementById('no-address-selected-msg').style.display = 'none';
+                document.getElementById('appeal-details-container').style.display = 'block';
+                document.getElementById('selected-address-title').textContent = selected.address;
+                const details = document.getElementById('selected-property-details');
+                if (details) { details.style.display = 'block'; details.textContent = 'Loading property details…'; }
+                try {
+                        const response = await dashboardAuthFetch(`/api/addresses?propertyId=${encodeURIComponent(selected.id)}`);
+                        if (!response.ok) throw new Error('Property details are unavailable.');
+                        const rows = await response.json();
+                        if (revision !== selectedDetailsRevision || dashboardUser?.uid !== uid || auth.currentUser?.uid !== uid) return;
+                        const row = rows.find(item => Number(item.id) === Number(selected.id));
+                        const target = userAddresses.find(item => Number(item.id) === Number(selected.id));
+                        if (row && target) { Object.assign(target,row); loadedDetails.add(cacheKey); saveDashboardCache(uid); }
+                } catch (error) { console.warn('Could not refresh property details:', error); }
+        }
+        if (revision !== selectedDetailsRevision || dashboardUser?.uid !== uid || auth.currentUser?.uid !== uid) return;
+        renderSelectedAddress(userAddresses.find(item => Number(item.id) === Number(selected.id)) || selected);
+}
+
+function renderSelectedAddress(selectedAddress) {
         const address = selectedAddress?.address || '';
         selectedAddressForImage = address;
         selectedPinForImage = '';
@@ -959,7 +1078,7 @@ function renderAppeals(appeals, address) {
                         const addr = e.currentTarget.dataset.address;
                         if (freeAppealTester) location.href = `appeal-packet.html?property=${encodeURIComponent(selectedProperty.id)}`;
                         else {
-                                const { openAppealModal } = await import('./appeal.js?v=20261103-session');
+                                const { openAppealModal } = await import('./appeal.js?v=20261103-account');
                                 openAppealModal(addr, selectedProperty);
                         }
                 });
@@ -974,123 +1093,166 @@ function uploadLegalFootnote() {
         `;
 }
 
+function cancelAddressLookup() {
+        window.clearTimeout(lookupTimer);
+        lookupRevision++;
+        lookupAbort?.abort();
+        activeSuggestionIndex = -1;
+        currentSuggestions = [];
+        document.getElementById('new-property-address')?.removeAttribute('aria-activedescendant');
+}
+
+function chooseAccountAddress(item) {
+        cancelAddressLookup();
+        const input = document.getElementById('new-property-address');
+        selectedAddressSuggestion = item.address;
+        selectedPropertyKeySuggestion = item.propertyKey || '';
+        input.value = item.address;
+        input.setCustomValidity('');
+        currentSuggestions = [];
+        document.getElementById('add-address-btn').disabled = !selectedPropertyKeySuggestion;
+        hideAddressSuggestions('property-address-suggestions');
+        input.setAttribute('aria-expanded','false');
+        input.focus({preventScroll:true});
+}
+
 function setupAddAddressForm() {
         const form = document.getElementById('add-address-form');
         if (!form) return;
+        const input = document.getElementById('new-property-address');
+        const button = document.getElementById('add-address-btn');
+        input.disabled = false;
+        button.disabled = !selectedPropertyKeySuggestion;
         if (form.dataset.bound === 'true') return;
         form.dataset.bound = 'true';
+        const status = document.createElement('p');
+        status.id = 'property-add-status';
+        status.setAttribute('role','status');
+        status.setAttribute('aria-live','polite');
+        form.after(status);
 
-        form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const input = document.getElementById('new-property-address');
+        form.addEventListener('submit', async event => {
+                event.preventDefault();
                 const address = selectedAddressSuggestion;
                 const propertyKey = selectedPropertyKeySuggestion;
-                const typedAddress = input.value.trim();
-                if (!address && typedAddress) {
-                        await updateAddressSuggestions(typedAddress, true);
-                        input.focus();
+                if (!address || !propertyKey || input.value.trim() !== address) {
+                        status.textContent = 'Choose a matching address from the suggestions before adding it.';
+                        if (input.value.trim().length >= 3) void updateAddressSuggestions(input.value, true);
                         return;
                 }
-
-                if (!address || !propertyKey) return;
-
-                const btn = document.getElementById('add-address-btn');
-                const originalText = btn.textContent;
-                btn.textContent = 'Adding...';
-                btn.disabled = true;
-
+                const uid = dashboardUser?.uid;
+                const revision = dashboardRevision;
+                cancelAddressLookup();
+                input.disabled = true;
+                button.disabled = true;
+                button.textContent = 'Adding…';
+                status.textContent = '';
                 try {
-                        const response = await dashboardAuthFetch('/api/addresses', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ address, propertyKey })
-                        });
-
-                        if (response.ok) {
-                                input.value = '';
-                                selectedAddressSuggestion = '';
-                                selectedPropertyKeySuggestion = '';
-                                hideAddressSuggestions('property-address-suggestions');
-                                // Refresh data
-                                await fetchAddresses();
-                                if (dashboardUser) saveDashboardCache(dashboardUser.uid);
-                                renderAccountSummary(dashboardUser || auth.currentUser);
+                        const response = await dashboardAuthFetch('/api/addresses', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({address,propertyKey})});
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.error || 'Could not add your property. Try again.');
+                        if (!dashboardIsCurrent(uid, revision)) return;
+                        propertyMutationRevision++;
+                        if (result.savedProperty?.id) {
+                                const index = userAddresses.findIndex(row => Number(row.id) === Number(result.savedProperty.id));
+                                if (index >= 0) userAddresses[index] = {...userAddresses[index],...result.savedProperty};
+                                else userAddresses.unshift(result.savedProperty);
+                                propertiesReady = true;
+                                saveDashboardCache(uid);
+                                renderAccountSummary(dashboardUser);
                                 renderAddressList();
                         } else {
-                                const err = await response.json();
-                                alert(`Failed to add address: ${err.error}`);
+                                await fetchAddresses(revision);
                         }
+                        input.value = '';
+                        selectedAddressSuggestion = '';
+                        selectedPropertyKeySuggestion = '';
+                        currentSuggestions = [];
+                        hideAddressSuggestions('property-address-suggestions');
+                        input.setAttribute('aria-expanded','false');
+                        status.textContent = 'Property saved to your account.';
                 } catch (error) {
-                        console.error("Error adding address:", error);
-                        alert('An error occurred while adding the address.');
+                        if (dashboardIsCurrent(uid, revision)) status.textContent = error.message || 'Could not add your property. Try again.';
                 } finally {
-                        btn.textContent = originalText;
-                        btn.disabled = false;
+                        if (dashboardIsCurrent(uid, revision)) {
+                                input.disabled = false;
+                                button.textContent = 'Add';
+                                button.disabled = !selectedPropertyKeySuggestion;
+                        }
                 }
         });
 
-        const input = document.getElementById('new-property-address');
-        input?.addEventListener('input', () => {
+        input.addEventListener('input', () => {
+                cancelAddressLookup();
                 selectedAddressSuggestion = '';
                 selectedPropertyKeySuggestion = '';
                 currentSuggestions = [];
-                window.clearTimeout(lookupTimer);
-                lookupTimer = window.setTimeout(() => {
-                        updateAddressSuggestions(input.value);
-                }, 250);
+                button.disabled = true;
+                status.textContent = '';
+                hideAddressSuggestions('property-address-suggestions');
+                input.setAttribute('aria-expanded','false');
+                lookupTimer = window.setTimeout(() => { void updateAddressSuggestions(input.value); }, 250);
         });
-
-        input?.addEventListener('focus', () => {
-                if (input.value.trim().length >= 3) {
-                        updateAddressSuggestions(input.value);
+        input.addEventListener('focus', () => {
+                if (selectedPropertyKeySuggestion && input.value === selectedAddressSuggestion) return;
+                if (input.value.trim().length >= 3) void updateAddressSuggestions(input.value);
+        });
+        input.addEventListener('keydown', event => {
+                if (event.key === 'Escape') {
+                        cancelAddressLookup();
+                        hideAddressSuggestions('property-address-suggestions');
+                        input.setAttribute('aria-expanded','false');
+                } else if (['ArrowDown','ArrowUp'].includes(event.key) && currentSuggestions.length) {
+                        event.preventDefault();
+                        const step = event.key === 'ArrowDown' ? 1 : -1;
+                        activeSuggestionIndex = activeSuggestionIndex < 0 ? (step > 0 ? 0 : currentSuggestions.length - 1) : (activeSuggestionIndex + step + currentSuggestions.length) % currentSuggestions.length;
+                        const buttons = form.querySelectorAll('.address-suggestion');
+                        buttons.forEach((item,index) => { item.setAttribute('aria-selected',String(index === activeSuggestionIndex)); item.style.background = index === activeSuggestionIndex ? 'var(--primary-subtle)' : ''; });
+                        const active = buttons[activeSuggestionIndex];
+                        if (active) { input.setAttribute('aria-activedescendant',active.id); active.scrollIntoView({block:'nearest'}); }
+                } else if (event.key === 'Enter' && !selectedPropertyKeySuggestion) {
+                        event.preventDefault();
+                        if (currentSuggestions.length) chooseAccountAddress(currentSuggestions[Math.max(0,activeSuggestionIndex)]);
+                        else if (input.value.trim().length >= 3) void updateAddressSuggestions(input.value, true);
                 }
         });
-
-        document.addEventListener('click', (event) => {
+        document.addEventListener('click', event => {
                 if (!event.target.closest('#add-address-form')) {
+                        cancelAddressLookup();
                         hideAddressSuggestions('property-address-suggestions');
+                        input.setAttribute('aria-expanded','false');
                 }
         });
 }
 
 async function updateAddressSuggestions(query, forceVisible = false) {
+        cancelAddressLookup();
+        const revision = lookupRevision;
+        const input = document.getElementById('new-property-address');
         const suggestionsPanel = document.getElementById('property-address-suggestions');
-        if (!suggestionsPanel) return;
-
-        if (!query || query.trim().length < 3) {
+        const value = String(query || '').trim();
+        if (!suggestionsPanel || value.length < 3) {
                 hideAddressSuggestions('property-address-suggestions');
                 return;
         }
-
-        suggestionsPanel.innerHTML = '<div class="address-suggestion-helper">Searching Cook County addresses...</div>';
+        lookupAbort = new AbortController();
+        const controller = lookupAbort;
+        const timeout = setTimeout(() => controller.abort(), 10000);
+        suggestionsPanel.innerHTML = '<div class="address-suggestion-helper">Searching Cook County addresses…</div>';
         suggestionsPanel.classList.add('is-visible');
-
+        input.setAttribute('aria-expanded','true');
         try {
-                const response = await dashboardAuthFetch(`/api/address-lookup?q=${encodeURIComponent(query)}&limit=5`);
-                if (!response.ok) {
-                        const error = await response.json().catch(() => ({}));
-                        renderAddressSuggestionMessage(
-                                'property-address-suggestions',
-                                error.error || 'Could not load address suggestions.'
-                        );
-                        return;
-                }
-
+                const response = await dashboardAuthFetch(`/api/address-lookup?q=${encodeURIComponent(value)}&limit=5`, {signal:controller.signal});
                 const data = await response.json();
-                currentSuggestions = data.suggestions || [];
-                renderAddressSuggestions('property-address-suggestions', currentSuggestions, (item) => {
-                        const input = document.getElementById('new-property-address');
-                        if (input) {
-                                input.value = item.address;
-                                input.focus();
-                        }
-                        selectedAddressSuggestion = item.address;
-                        selectedPropertyKeySuggestion = item.propertyKey || '';
-                }, forceVisible ? 'Select the closest matching address before adding it.' : '');
+                if (revision !== lookupRevision || input.value.trim() !== value) return;
+                if (!response.ok) throw new Error(data.error || 'Could not load address suggestions.');
+                currentSuggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
+                renderAddressSuggestions('property-address-suggestions', currentSuggestions, chooseAccountAddress, forceVisible ? 'Choose a matching property, then click Add.' : '');
         } catch (error) {
-                console.error('Address lookup failed:', error);
-                renderAddressSuggestionMessage('property-address-suggestions', 'Could not load address suggestions.');
-        }
+                if (revision !== lookupRevision || input.value.trim() !== value) return;
+                currentSuggestions = [];
+                renderAddressSuggestionMessage('property-address-suggestions', error.name === 'AbortError' ? 'Address search took too long. Keep typing or try again.' : error.message || 'Could not load address suggestions.');
+        } finally { clearTimeout(timeout); }
 }
 
 function renderAddressSuggestions(containerId, suggestions, onSelect, helperText = '') {
@@ -1108,7 +1270,7 @@ function renderAddressSuggestions(containerId, suggestions, onSelect, helperText
         panel.innerHTML = `
                 ${helperText ? `<div class="address-suggestion-helper">${escapeHtml(helperText)}</div>` : ''}
                 ${suggestions.slice(0, 5).map((item, index) => `
-                <button type="button" class="address-suggestion" role="option" data-index="${index}">
+                <button type="button" class="address-suggestion" role="option" id="account-address-option-${index}" aria-selected="false" data-index="${index}">
                         ${escapeHtml(item.address)}
                         <span>${escapeHtml([
                                 item.pin ? `PIN ${item.pin}` : 'Cook County property record',

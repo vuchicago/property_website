@@ -44,6 +44,8 @@ Session checks include delayed Firebase restoration, navigation from a saved pro
 
 Property-loading regressions execute the actual SQL against 100,000 unrelated property records and check its query plan for index use. Browser tests verify that starting a selected property skips the property list, existing packets open independently of property/history failures, pending history does not block the picker, and retry preserves the property and year without creating another workspace.
 
+Account tests hold administrator-role and appeal-access responses open while loading properties and typing an address. They cover live suggestions without Enter, Enter selecting before submission, adding during an older pending list request, persistence after reload, retry after a failed list request, and loading details for only the selected property. The Worker integration also searches an address, saves it, reloads it, rejects another account's detail request, and starts an appeal using the saved account ID.
+
 These browser fixtures do not test real Firebase login, provider credentials, live email delivery, the external ROI/loan iframe calculators, or an actual Stripe/DocuSign transaction. Complete the manual account and test-provider steps in [APPEAL_LOCAL_TESTING.md](APPEAL_LOCAL_TESTING.md) before releasing those integrations.
 
 ## Cloudflare Functions compilation

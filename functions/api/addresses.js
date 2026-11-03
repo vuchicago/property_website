@@ -92,7 +92,10 @@ export const onRequestGet = async (context) => {
         if (!context.env.DB) return jsonResponse({ error: 'Database not configured' }, 500);
         try {
                 const summary = new URL(context.request.url).searchParams.get('summary') === '1';
-                const result = jsonResponse(await getSavedProperties(context.env.DB, user.uid, { summary }));
+                const rawPropertyId = new URL(context.request.url).searchParams.get('propertyId');
+                const propertyId = rawPropertyId === null ? null : Number(rawPropertyId);
+                if (propertyId !== null && (!Number.isInteger(propertyId) || propertyId < 1)) return jsonResponse({error:'Choose a valid saved property.'},400);
+                const result = jsonResponse(await getSavedProperties(context.env.DB, user.uid, { summary, propertyId }));
                 result.headers.set('Cache-Control', 'private, no-store');
                 return result;
         } catch (error) {
@@ -151,6 +154,9 @@ export const onRequestPost = async (context) => {
                 const result = await context.env.DB.prepare(
                         "INSERT OR IGNORE INTO user_addresses (customer_id, address, property_key, email) VALUES (?, ?, ?, ?)"
                 ).bind(user.uid, propertyAddress.address, propertyAddress.property_key, user.email || '').run();
+                const savedProperty = await context.env.DB.prepare(
+                        'SELECT id, address, property_key, created_at FROM user_addresses WHERE customer_id = ? AND property_key = ?'
+                ).bind(user.uid,propertyAddress.property_key).first();
 
                 // If changes === 0, it means it was a duplicate (ignored due to UNIQUE constraint)
                 if (result.meta && result.meta.changes === 0) {
@@ -159,7 +165,8 @@ export const onRequestPost = async (context) => {
                                 message: 'Address already exists',
                                 address: propertyAddress.address,
                                 propertyKey: propertyAddress.property_key,
-                                property: propertyAddress
+                                property: propertyAddress,
+                                savedProperty
                         });
                 }
 
@@ -167,7 +174,8 @@ export const onRequestPost = async (context) => {
                         success: true,
                         address: propertyAddress.address,
                         propertyKey: propertyAddress.property_key,
-                        property: propertyAddress
+                        property: propertyAddress,
+                        savedProperty
                 });
         } catch (err) {
                 return jsonResponse({ error: err.message }, 500);

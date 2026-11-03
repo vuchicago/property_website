@@ -37,6 +37,7 @@ before(async () => {
     for (const statement of statements) await db.prepare(statement).run();
     await db.prepare("INSERT INTO appeal_pilot_access(email,invited_by) VALUES('owner@example.com','admin@example.com'),('stranger@example.com','admin@example.com')").run();
     await db.prepare("INSERT INTO property_addresses(id,pin,address,normalized_address,taxable_value,home_size,year_built,pin_proration_rate) VALUES(1,'00000000000001','123 TEST AVE SKOKIE','123 TEST AVE SKOKIE',21000,1450,1965,1)").run();
+    await db.prepare("INSERT INTO property_addresses(id,pin,address,normalized_address,taxable_value,home_size,year_built,pin_proration_rate) VALUES(2,'00000000000002','125 TEST AVE SKOKIE','125 TEST AVE SKOKIE',22000,1500,1966,1)").run();
     await db.prepare("INSERT INTO user_addresses(id,customer_id,address,property_key,email) VALUES(7,'owner','123 TEST AVE SKOKIE','123 TEST AVE SKOKIE|pin:00000000000001','owner@example.com')").run();
     await db.prepare("WITH RECURSIVE entries(n) AS (SELECT 1000 UNION ALL SELECT n+1 FROM entries WHERE n<100999) INSERT INTO property_addresses(id,pin,address,normalized_address,taxable_value,pin_proration_rate) SELECT n,printf('%014d',n),printf('%d UNRELATED ST',n),printf('%d UNRELATED ST',n),10000,1 FROM entries").run();
 }, { timeout: 60000 });
@@ -81,4 +82,29 @@ test('local Worker denies another account and anonymous access to the appeal', a
     const summary = await api('/api/addresses?summary=1', 'stranger');
     assert.deepEqual(await summary.json(), []);
     assert.equal((await worker.dispatchFetch(`https://local.test/api/packet?id=${packetId}`)).status, 401);
+});
+
+test('local Worker searches, saves, and reloads a property using its account-owned ID', async () => {
+    const lookup=await api('/api/address-lookup?q=125%20TEST%20AVE&limit=5');
+    assert.equal(lookup.status,200,await lookup.clone().text());
+    const suggestion=(await lookup.json()).suggestions.find(item=>item.address==='125 TEST AVE SKOKIE');
+    assert.ok(suggestion);
+    const input={address:suggestion.address,propertyKey:suggestion.propertyKey};
+    const added=await api('/api/addresses','owner',input);
+    assert.equal(added.status,200,await added.clone().text());
+    const saved=(await added.json()).savedProperty;
+    assert.ok(saved?.id);
+    assert.notEqual(saved.id,suggestion.id);
+    const summary=await api('/api/addresses?summary=1');
+    assert.ok((await summary.json()).some(row=>row.id===saved.id&&row.address===suggestion.address));
+    const details=await api(`/api/addresses?propertyId=${saved.id}`);
+    assert.equal((await details.json())[0].propertyDetails.taxableValue,22000);
+    const duplicate=await api('/api/addresses','owner',input);
+    assert.equal((await duplicate.json()).savedProperty.id,saved.id);
+    const stranger=await api(`/api/addresses?propertyId=${saved.id}`,'stranger');
+    assert.deepEqual(await stranger.json(),[]);
+    const created=await api('/api/packet-start','owner',{propertyId:saved.id,taxYear:2026});
+    assert.equal(created.status,200,await created.clone().text());
+    const opened=await api(`/api/packet?id=${(await created.json()).id}`);
+    assert.equal((await opened.json()).state.propertySnapshot.address,suggestion.address);
 });

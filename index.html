@@ -398,20 +398,18 @@
 
                     <form id="add-address-form" style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
                         <div class="address-search-wrap">
-                            <input type="text" id="new-property-address" placeholder="Enter Cook County, IL address"
+                            <input type="text" id="new-property-address" disabled role="combobox" aria-expanded="false" placeholder="Enter Cook County, IL address"
                                 required autocomplete="off" aria-autocomplete="list"
                                 aria-controls="property-address-suggestions"
                                 style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
                             <div id="property-address-suggestions" class="address-suggestions" role="listbox"></div>
                         </div>
-                        <button type="submit" class="btn btn-primary" id="add-address-btn"
+                        <button type="submit" class="btn btn-primary" id="add-address-btn" disabled
                             style="padding: 0.5rem 1rem;">Add</button>
                     </form>
 
                     <ul id="address-list" class="address-list"
-                        style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem;">
-                        <!-- Addresses loaded here -->
-                    </ul>
+                        style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem;"><li class="text-sm text-muted">Loading saved properties…</li></ul>
                 </div>
 
                 <!-- Appeal Details Side -->
@@ -1176,13 +1174,13 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script type="module" src="components.js"></script>
     <script type="module">
-        import { initAuthUI } from './auth-client.js?v=20261103-session';
+        import { initAuthUI } from './auth-client.js?v=20261103-account';
         initAuthUI();
     </script>
-    <script type="module" src="appeal.js?v=20261103-session"></script>
+    <script type="module" src="appeal.js?v=20261103-account"></script>
     <script src="appeal_deadlines.js?v=20261102-deadlines"></script>
     <script src="app.js?v=20260527-analyze-click"></script>
-    <script src="property-tax.js?v=20261103-session"></script>
+    <script src="property-tax.js?v=20261103-account"></script>
     <script src="roi-calculator.js"></script>
     <script src="loan-tool.js"></script>
 </body>
