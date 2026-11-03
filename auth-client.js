@@ -219,15 +219,23 @@ export const getCurrentUserToken = async () => {
 };
 
 export const authFetch = async (url, options = {}) => {
+        const user = await waitForAuthUser();
         const token = await getCurrentUserToken();
         const headers = new Headers(options.headers || {});
-        headers.set('Authorization', `Bearer ${token}`);
-        headers.set('X-Firebase-Auth', token);
-
-        return fetch(url, {
-                ...options,
-                headers
-        });
+        const send = value => {
+                if (auth.currentUser?.uid !== user.uid) throw new Error('Your account changed. Please try again.');
+                headers.set('Authorization', `Bearer ${value}`);
+                headers.set('X-Firebase-Auth', value);
+                return fetch(url, { ...options, cache: 'no-store', headers });
+        };
+        const response = await send(token);
+        // A restored Firebase session can still hold a rejected cached token.
+        // Retry once with a fresh token; a 401 is returned before API mutations.
+        if (response.status !== 401 || options.signal?.aborted || options.body instanceof ReadableStream) return response;
+        if (auth.currentUser?.uid !== user.uid) throw new Error('Your account changed. Please try again.');
+        const freshToken = await user.getIdToken(true);
+        if (!freshToken) return response;
+        return send(freshToken);
 };
 
 // UI State Management
@@ -262,7 +270,7 @@ const updateNavigation = (user) => {
                 if (user) {
                         dashboard.style.display = 'block';
                         // Load history
-                        import('./history.js?v=20261103-account').then(module => {
+                        import('./history.js?v=20261103-packet-access').then(module => {
                                 module.loadAppealHistory(user);
                         }).catch(err => console.error("Failed to load history module:", err));
                 } else {

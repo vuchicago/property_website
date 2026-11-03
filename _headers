@@ -1,0 +1,4 @@
+# Revalidate application scripts after a deployment instead of retaining an
+# older session/access implementation for Cloudflare's default four hours.
+/*.js
+  Cache-Control: no-cache

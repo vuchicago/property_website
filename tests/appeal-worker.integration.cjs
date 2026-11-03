@@ -43,9 +43,9 @@ before(async () => {
 }, { timeout: 60000 });
 after(async () => { await worker?.dispose(); });
 
-async function api(route, uid = 'owner', body) {
+async function api(route, uid = 'owner', body, claims = {}) {
     const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
-    const content = `${encode({ alg: 'RS256', kid: jwk.kid })}.${encode({ sub: uid, email: `${uid}@example.com`, email_verified: true, aud: 'cookcounty-tax-compare', iss: 'https://securetoken.google.com/cookcounty-tax-compare', exp: Math.floor(Date.now() / 1000) + 3600 })}`;
+    const content = `${encode({ alg: 'RS256', kid: jwk.kid })}.${encode({ sub: uid, email: `${uid}@example.com`, email_verified: true, aud: 'cookcounty-tax-compare', iss: 'https://securetoken.google.com/cookcounty-tax-compare', exp: Math.floor(Date.now() / 1000) + 3600, ...claims })}`;
     const signature = Buffer.from(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', pair.privateKey, new TextEncoder().encode(content))).toString('base64url');
     return worker.dispatchFetch(`https://local.test${route}`, { method: body ? 'POST' : 'GET', headers: { Authorization: `Bearer ${content}.${signature}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
 }
@@ -107,4 +107,30 @@ test('local Worker searches, saves, and reloads a property using its account-own
     assert.equal(created.status,200,await created.clone().text());
     const opened=await api(`/api/packet?id=${(await created.json()).id}`);
     assert.equal((await opened.json()).state.propertySnapshot.address,suggestion.address);
+});
+
+test('local Worker enforces invitation status on start and packet reads independently of the access endpoint', async () => {
+    const allowed=await api('/api/appeal-access');
+    assert.deepEqual(await allowed.json(),{allowed:true,admin:false});
+    assert.match(allowed.headers.get('Cache-Control'),/private.*no-store/);
+    const countBefore=(await db.prepare('SELECT count(*) AS total FROM appeals').first()).total;
+    await db.prepare("UPDATE appeal_pilot_access SET active=0 WHERE email='owner@example.com'").run();
+    try {
+        const denied=await api('/api/appeal-access');
+        assert.deepEqual(await denied.json(),{allowed:false,admin:false});
+        assert.equal((await api('/api/packet-start','owner',{propertyId:7,taxYear:2026})).status,403);
+        assert.equal((await api(`/api/packet?id=${packetId}`)).status,403);
+        // Account data remains available even when free preparation is paused.
+        assert.equal((await api('/api/addresses?summary=1')).status,200);
+        assert.equal((await db.prepare('SELECT count(*) AS total FROM appeals').first()).total,countBefore);
+        const uninvited={email:'uninvited@example.com'};
+        assert.equal((await api('/api/packet-start','owner',{propertyId:7,taxYear:2026},uninvited)).status,403);
+    } finally {
+        await db.prepare("UPDATE appeal_pilot_access SET active=1 WHERE email='owner@example.com'").run();
+    }
+    const primary=await api('/api/appeal-access','primary',undefined,{email:'vuchicago@gmail.com'});
+    assert.deepEqual(await primary.json(),{allowed:true,admin:true});
+    const anonymous=await worker.dispatchFetch('https://local.test/api/appeal-access');
+    assert.equal(anonymous.status,401);
+    assert.match(anonymous.headers.get('Cache-Control'),/no-store/);
 });

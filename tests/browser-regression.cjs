@@ -37,7 +37,8 @@ function firebaseSource(identity, options = {}) {
         const identity = ${JSON.stringify(identity)};
         let resolveReady;
         const ready = new Promise(resolve => { resolveReady = resolve; });
-        const makeUser = value => value ? {...value, reload: async()=>{ window.__regressionReloads = (window.__regressionReloads || 0) + 1; if (${Boolean(options.refreshVerified)}) auth.currentUser.emailVerified = true; }, getIdToken: async()=> 'regression-token', providerData: []} : null;
+        let cachedToken = 'regression-token';
+        const makeUser = value => value ? {...value, reload: async()=>{ window.__regressionReloads = (window.__regressionReloads || 0) + 1; if (${Boolean(options.refreshVerified)}) auth.currentUser.emailVerified = true; }, getIdToken: async force => { if (force) { window.__regressionTokenRefreshes = (window.__regressionTokenRefreshes || 0) + 1; cachedToken = 'regression-fresh-token'; } return cachedToken; }, providerData: []} : null;
         const subscribe = callback => { callbacks.add(callback); ready.then(()=>{ if(callbacks.has(callback)) callback(auth.currentUser); }); return ()=>callbacks.delete(callback); };
         const auth = { currentUser: null, onAuthStateChanged: subscribe, authStateReady: ()=>ready };
         const restore = ()=>{ auth.currentUser = sessionStorage.getItem('regression-signed-out') || (${Boolean(options.startSignedOut)} && !sessionStorage.getItem('regression-signed-in')) ? null : makeUser(identity); resolveReady(); };
@@ -64,6 +65,8 @@ async function scenario(options = {}) {
     store.addressPosts = [];
     store.lookups = [];
     store.summaryRequests = 0;
+    store.authAttempts = [];
+    store.history = options.history || [];
     const gates = {}, releases = [], pendingResponses = [];
     for (const name of ['History','Roles','Access','Properties']) {
         gates[name] = new Promise(resolve => {
@@ -87,6 +90,8 @@ async function scenario(options = {}) {
         if (url.origin !== base.origin) return route.fulfill({ contentType: request.resourceType() === 'document' ? 'text/html' : request.resourceType() === 'stylesheet' ? 'text/css' : 'text/javascript', body: '' });
         if (!url.pathname.startsWith('/api/')) return route.continue();
         store.requests.push(url.pathname + url.search);
+        store.authAttempts.push({path:url.pathname, method:request.method(), token:request.headers().authorization, body:request.postData()});
+        if (options.alwaysUnauthorized || (options.rejectCachedToken && request.headers().authorization === 'Bearer regression-token')) return json({error:'Unauthorized'},401);
         switch (url.pathname) {
             case '/api/appeal-access': return deferred('Access', () => store.accessFails ? json({ error: 'Test access service unavailable' }, 503) : json({ allowed: store.access, admin: ['admin', 'superadmin'].includes(options.role) }));
             case '/api/addresses': {
@@ -108,7 +113,7 @@ async function scenario(options = {}) {
             }
             case '/api/history': {
                 store.historyRequests++;
-                return deferred('History', () => store.historyFails ? json({ error: 'Test history failure' }, 503) : json([]));
+                return deferred('History', () => store.historyFails ? json({ error: 'Test history failure' }, 503) : json(store.history));
             }
             case '/api/notifications':
             case '/api/admin/notifications': return json({ notifications: [] });
@@ -130,6 +135,7 @@ async function scenario(options = {}) {
                 store.contacts.push(request.postDataJSON());
                 return store.contactFails ? json({ error: 'Test submission failure' }, 503) : json({ success: true, captured: true, emailSent: false });
             case '/api/packet-start':
+                if (!store.access) return json({ error:'Free appeal testing is currently by invitation.' },403);
                 store.starts.push(request.postDataJSON());
                 if (store.startFailsLeft > 0) { store.startFailsLeft--; return json({ error: 'Test appeal start failure' }, 503); }
                 return json({ id: 'free_fixture', url: 'appeal-packet.html?id=free_fixture' });
@@ -458,7 +464,7 @@ test('unverified account remains signed in while protected appeal actions stay u
         assert.equal(s.store.starts.length, 0);
         assert.equal(await s.page.evaluate(() => sessionStorage.getItem('regression-sign-outs')), null);
         const result = await s.page.evaluate(async () => {
-            const { authFetch } = await import('/auth-client.js?v=20261103-account');
+            const { authFetch } = await import('/auth-client.js?v=20261103-packet-access');
             try { await authFetch('/api/addresses'); return 'unexpected access'; } catch (error) { return error.message; }
         });
         assert.match(result, /verify your email/i);
@@ -468,16 +474,92 @@ test('unverified account remains signed in while protected appeal actions stay u
     } finally { await s.close(); }
 });
 
-test('temporary access-service failure does not turn a signed-in account into a sign-in prompt', async () => {
-    const s = await scenario({ email: 'tester@example.com', access: true });
+test('landing-page packet action starts an appeal even when the advisory access service fails', async () => {
+    const s = await scenario({ email: 'vuchicago@gmail.com', access: true });
     try {
         s.store.accessFails = true;
-        await s.goto('/appeal-packet.html');
-        await s.page.waitForFunction(() => document.getElementById('packet-message').textContent.includes('Could not check appeal access'));
-        assert.equal(await s.page.locator('#packet-session').textContent(), 'Signed in as tester@example.com');
+        await s.goto('/index.html');
+        await s.page.getByRole('link', {name:'Start or manage my packet',exact:true}).click();
+        await s.page.locator('#packet-property option[value="7"]').waitFor({state:'attached'});
+        await s.page.locator('#packet-property').selectOption('7');
+        await s.page.locator('#packet-start').click();
+        await s.page.getByRole('heading',{name:'Submit it yourself · Free'}).waitFor();
+        assert.equal(await s.page.locator('#packet-session').textContent(), 'Signed in as vuchicago@gmail.com');
         assert.equal(await s.page.locator('#packet-sign-in').isVisible(), false);
         assert.equal(await s.page.locator('#packet-waitlist').isVisible(), false);
+        assert.equal(s.store.starts.length,1);
         assert.equal(await s.page.evaluate(() => sessionStorage.getItem('regression-sign-outs')), null);
+    } finally { await s.close(); }
+});
+
+test('packet picker and start do not wait for a pending advisory access request', async () => {
+    const s = await scenario({email:'tester@example.com',access:true,holdAccess:true});
+    try {
+        await s.goto('/appeal-packet.html');
+        await s.page.locator('#packet-property option[value="7"]').waitFor({state:'attached'});
+        await s.page.locator('#packet-property').selectOption('7');
+        await s.page.locator('#packet-start').click();
+        await s.page.getByRole('heading',{name:'Submit it yourself · Free'}).waitFor();
+        s.store.releaseAccess();
+        await s.page.waitForTimeout(100);
+        assert.equal(await s.page.locator('#packet-workspace').isVisible(),true);
+        assert.equal(s.store.starts.length,1);
+    } finally { await s.close(); }
+});
+
+test('failed advisory access cannot bypass the server invitation requirement', async () => {
+    const s = await scenario({email:'member@example.com'});
+    try {
+        s.store.accessFails=true;
+        await s.goto('/appeal-packet.html');
+        await s.page.locator('#packet-property option[value="7"]').waitFor({state:'attached'});
+        await s.page.locator('#packet-property').selectOption('7');
+        await s.page.locator('#packet-start').click();
+        await s.page.locator('#packet-waitlist').waitFor();
+        assert.equal(await s.page.locator('#packet-workspace').isVisible(),false);
+        assert.equal(s.store.starts.length,0);
+        assert.equal(await s.page.locator('#packet-sign-in').isVisible(),false);
+    } finally { await s.close(); }
+});
+
+test('existing packets can be listed and opened while the access service fails', async () => {
+    const s = await scenario({email:'tester@example.com',access:true,holdProperties:true,history:[{id:'free_fixture',propertyAddress:property.address}]});
+    try {
+        s.store.accessFails=true;
+        await s.goto('/appeal-packet.html');
+        await s.page.locator('#packet-existing').getByRole('link',{name:/open packet/}).click();
+        await s.page.getByRole('heading',{name:'Submit it yourself · Free'}).waitFor();
+        assert.equal(s.store.starts.length,0);
+        assert.equal(await s.page.locator('#packet-sign-in').isVisible(),false);
+    } finally { await s.close(); }
+});
+
+test('a rejected cached token refreshes once and retries the same packet start before any mutation', async () => {
+    const s = await scenario({email:'tester@example.com',access:true,rejectCachedToken:true});
+    try {
+        await s.goto('/appeal-packet.html?property=7');
+        await s.page.getByRole('heading',{name:'Submit it yourself · Free'}).waitFor();
+        const attempts=s.store.authAttempts.filter(row=>row.path==='/api/packet-start');
+        assert.equal(attempts.length,2);
+        assert.equal(attempts[0].token,'Bearer regression-token');
+        assert.equal(attempts[1].token,'Bearer regression-fresh-token');
+        assert.equal(attempts[0].method,'POST');
+        assert.equal(attempts[0].body,attempts[1].body);
+        assert.equal(s.store.starts.length,1);
+        assert.equal(await s.page.evaluate(()=>window.__regressionTokenRefreshes),1);
+        assert.equal(await s.page.evaluate(()=>sessionStorage.getItem('regression-sign-outs')),null);
+    } finally { await s.close(); }
+});
+
+test('persistent unauthorized responses stop after one token retry without signing out', async () => {
+    const s = await scenario({email:'tester@example.com',access:true,alwaysUnauthorized:true});
+    try {
+        await s.goto('/appeal-packet.html?property=7');
+        await s.page.locator('#packet-retry').waitFor();
+        assert.equal(s.store.authAttempts.filter(row=>row.path==='/api/packet-start').length,2);
+        assert.equal(s.store.starts.length,0);
+        assert.equal(await s.page.locator('#packet-sign-in').isVisible(),false);
+        assert.equal(await s.page.evaluate(()=>sessionStorage.getItem('regression-sign-outs')),null);
     } finally { await s.close(); }
 });
 

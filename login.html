@@ -585,8 +585,8 @@
 
         <!-- Auth Logic Script -->
         <script type="module">
-                import { auth, authFetch, loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, refreshCurrentUser, resetPasswordForEmail } from './auth-client.js?v=20261103-account';
-                import { loadAppealHistory } from './history.js?v=20261103-account';
+                import { auth, authFetch, loginUser, registerUser, signInWithGoogle, logoutUser, onAuthUserChanged, refreshCurrentUser, resetPasswordForEmail } from './auth-client.js?v=20261103-packet-access';
+                import { loadAppealHistory } from './history.js?v=20261103-packet-access';
 
                 const form = document.getElementById('auth-form');
                 const emailInput = document.getElementById('email');
@@ -776,7 +776,7 @@
                 });
 
                 addAppealBtn.addEventListener('click', async () => {
-                        const { openAppealModal } = await import('./appeal.js?v=20261103-account');
+                        const { openAppealModal } = await import('./appeal.js?v=20261103-packet-access');
                         openAppealModal();
                 });
 

@@ -46,6 +46,8 @@ Property-loading regressions execute the actual SQL against 100,000 unrelated pr
 
 Account tests hold administrator-role and appeal-access responses open while loading properties and typing an address. They cover live suggestions without Enter, Enter selecting before submission, adding during an older pending list request, persistence after reload, retry after a failed list request, and loading details for only the selected property. The Worker integration also searches an address, saves it, reloads it, rejects another account's detail request, and starts an appeal using the saved account ID.
 
+Packet-entry tests click the landing page's Start or manage my packet link while the advisory access endpoint returns 503, hold that endpoint open, and open existing packets while property loading is pending. They verify that cached-token rejection triggers exactly one refresh and preserves the POST body without duplicating the workspace. Persistent 401 responses stop after one retry. The real Worker tests separately confirm that paused and uninvited accounts cannot start or read free packets, and authenticated access responses cannot be cached. Frontend scripts use a shared deployment version and `_headers` makes browsers revalidate JavaScript after deployment.
+
 These browser fixtures do not test real Firebase login, provider credentials, live email delivery, the external ROI/loan iframe calculators, or an actual Stripe/DocuSign transaction. Complete the manual account and test-provider steps in [APPEAL_LOCAL_TESTING.md](APPEAL_LOCAL_TESTING.md) before releasing those integrations.
 
 ## Cloudflare Functions compilation

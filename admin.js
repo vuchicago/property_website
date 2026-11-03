@@ -1,4 +1,4 @@
-import { auth, authFetch } from './auth-client.js?v=20261103-account';
+import { auth, authFetch } from './auth-client.js?v=20261103-packet-access';
 
 const PRIMARY_SUPERADMIN_EMAIL = 'vuchicago@gmail.com';
 

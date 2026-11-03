@@ -1,5 +1,5 @@
 import { requirements, preparationProblems, evidenceCategories, OFFICIAL_FORM } from './packet-requirements.js';
-import { authFetch, onAuthUserChanged } from './auth-client.js?v=20261103-account';
+import { authFetch, onAuthUserChanged } from './auth-client.js?v=20261103-packet-access';
 
 const labels = { intake: 'Your information', preparing: 'Preparing packet', review: 'Review packet', approved: 'Download or choose fulfillment', awaiting_signature: 'Awaiting signatures', signed: 'Signed', mailed: 'Mailed', delivered: 'Delivered by carrier', filed: 'County filing confirmed' };
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -25,6 +25,7 @@ const retryButton = document.getElementById('packet-retry');
 let currentSessionUser = null;
 let pendingPropertyId = propertyQuery ? Number(propertyQuery) : null;
 let openingRevision = null;
+let pickerAccess = null;
 
 async function requestJSON(url, options = {}, failure = 'Could not load your appeal.') {
     const controller = new AbortController();
@@ -45,7 +46,10 @@ function showLoadError(error, revision) {
     if (revision !== sessionRevision) return;
     message(error.message, true);
     retryButton.hidden = [400,403,404].includes(error.status);
-    if (error.status === 403) document.getElementById('packet-waitlist').hidden = false;
+    if (error.status === 403) {
+        document.getElementById('packet-waitlist').hidden = false;
+        document.getElementById('packet-orders').hidden = true;
+    }
 }
 
 async function startOrResume(propertyId, revision) {
@@ -80,37 +84,54 @@ async function loadOrderList(revision) {
     try {
         const orders = await requestJSON('/api/history', {}, 'Could not load previous appeals.');
         if (revision !== sessionRevision || selectedId) return;
-        document.getElementById('order-list').innerHTML = orders.filter(order => order.id.startsWith('free_')).map(order => `<p><a href="appeal-packet.html?id=${encodeURIComponent(order.id)}">${escape(order.propertyAddress)} — open packet</a></p>`).join('') || '<p>No appeal workspaces yet. Choose a property above to start.</p>';
+        const packets = orders.filter(order => order.id.startsWith('free_'));
+        document.getElementById('order-list').innerHTML = packets.map(order => `<p><a href="appeal-packet.html?id=${encodeURIComponent(order.id)}">${escape(order.propertyAddress)} — open packet</a></p>`).join('');
+        document.getElementById('packet-existing').hidden = packets.length === 0;
     } catch {
-        if (revision === sessionRevision && !selectedId) document.getElementById('order-list').textContent = 'Previous appeals could not be listed. You can still start or resume using your saved property above.';
+        if (revision === sessionRevision && !selectedId) {
+            document.getElementById('order-list').textContent = 'Previous appeals could not be listed. You can still start or resume using your saved property above.';
+            document.getElementById('packet-existing').hidden = false;
+        }
+    }
+}
+
+async function checkPickerAccess(revision) {
+    try {
+        const access = await requestJSON('/api/appeal-access');
+        if (revision !== sessionRevision || selectedId || pendingPropertyId !== null) return;
+        pickerAccess = access.allowed === true;
+        if (!pickerAccess) {
+            document.getElementById('packet-orders').hidden = true;
+            document.getElementById('packet-waitlist').hidden = false;
+            message('Free appeal testing is currently by invitation.');
+        }
+    } catch {
+        // This is an advisory UI check. packet-start and packet always enforce
+        // access on the server, including when this separate service fails.
     }
 }
 
 async function loadPropertyPicker(revision) {
-    const access = await requestJSON('/api/appeal-access', {}, 'Could not check appeal access.');
-    if (revision !== sessionRevision) return;
-    if (!access.allowed) {
-        document.getElementById('packet-waitlist').hidden = false;
-        message('Free appeal testing is currently by invitation.');
-        return;
-    }
+    void checkPickerAccess(revision);
+    void loadOrderList(revision);
     const properties = await requestJSON('/api/addresses?summary=1', {}, 'Could not load saved properties.');
     if (revision !== sessionRevision) return;
     if (!Array.isArray(properties)) throw new Error('Your saved properties could not be read. Please try again.');
     propertySelect.innerHTML = '<option value="">Choose a saved property</option>' + properties.map(p => `<option value="${Number(p.id)}">${escape(p.address)}</option>`).join('');
     propertySelect.disabled = properties.length === 0;
+    if (pickerAccess === false) return;
     document.getElementById('packet-orders').hidden = false;
     message(properties.length ? 'Choose a saved property and assessment year to start or resume.' : 'Add a property in My account, then return here to prepare your appeal.');
-    // A slow history request must not block the property picker or appeal start.
-    void loadOrderList(revision);
 }
 
 async function initializeWorkspace(user) {
     const revision = ++sessionRevision;
+    pickerAccess = null;
     retryButton.hidden = true;
     startButton.disabled = true;
     propertySelect.disabled = true;
     document.getElementById('packet-orders').hidden = true;
+    document.getElementById('packet-existing').hidden = true;
     document.getElementById('packet-workspace').hidden = true;
     document.getElementById('packet-waitlist').hidden = true;
     signInLink.hidden = Boolean(user?.emailVerified);
@@ -166,6 +187,7 @@ async function load() {
     if(data.packetId)selectedId=data.packetId;
     render();
     document.getElementById('packet-orders').hidden = true;
+    document.getElementById('packet-existing').hidden = true;
     retryButton.hidden = true;
     message('Packet loaded.');
 }
