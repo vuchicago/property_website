@@ -17,7 +17,7 @@ export async function onRequestPost({request, env}) {
         if(existing) {
             const state=JSON.parse(existing.state_json);
             if(!state.propertySnapshot && ['intake','preparing'].includes(state.status)) {
-                state.propertySnapshot=await propertySnapshot({request,env},propertyId);
+                state.propertySnapshot=await propertySnapshot({env},propertyId,user.uid);
                 state.taxYear=taxYear;
                 await env.DB.prepare('UPDATE appeal_packets SET state_json = ?, revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE transaction_id = ? AND revision = ?').bind(JSON.stringify(state),existing.transaction_id,existing.revision).run();
             }
@@ -25,7 +25,7 @@ export async function onRequestPost({request, env}) {
         }
         const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([user.uid,propertyId,taxYear])));
         const id = `free_${Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('')}`;
-        const snapshot=await propertySnapshot({request,env},propertyId);
+        const snapshot=await propertySnapshot({env},propertyId,user.uid);
         await env.DB.batch([
             env.DB.prepare(`INSERT OR IGNORE INTO appeals (transaction_id, customer_id, customer_email, property_address, property_key, payment_amount, payment_status, appeal_status)
               VALUES (?, ?, ?, ?, ?, 0, 'free', 'Pending')`).bind(id,user.uid,user.email,property.address,property.property_key || null),

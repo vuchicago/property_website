@@ -58,7 +58,10 @@ function firebaseSource(identity, options = {}) {
 
 async function scenario(options = {}) {
     const identity = options.email ? { uid: 'regression-owner', email: options.email, emailVerified: options.verified !== false } : null;
-    const store = { contacts: [], starts: [], pilots: [], unexpected: [], contactFails: false, accessFails: false, access: Boolean(options.access), packetStatus: options.packetStatus || 'approved', signatureCalls: 0 };
+    const store = { contacts: [], starts: [], pilots: [], unexpected: [], requests: [], contactFails: false, accessFails: false, addressesFailsLeft: 0, startFailsLeft: 0, packetFailsLeft: 0, historyFails: false, historyRequests: 0, access: Boolean(options.access), packetStatus: options.packetStatus || 'approved', signatureCalls: 0 };
+    let releaseHistory;
+    const historyGate = new Promise(resolve => { releaseHistory = resolve; if (!options.holdHistory) resolve(); });
+    const historyResponses = [];
     const context = await browser.newContext({ viewport: { width: options.width || 1440, height: 900 }, reducedMotion: 'reduce' });
     await context.route('**/*', async route => {
         const request = route.request(), url = new URL(request.url());
@@ -68,10 +71,18 @@ async function scenario(options = {}) {
         if (url.pathname.endsWith('/firebase-auth.js')) return route.fulfill({ contentType: 'text/javascript', body: firebaseSource(identity, options) });
         if (url.origin !== base.origin) return route.fulfill({ contentType: request.resourceType() === 'document' ? 'text/html' : request.resourceType() === 'stylesheet' ? 'text/css' : 'text/javascript', body: '' });
         if (!url.pathname.startsWith('/api/')) return route.continue();
+        store.requests.push(url.pathname + url.search);
         switch (url.pathname) {
             case '/api/appeal-access': return store.accessFails ? json({ error: 'Test access service unavailable' }, 503) : json({ allowed: store.access, admin: ['admin', 'superadmin'].includes(options.role) });
-            case '/api/addresses': return json([property]);
-            case '/api/history': return json([]);
+            case '/api/addresses':
+                if (store.addressesFailsLeft > 0) { store.addressesFailsLeft--; return json({ error: 'Test property loading failure' }, 503); }
+                return json([property]);
+            case '/api/history': {
+                store.historyRequests++;
+                const response = historyGate.then(() => store.historyFails ? json({ error: 'Test history failure' }, 503) : json([]));
+                historyResponses.push(response);
+                return response;
+            }
             case '/api/notifications':
             case '/api/admin/notifications': return json({ notifications: [] });
             case '/api/admin/roles': return options.role ? json(url.searchParams.has('checkRoleOnly') ? { role: options.role } : { roles: [] }) : json({ error: 'Unauthorized' }, 403);
@@ -93,10 +104,12 @@ async function scenario(options = {}) {
                 return store.contactFails ? json({ error: 'Test submission failure' }, 503) : json({ success: true, captured: true, emailSent: false });
             case '/api/packet-start':
                 store.starts.push(request.postDataJSON());
+                if (store.startFailsLeft > 0) { store.startFailsLeft--; return json({ error: 'Test appeal start failure' }, 503); }
                 return json({ id: 'free_fixture', url: 'appeal-packet.html?id=free_fixture' });
             case '/api/packet': {
                 if (!store.access) return json({ error: 'Free appeal testing is currently by invitation.' }, 403);
                 if (url.searchParams.has('document')) return route.fulfill({ contentType: 'application/pdf', body: '%PDF-1.7\nRegression test fixture\n%%EOF' });
+                if (store.packetFailsLeft > 0) { store.packetFailsLeft--; return json({ error: 'Test packet loading failure' }, 503); }
                 return json({
                     appeal: { customer_name: 'Test Owner', property_address: property.address, payment_status: 'free' },
                     state: { status: store.packetStatus, version: 1, taxYear: 2026, documents: [{ id: 'prepared', kind: 'packet', version: 1, name: 'test-appeal.pdf' }], propertySnapshot: { address: property.address, pin: property.pin } },
@@ -115,6 +128,8 @@ async function scenario(options = {}) {
         page, store,
         goto: route => page.goto(new URL(route, base).href, { waitUntil: 'load' }),
         async close() {
+            releaseHistory();
+            await Promise.allSettled(historyResponses);
             await context.close();
             assert.deepEqual(errors, [], 'Browser JavaScript errors');
             assert.deepEqual(store.unexpected, [], 'Unmocked API requests');
@@ -276,7 +291,10 @@ for (const email of [null, 'member@example.com']) {
             await s.goto('/#contact');
             await s.page.locator('#name').fill('Test Owner');
             await s.page.locator('#email').fill('owner@example.com');
+            const suggestions = s.page.waitForResponse(response => new URL(response.url()).pathname === '/api/property/suggest');
             await s.page.locator('#property-address-contact').fill(property.address);
+            await suggestions;
+            await s.page.locator('#property-address-contact').press('Escape');
             const sent = s.page.waitForResponse(response => new URL(response.url()).pathname === '/api/contact');
             await s.page.locator('#contact-form').getByRole('button', { name: 'Join Waitlist' }).click();
             await sent;
@@ -296,7 +314,10 @@ test('failed waitlist submission preserves details and permits retry', async () 
         await s.goto('/#contact');
         await s.page.locator('#name').fill('Test Owner');
         await s.page.locator('#email').fill('owner@example.com');
+        const suggestions = s.page.waitForResponse(response => new URL(response.url()).pathname === '/api/property/suggest');
         await s.page.locator('#property-address-contact').fill(property.address);
+        await suggestions;
+        await s.page.locator('#property-address-contact').press('Escape');
         await s.page.locator('#contact-form').getByRole('button', { name: 'Join Waitlist' }).click();
         await s.page.getByText('Test submission failure', { exact: true }).waitFor();
         assert.equal(await s.page.locator('#name').inputValue(), 'Test Owner');
@@ -458,4 +479,110 @@ test('sign-in ignores return URLs outside the site', async () => {
         await s.page.locator('#address-list').getByRole('link', { name: 'Prepare my appeal', exact: true }).waitFor();
         assert.equal(new URL(s.page.url()).origin, base.origin);
     } finally { await s.close(); }
+});
+
+test('existing packet opens while property-list and history services are failing', async () => {
+    const s = await scenario({ email: 'tester@example.com', access: true });
+    try {
+        s.store.addressesFailsLeft = 10;
+        s.store.historyFails = true;
+        await s.goto('/appeal-packet.html?id=free_fixture');
+        await s.page.getByRole('heading', { name: 'Submit it yourself · Free' }).waitFor();
+        assert.deepEqual(s.store.requests, ['/api/packet?id=free_fixture']);
+    } finally { await s.close(); }
+});
+
+test('selected-property appeal opens directly without another property list or page reload', async () => {
+    const s = await scenario({ email: 'tester@example.com', access: true });
+    try {
+        s.store.addressesFailsLeft = 10;
+        s.store.historyFails = true;
+        await s.goto('/appeal-packet.html?property=7');
+        await s.page.getByRole('heading', { name: 'Submit it yourself · Free' }).waitFor();
+        assert.deepEqual(s.store.requests, ['/api/packet-start', '/api/packet?id=free_fixture']);
+        assert.equal(s.store.starts[0].propertyId, 7);
+        assert.equal(await s.page.evaluate(() => performance.getEntriesByType('navigation')[0].name.includes('property=7')), true);
+    } finally { await s.close(); }
+});
+
+test('property picker is usable while appeal history is still pending', async () => {
+    const s = await scenario({ email: 'tester@example.com', access: true, holdHistory: true });
+    try {
+        await s.goto('/appeal-packet.html');
+        await s.page.locator('#packet-property option[value="7"]').waitFor({ state: 'attached' });
+        assert.equal(await s.page.locator('#packet-start').isDisabled(), true);
+        await s.page.locator('#packet-property').selectOption('7');
+        await s.page.locator('#packet-start').click();
+        await s.page.getByRole('heading', { name: 'Submit it yourself · Free' }).waitFor();
+        assert.ok(s.store.requests.includes('/api/addresses?summary=1'));
+        assert.ok(!s.store.requests.includes('/api/addresses'));
+        assert.equal(s.store.starts.length, 1);
+        assert.equal(s.store.historyRequests, 1);
+    } finally { await s.close(); }
+});
+
+test('property-list failure can be retried without signing out', async () => {
+    const s = await scenario({ email: 'tester@example.com', access: true });
+    try {
+        s.store.addressesFailsLeft = 1;
+        await s.goto('/appeal-packet.html');
+        await s.page.getByRole('button', { name: 'Try again', exact: true }).waitFor();
+        assert.match(await s.page.locator('#packet-message').textContent(), /Test property loading failure/);
+        await s.page.getByRole('button', { name: 'Try again', exact: true }).click();
+        await s.page.locator('#packet-property option[value="7"]').waitFor({ state: 'attached' });
+        assert.equal(await s.page.locator('#packet-property').isEnabled(), true);
+        assert.equal(await s.page.locator('#packet-sign-in').isVisible(), false);
+        assert.equal(await s.page.evaluate(() => sessionStorage.getItem('regression-sign-outs')), null);
+    } finally { await s.close(); }
+});
+
+test('appeal-start retry retains the chosen property and assessment year', async () => {
+    const s = await scenario({ email: 'tester@example.com', access: true });
+    try {
+        s.store.startFailsLeft = 1;
+        await s.goto('/appeal-packet.html');
+        await s.page.locator('#packet-property').selectOption('7');
+        await s.page.locator('#packet-year').fill('2025');
+        await s.page.locator('#packet-start').click();
+        await s.page.getByRole('button', { name: 'Try again', exact: true }).waitFor();
+        assert.equal(await s.page.locator('#packet-property').inputValue(), '7');
+        assert.equal(await s.page.locator('#packet-year').inputValue(), '2025');
+        await s.page.getByRole('button', { name: 'Try again', exact: true }).click();
+        await s.page.getByRole('heading', { name: 'Submit it yourself · Free' }).waitFor();
+        assert.deepEqual(s.store.starts, [{ propertyId: 7, taxYear: 2025 }, { propertyId: 7, taxYear: 2025 }]);
+        assert.equal(await s.page.locator('#packet-sign-in').isVisible(), false);
+    } finally { await s.close(); }
+});
+
+test('packet-load retry resumes the created workspace without starting another one', async () => {
+    const s = await scenario({ email: 'tester@example.com', access: true });
+    try {
+        s.store.packetFailsLeft = 1;
+        await s.goto('/appeal-packet.html?property=7');
+        await s.page.getByRole('button', { name: 'Try again', exact: true }).waitFor();
+        assert.equal(new URL(s.page.url()).searchParams.get('id'), 'free_fixture');
+        await s.page.getByRole('button', { name: 'Try again', exact: true }).click();
+        await s.page.getByRole('heading', { name: 'Submit it yourself · Free' }).waitFor();
+        assert.equal(s.store.starts.length, 1);
+        assert.equal(s.store.requests.filter(url => url === '/api/packet?id=free_fixture').length, 2);
+    } finally { await s.close(); }
+});
+
+test('property selection stays locked while the appeal start request is pending', async () => {
+    const s = await scenario({ email: 'tester@example.com', access: true });
+    let release, observed;
+    const gate = new Promise(resolve => { release = resolve; });
+    const requested = new Promise(resolve => { observed = resolve; });
+    try {
+        await s.page.route('**/api/packet-start', async route => { observed(); await gate; await route.fallback(); });
+        await s.goto('/appeal-packet.html');
+        await s.page.locator('#packet-property').selectOption('7');
+        await s.page.locator('#packet-start').click();
+        await requested;
+        assert.equal(await s.page.locator('#packet-property').isDisabled(), true);
+        assert.equal(await s.page.locator('#packet-start').isDisabled(), true);
+        release();
+        await s.page.getByRole('heading', { name: 'Submit it yourself · Free' }).waitFor();
+        assert.equal(s.store.starts.length, 1);
+    } finally { release(); await s.close(); }
 });

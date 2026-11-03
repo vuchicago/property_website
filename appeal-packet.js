@@ -19,58 +19,140 @@ const toggle=(name,label,value=false)=>`<label><input type="checkbox" name="${na
 const signInLink = document.getElementById('packet-sign-in');
 signInLink.href = `login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
 
-document.getElementById('packet-start').addEventListener('click', async event => {
-    const button=event.currentTarget;button.disabled=true;
-    try {const response=await authFetch('/api/packet-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({propertyId:Number(document.getElementById('packet-property').value),taxYear:Number(document.getElementById('packet-year').value)})});const result=await response.json();if(!response.ok)throw new Error(result.error);location.href=result.url;}catch(e){message(e.message,true);}finally{button.disabled=false;}
-});
-onAuthUserChanged(async user => {
+const propertySelect = document.getElementById('packet-property');
+const startButton = document.getElementById('packet-start');
+const retryButton = document.getElementById('packet-retry');
+let currentSessionUser = null;
+let pendingPropertyId = propertyQuery ? Number(propertyQuery) : null;
+let openingRevision = null;
+
+async function requestJSON(url, options = {}, failure = 'Could not load your appeal.') {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+        const response = await authFetch(url, {...options, signal:controller.signal});
+        const result = await response.json().catch(() => null);
+        if (!response.ok) throw Object.assign(new Error(`${failure} ${result?.error || 'Please try again.'}`), {status:response.status});
+        if (result === null) throw new Error(`${failure} Please try again.`);
+        return result;
+    } catch (error) {
+        if (error.name === 'AbortError') throw new Error('The request took too long. Try again to continue with the same property.');
+        throw error;
+    } finally { clearTimeout(timeout); }
+}
+
+function showLoadError(error, revision) {
+    if (revision !== sessionRevision) return;
+    message(error.message, true);
+    retryButton.hidden = [400,403,404].includes(error.status);
+    if (error.status === 403) document.getElementById('packet-waitlist').hidden = false;
+}
+
+async function startOrResume(propertyId, revision) {
+    if (openingRevision === revision) return;
+    const taxYear = Number(document.getElementById('packet-year').value);
+    if (!Number.isInteger(propertyId) || propertyId < 1) throw Object.assign(new Error('Choose a saved property first.'), {status:400});
+    if (!Number.isInteger(taxYear) || taxYear < 2020 || taxYear > 2100) throw Object.assign(new Error('Choose a valid assessment year.'), {status:400});
+    openingRevision = revision;
+    startButton.disabled = true;
+    propertySelect.disabled = true;
+    startButton.textContent = 'Opening appeal…';
+    message('Opening your appeal…');
+    try {
+        const result = await requestJSON('/api/packet-start', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({propertyId,taxYear})}, 'Could not open your appeal.');
+        if (revision !== sessionRevision) return;
+        if (!result.id) throw new Error('Your workspace response was incomplete. Try again to resume it.');
+        selectedId = result.id;
+        window.history.replaceState({}, '', `appeal-packet.html?id=${encodeURIComponent(selectedId)}`);
+        signInLink.href = `login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+        await load();
+    } finally {
+        if (openingRevision === revision) openingRevision = null;
+        if (revision === sessionRevision) {
+            startButton.textContent = 'Start or resume appeal';
+            startButton.disabled = Boolean(selectedId) || !propertySelect.value;
+            propertySelect.disabled = Boolean(selectedId) || propertySelect.options.length < 2;
+        }
+    }
+}
+
+async function loadOrderList(revision) {
+    try {
+        const orders = await requestJSON('/api/history', {}, 'Could not load previous appeals.');
+        if (revision !== sessionRevision || selectedId) return;
+        document.getElementById('order-list').innerHTML = orders.filter(order => order.id.startsWith('free_')).map(order => `<p><a href="appeal-packet.html?id=${encodeURIComponent(order.id)}">${escape(order.propertyAddress)} — open packet</a></p>`).join('') || '<p>No appeal workspaces yet. Choose a property above to start.</p>';
+    } catch {
+        if (revision === sessionRevision && !selectedId) document.getElementById('order-list').textContent = 'Previous appeals could not be listed. You can still start or resume using your saved property above.';
+    }
+}
+
+async function loadPropertyPicker(revision) {
+    const access = await requestJSON('/api/appeal-access', {}, 'Could not check appeal access.');
+    if (revision !== sessionRevision) return;
+    if (!access.allowed) {
+        document.getElementById('packet-waitlist').hidden = false;
+        message('Free appeal testing is currently by invitation.');
+        return;
+    }
+    const properties = await requestJSON('/api/addresses?summary=1', {}, 'Could not load saved properties.');
+    if (revision !== sessionRevision) return;
+    if (!Array.isArray(properties)) throw new Error('Your saved properties could not be read. Please try again.');
+    propertySelect.innerHTML = '<option value="">Choose a saved property</option>' + properties.map(p => `<option value="${Number(p.id)}">${escape(p.address)}</option>`).join('');
+    propertySelect.disabled = properties.length === 0;
+    document.getElementById('packet-orders').hidden = false;
+    message(properties.length ? 'Choose a saved property and assessment year to start or resume.' : 'Add a property in My account, then return here to prepare your appeal.');
+    // A slow history request must not block the property picker or appeal start.
+    void loadOrderList(revision);
+}
+
+async function initializeWorkspace(user) {
     const revision = ++sessionRevision;
-    const propertySelect = document.getElementById('packet-property');
-    const startButton = document.getElementById('packet-start');
-    const session = document.getElementById('packet-session');
+    retryButton.hidden = true;
     startButton.disabled = true;
     propertySelect.disabled = true;
     document.getElementById('packet-orders').hidden = true;
     document.getElementById('packet-workspace').hidden = true;
+    document.getElementById('packet-waitlist').hidden = true;
     signInLink.hidden = Boolean(user?.emailVerified);
     signInLink.textContent = user ? 'Verify email' : 'Sign in';
-    session.textContent = user ? `Signed in as ${user.email}` : 'You are signed out';
+    document.getElementById('packet-session').textContent = user ? `Signed in as ${user.email}` : 'You are signed out';
     if (!user || !user.emailVerified) {
         current = null;
         document.getElementById('order-list').replaceChildren();
-        propertySelect.innerHTML='<option value="">Sign in with a verified email to choose a property</option>';
-        document.getElementById('packet-waitlist').hidden=false;
+        propertySelect.innerHTML = '<option value="">Sign in with a verified email to choose a property</option>';
+        document.getElementById('packet-waitlist').hidden = false;
         document.getElementById('packet-workspace').replaceChildren();
         message(user ? 'Verify your email to prepare your appeal. Your account is still signed in.' : 'Sign in to prepare your appeal. We will return you to this property.');
         return;
     }
     try {
-        message('Loading your saved properties…');
-        const accessResponse=await authFetch('/api/appeal-access');
-        if (!accessResponse.ok) throw new Error('Could not check appeal access. Your session is still signed in. Please reload to try again.');
-        const access=await accessResponse.json();
-        if (revision !== sessionRevision) return;
-        document.getElementById('packet-orders').hidden=!access.allowed;
-        document.getElementById('packet-waitlist').hidden=access.allowed || Boolean(selectedId);
-        if(!access.allowed){
-            if(selectedId) await load();
-            else message('Free appeal testing is currently by invitation.');
-            return;
+        if (selectedId) {
+            message('Loading your appeal…');
+            await load();
+        } else if (pendingPropertyId !== null) {
+            // This property was already selected in My Account. The API checks
+            // ownership and access; another property-list request is unnecessary.
+            await startOrResume(pendingPropertyId, revision);
+        } else {
+            message('Loading your saved properties…');
+            await loadPropertyPicker(revision);
         }
-        const addresses=await authFetch('/api/addresses'); if(!addresses.ok)throw new Error('Could not load saved properties.');
-        const properties=await addresses.json();
-        if (revision !== sessionRevision) return;
-        propertySelect.innerHTML='<option value="">Choose a saved property</option>'+properties.map(p=>`<option value="${Number(p.id)}">${escape(p.address)}</option>`).join('');
-        propertySelect.disabled = properties.length === 0;
-        startButton.disabled = properties.length === 0;
-        if(propertyQuery)propertySelect.value=propertyQuery;
-        const response = await authFetch('/api/history');
-        if (!response.ok) throw new Error('Could not load your orders.');
-        const orders = await response.json();
-        if (revision !== sessionRevision) return;
-        document.getElementById('order-list').innerHTML = orders.filter(order => order.id.startsWith('free_')).map(order => `<p><a href="appeal-packet.html?id=${encodeURIComponent(order.id)}">${escape(order.propertyAddress)} — open packet</a></p>`).join('') || '<p>No free workspaces yet. Add a property in My account, then start here.</p>';
-        if (selectedId) await load(); else if(propertyQuery && properties.some(p=>String(p.id)===propertyQuery)) document.getElementById('packet-start').click(); else message('Choose a saved property and assessment year to start or resume.');
-    } catch (error) { if (revision === sessionRevision) message(error.message, true); }
+    } catch (error) { showLoadError(error, revision); }
+}
+
+propertySelect.addEventListener('change', () => { startButton.disabled = !propertySelect.value; });
+startButton.addEventListener('click', async () => {
+    if (startButton.disabled) return;
+    pendingPropertyId = Number(propertySelect.value);
+    retryButton.hidden = true;
+    const revision = sessionRevision;
+    try { await startOrResume(pendingPropertyId, revision); }
+    catch (error) { showLoadError(error, revision); }
+});
+retryButton.addEventListener('click', () => { void initializeWorkspace(currentSessionUser); });
+onAuthUserChanged(user => {
+    currentSessionUser = user;
+    return initializeWorkspace(user);
 }, error => {
     document.getElementById('packet-session').textContent = 'Session could not be restored';
     message(error.message || 'Could not restore your session. Please reload and try again.', true);
@@ -78,13 +160,13 @@ onAuthUserChanged(async user => {
 
 async function load() {
     const revision = sessionRevision;
-    const response = await authFetch(`/api/packet?id=${encodeURIComponent(selectedId)}`);
-    const data = await response.json();
+    const data = await requestJSON(`/api/packet?id=${encodeURIComponent(selectedId)}`, {}, 'Could not load your appeal.');
     if (revision !== sessionRevision) return;
-    if (!response.ok) throw new Error(data.error || 'Could not load packet.');
     current = data;
     if(data.packetId)selectedId=data.packetId;
     render();
+    document.getElementById('packet-orders').hidden = true;
+    retryButton.hidden = true;
     message('Packet loaded.');
 }
 

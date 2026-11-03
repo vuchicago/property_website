@@ -17,9 +17,10 @@
       <label>Saved property<select id="packet-property" disabled><option value="">Loading your saved properties…</option></select></label><label>Assessment tax year<input id="packet-year" type="number" min="2020" max="2100" required></label><button class="btn btn-primary" id="packet-start" disabled>Start or resume appeal</button><div id="order-list"></div>
     </section>
     <p id="packet-message" role="status" aria-live="polite">Restoring your session…</p>
+    <button type="button" class="btn btn-secondary" id="packet-retry" hidden>Try again</button>
     <p id="packet-waitlist" hidden>Free appeal testing is currently by invitation. <a href="index.html#contact">Join the public appeal waitlist</a>.</p>
     <div id="packet-workspace" hidden></div>
   </main>
-  <script type="module" src="appeal-packet.js?v=20261103-session"></script>
+  <script type="module" src="appeal-packet.js?v=20261103-properties"></script>
 </body>
 </html>

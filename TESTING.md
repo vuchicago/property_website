@@ -6,7 +6,7 @@ Run the automated checks before publishing a change:
 bash scripts/test.sh
 ```
 
-This runs the JavaScript unit/API tests, real SQLite migration and constraint tests, JavaScript syntax checks, the static build, and Git whitespace validation. It needs Node.js 22 or newer, Python 3, Bash, and ripgrep. It uses generated identities, synthetic documents, and in-memory databases. Expected rejection tests log messages such as “Payment required” or “Test delivery failure”; the final pass/fail result determines success.
+This runs the JavaScript unit/API tests, real SQLite migration and constraint tests, JavaScript syntax checks, the static build, and Git whitespace validation. It needs Node.js 22.13 or newer, Python 3, Bash, and ripgrep. The saved-property SQL tests use Node's built-in SQLite module. It uses generated identities, synthetic documents, and in-memory databases. Expected rejection tests log messages such as “Payment required” or “Test delivery failure”; the final pass/fail result determines success.
 
 The suite covers free packet preparation and PDF assembly, property ownership and document access, administrator and tester permissions, invitation pause/restore, the fixed $49 checkout, payment before DocuSign, signature completion, refunds, webhook signatures, mailing consent, and public waitlist validation and capture when email delivery fails.
 
@@ -42,6 +42,8 @@ Browser tests exercise the actual built HTML, CSS, navigation, authentication UI
 
 Session checks include delayed Firebase restoration, navigation from a saved property to its appeal, refreshing stale email-verification state without signing out, retaining an unverified session while denying protected actions, service failures without a false sign-in prompt, and returning to the selected property after sign-in. External return URLs are rejected. The landing-page check verifies that Appeal Waitlist is below How Appeals Work with matching button dimensions.
 
+Property-loading regressions execute the actual SQL against 100,000 unrelated property records and check its query plan for index use. Browser tests verify that starting a selected property skips the property list, existing packets open independently of property/history failures, pending history does not block the picker, and retry preserves the property and year without creating another workspace.
+
 These browser fixtures do not test real Firebase login, provider credentials, live email delivery, the external ROI/loan iframe calculators, or an actual Stripe/DocuSign transaction. Complete the manual account and test-provider steps in [APPEAL_LOCAL_TESTING.md](APPEAL_LOCAL_TESTING.md) before releasing those integrations.
 
 ## Cloudflare Functions compilation
@@ -53,3 +55,20 @@ npx --no-install wrangler pages functions build functions --outdir /tmp/cookcoun
 ```
 
 Compilation creates a local bundle. It does not publish the site or apply remote migrations.
+
+## Local Worker and D1 integration
+
+Install Miniflare alongside the optional browser dependency, or set `MINIFLARE_MODULE` to an existing installation:
+
+```bash
+npm install --no-save --package-lock=false miniflare playwright-core
+bash scripts/test.sh --worker
+```
+
+This compiles the Functions and runs them inside the actual local Workers runtime with isolated D1 and R2 bindings. It applies the repository's schema and packet migrations to a temporary database, inserts 100,000 fictional unrelated properties, and checks property listing, starting, opening, resuming, ownership, and anonymous access. Only Firebase's public-key response is replaced with a generated test key; SQL and API responses are real. It never reads Production credentials or connects to remote D1.
+
+With the local website running, run every layer with:
+
+```bash
+bash scripts/test.sh --worker --browser
+```

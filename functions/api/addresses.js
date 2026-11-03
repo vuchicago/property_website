@@ -9,27 +9,28 @@ const PROPERTY_GROUP_KEY = `CASE
         ELSE normalized_address || '|pin:' || COALESCE(pin, id)
 END`;
 
-export const onRequestGet = async (context) => {
-        const { user, response } = await requireFirebaseUser(context.request);
-
-        if (response) {
-                return response;
+// The normalized-address predicate lets SQLite use the existing address index.
+// Matching only the computed group key scans the entire county table per property.
+export async function getSavedProperties(db, userId, { summary = false, propertyId = null } = {}) {
+        const filter = 'user_addresses.customer_id = ?' + (propertyId === null ? '' : ' AND user_addresses.id = ?');
+        const params = propertyId === null ? [userId] : [userId, propertyId];
+        if (summary) {
+                const { results = [] } = await db.prepare(
+                        `SELECT id, address, property_key, created_at FROM user_addresses WHERE ${filter} ORDER BY created_at DESC`
+                ).bind(...params).all();
+                return results;
         }
-
-        if (!context.env.DB) {
-                return jsonResponse({ error: 'Database not configured' }, 500);
-        }
-
-        try {
-                const { results } = await context.env.DB.prepare(
-                        `SELECT user_addresses.*,
+        const { results = [] } = await db.prepare(
+                `SELECT user_addresses.*,
                                 (
                                   SELECT group_concat(pin, ', ')
                                   FROM property_addresses
-                                  WHERE ${PROPERTY_GROUP_KEY} = user_addresses.property_key
+                                  WHERE normalized_address = substr(user_addresses.property_key, 1, instr(user_addresses.property_key, '|') - 1)
+                                    AND ${PROPERTY_GROUP_KEY} = user_addresses.property_key
                                 ) AS pin,
                                 (
                                   SELECT json_object(
+                                    'recordId', MIN(id),
                                     'pin', group_concat(pin, ', '),
                                     'pinCount', COUNT(pin),
                                     'city', MAX(city),
@@ -68,32 +69,37 @@ export const onRequestGet = async (context) => {
                                     'condoCommonArea', condo_common_area
                                   )
                                   FROM property_addresses
-                                  WHERE ${PROPERTY_GROUP_KEY} = user_addresses.property_key
+                                  WHERE normalized_address = substr(user_addresses.property_key, 1, instr(user_addresses.property_key, '|') - 1)
+                                    AND ${PROPERTY_GROUP_KEY} = user_addresses.property_key
                                 ) AS property_details
                          FROM user_addresses
-                         WHERE user_addresses.customer_id = ?
+                         WHERE ${filter}
                          ORDER BY user_addresses.created_at DESC`
-                ).bind(user.uid).all();
-
-                const addresses = await Promise.all(results.map(async row => {
-                        const propertyDetails = row.property_details ? JSON.parse(row.property_details) : null;
-                        if (propertyDetails) {
-                                propertyDetails.appealCalendar = getAppealCalendarForProperty(propertyDetails);
-                                Object.assign(propertyDetails, await attachPropertyTaxContext(context.env.DB, propertyDetails));
-                        }
-
-                        return {
-                                ...row,
-                                propertyDetails,
-                                property_details: undefined
-                        };
-                }));
-
-                return jsonResponse(addresses);
-        } catch (err) {
-                return jsonResponse({ error: err.message }, 500);
-        }
+        ).bind(...params).all();
+        return Promise.all(results.map(async row => {
+                const propertyDetails = row.property_details ? JSON.parse(row.property_details) : null;
+                if (propertyDetails?.recordId != null) {
+                        propertyDetails.appealCalendar = getAppealCalendarForProperty(propertyDetails);
+                        Object.assign(propertyDetails, await attachPropertyTaxContext(db, propertyDetails));
+                }
+                return { ...row, propertyDetails: propertyDetails?.recordId != null ? propertyDetails : null, property_details: undefined };
+        }));
 }
+
+export const onRequestGet = async (context) => {
+        const { user, response } = await requireFirebaseUser(context.request);
+        if (response) return response;
+        if (!context.env.DB) return jsonResponse({ error: 'Database not configured' }, 500);
+        try {
+                const summary = new URL(context.request.url).searchParams.get('summary') === '1';
+                const result = jsonResponse(await getSavedProperties(context.env.DB, user.uid, { summary }));
+                result.headers.set('Cache-Control', 'private, no-store');
+                return result;
+        } catch (error) {
+                console.error('Saved property query failed:', error.message);
+                return jsonResponse({ error: 'Could not load saved properties. Please try again.' }, 503);
+        }
+};
 
 export const onRequestPost = async (context) => {
         const { user, response } = await requireFirebaseUser(context.request);
@@ -123,10 +129,10 @@ export const onRequestPost = async (context) => {
                                         MAX(mailing_name) AS mailing_name,
                                         SUM(pin_proration_rate) AS pin_proration_rate
                                  FROM property_addresses
-                                 WHERE ${PROPERTY_GROUP_KEY} = ?
+                                 WHERE normalized_address = ? AND ${PROPERTY_GROUP_KEY} = ?
                                  GROUP BY property_key
                                  LIMIT 1`
-                        ).bind(propertyKey).first()
+                        ).bind(String(propertyKey).split('|')[0],propertyKey).first()
                         : await findBestPropertyAddress(context.env.DB, address);
 
                 if (!propertyAddress) {
