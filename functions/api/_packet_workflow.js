@@ -1,4 +1,5 @@
 import { requireOpenMailingWindow } from './_packet_mailing.js';
+import { singleFamilyEligibility } from '../../packet-scope.js';
 
 export const initialPacket = () => ({ status: 'intake', version: 0, documents: [] });
 
@@ -38,17 +39,30 @@ export function transitionPacket(current, input, actor, now = new Date().toISOSt
             requireCondition(Number.isInteger(input.taxYear) && input.taxYear >= 2020 && input.taxYear <= new Date(now).getUTCFullYear() + 1, 'Select a valid assessment tax year.');
             if(current.taxYear) requireCondition(input.taxYear === current.taxYear, 'Start a separate workspace for a different assessment year.');
             requireCondition(['uniformity', 'overvaluation', 'characteristics'].includes(input.reason), 'Select a reason for appeal.');
+            if(actor.freePacket || current.service==='assessor_self_service') requireCondition(input.singleFamilyScope===true && input.condo!==true && singleFamilyEligibility(current.propertySnapshot?.details).eligible!==false,'This workflow supports single-family homes with one dwelling unit only.');
             next.intake = { agency: input.agency, taxYear: input.taxYear, ownerName: field(input.ownerName, 'Legal owner name', 200), mailingAddress: field(input.mailingAddress, 'Owner mailing address'), reason: input.reason, explanation: field(input.explanation, 'Explanation', 10000), individualOwner: true, noExistingAppeal: true, confirmedAt: now };
+            if(input.singleFamilyScope===true)next.intake.singleFamilyScope=true;
             if (input.requestedMarketValue !== undefined) {
                 requireCondition(Number.isFinite(input.requestedMarketValue) && input.requestedMarketValue > 0 && input.requestedMarketValue <= 1e10, 'Enter a valid requested fair market value.');
-                requireCondition(input.residentialScope === true, 'This workflow supports individually owned residential property with up to six units.');
-                next.intake.residentialScope = true;
+                requireCondition(input.singleFamilyScope === true && input.condo !== true && singleFamilyEligibility(current.propertySnapshot?.details).eligible!==false, 'This workflow supports single-family homes with one dwelling unit only.');
+                next.intake.singleFamilyScope = true;
                 requireCondition(typeof input.ownResidence === 'boolean', 'Confirm whether you live at this property.');
                 requireCondition(input.recordsConfirmed === true, 'Verify the imported data against your current assessment record.');
                 next.intake.requestedMarketValue = input.requestedMarketValue;
                 next.intake.pins = field(input.pins, 'All property PINs', 500);
                 requireCondition(next.intake.pins.split(/[,;\n]+/).every(pin=>pin.replace(/[-\s]/g,'').match(/^\d{14}$/)), 'Enter each 14-digit PIN, separated by commas.');
                 for(const key of ['ownResidence','recentSale','appraisal','condo','damage','affidavit','documentsReviewed','recordsConfirmed']) next.intake[key] = input[key] === true;
+                for(const key of ['ownerPhone','mailingCity','mailingState','mailingZip','propertyCity','propertyZip','purchaseDate','sellerName','saleRelationship','attestationFacts']) {
+                    if(input[key]!==undefined) {
+                        requireCondition(typeof input[key]==='string' && input[key].length <= (key==='attestationFacts'?10000:300), 'Enter valid contact and supporting information.');
+                        next.intake[key]=input[key].trim();
+                    }
+                }
+                if(input.purchasePrice!==undefined && input.purchasePrice!=='') {
+                    requireCondition(Number.isFinite(Number(input.purchasePrice)) && Number(input.purchasePrice)>0,'Enter a valid purchase price.');
+                    next.intake.purchasePrice=Number(input.purchasePrice);
+                }
+                if(next.intake.purchaseDate)requireCondition(date(next.intake.purchaseDate,'Purchase date')<=today,'Purchase date cannot be in the future.');
                 const allowed = new Set((current.propertySnapshot?.comparables || []).map(c=>String(c.pin)));
                 requireCondition(Array.isArray(input.selectedComparables) && input.selectedComparables.every(pin=>allowed.has(pin)), 'Select comparisons from this property record.');
                 next.intake.selectedComparables = [...new Set(input.selectedComparables)];
@@ -64,6 +78,7 @@ export function transitionPacket(current, input, actor, now = new Date().toISOSt
             break;
         case 'packet':
             requireCondition(actor.isOwner || actor.isAdmin, 'Access denied.'); at('preparing'); requireCondition(current.intake, 'Customer intake is required.');
+            if(actor.freePacket || current.service==='assessor_self_service') requireCondition(current.intake.singleFamilyScope===true && singleFamilyEligibility(current.propertySnapshot?.details).eligible!==false,'Confirm the single-family home scope before preparing this packet.');
             next.version += 1;
             requireCondition(input.document?.kind === 'packet' && input.document.version === next.version, 'Upload a prepared packet PDF.');
             requireCondition(next.documents.length < 50, 'Document limit reached.');

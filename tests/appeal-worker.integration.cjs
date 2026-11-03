@@ -47,7 +47,12 @@ async function api(route, uid = 'owner', body, claims = {}, method = body ? 'POS
     const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
     const content = `${encode({ alg: 'RS256', kid: jwk.kid })}.${encode({ sub: uid, email: `${uid}@example.com`, email_verified: true, aud: 'cookcounty-tax-compare', iss: 'https://securetoken.google.com/cookcounty-tax-compare', exp: Math.floor(Date.now() / 1000) + 3600, ...claims })}`;
     const signature = Buffer.from(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', pair.privateKey, new TextEncoder().encode(content))).toString('base64url');
-    return worker.dispatchFetch(`https://local.test${route}`, { method, headers: { Authorization: `Bearer ${content}.${signature}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    const multipart=body instanceof FormData;
+    if(multipart) {
+        const outgoing=new Request(`https://local.test${route}`,{method,headers:{Authorization:`Bearer ${content}.${signature}`},body});
+        return worker.dispatchFetch(outgoing.url,{method,headers:Object.fromEntries(outgoing.headers),body:await outgoing.arrayBuffer()});
+    }
+    return worker.dispatchFetch(`https://local.test${route}`, { method, headers: { Authorization: `Bearer ${content}.${signature}`, ...(multipart?{}:{'Content-Type':'application/json'}) }, ...(body ? { body: multipart?body:JSON.stringify(body) } : {}) });
 }
 
 test('local Worker loads saved properties, starts, opens, and resumes with 100,000 unrelated rows', async t => {
@@ -140,7 +145,7 @@ test('local Worker saves intake without a deadline and preserves the packet afte
     const packet=await before.json();
     assert.equal(packet.mailingWindow.township,'Niles');
     assert.equal(packet.mailingWindow.opensOn,'2026-10-20');
-    const intake={action:'intake',revision:packet.revision,agency:'assessor',taxYear:2026,ownerName:'Test Owner',mailingAddress:'123 Test Ave',reason:'characteristics',explanation:'Incorrect area',individualOwner:true,noExistingAppeal:true,requestedMarketValue:200000,residentialScope:true,ownResidence:true,recordsConfirmed:true,pins:'00000000000001',selectedComparables:[]};
+    const intake={action:'intake',revision:packet.revision,agency:'assessor',taxYear:2026,ownerName:'Test Owner',mailingAddress:'123 Test Ave',reason:'characteristics',explanation:'Incorrect area',individualOwner:true,noExistingAppeal:true,requestedMarketValue:200000,singleFamilyScope:true,ownResidence:true,recordsConfirmed:true,pins:'00000000000001',selectedComparables:[]};
     const saved=await api(`/api/packet?id=${packetId}`,'owner',intake);
     assert.equal(saved.status,200,await saved.clone().text());
     const unauthorized=await api('/api/addresses','stranger',{propertyId:7},{},'DELETE');
@@ -157,4 +162,49 @@ test('local Worker saves intake without a deadline and preserves the packet afte
     assert.equal(data.state.intake.filingDeadline,undefined);
     assert.equal(data.state.propertySnapshot.address,'123 TEST AVE SKOKIE');
     assert.equal((await db.prepare('SELECT count(*) AS total FROM appeals WHERE transaction_id=?').bind(packetId).first()).total,1);
+});
+
+test('administrator imports one reusable official-form template; owner builds the prefilled packet without uploading an application',async()=>{
+    const {formFixture}=await import('./official-form-fixtures.mjs');
+    const {PDFDocument}=await import('../assets/vendor/pdf-lib.esm.min.js');
+    const fixture=await formFixture();
+    const endpoint='/api/admin/appeal-forms?year=2026&kind=application';
+    assert.equal((await api(endpoint)).status,403);
+    const adminClaims={email:'vuchicago@gmail.com'};
+    const post=async data=>{
+        const body=new FormData();body.set('data',JSON.stringify(data));body.set('file',new File([fixture.bytes],'synthetic-test-only.pdf',{type:'application/pdf'}));
+        return api(endpoint,'primary',body,adminClaims);
+    };
+    const inspected=await post({action:'inspect'});
+    assert.equal(inspected.status,200,await inspected.clone().text());
+    assert.ok((await inspected.json()).fields.some(field=>field.name==='primaryPin'));
+    const denied=await post({action:'publish',mapping:fixture.manifest.mapping});
+    assert.equal(denied.status,400);
+    const published=await post({action:'publish',mapping:fixture.manifest.mapping,sourceUrl:fixture.manifest.sourceUrl,officialReviewed:true,mappingReviewed:true,signaturesBlank:true});
+    assert.equal(published.status,200,await published.clone().text());
+    let packet=await (await api(`/api/packet?id=${packetId}`)).json();
+    assert.equal(packet.officialForms[0].ready,true);
+    assert.ok(packet.officialForms[0].missingValues.some(value=>value.source==='ownerPhone'));
+    const saved=await api(`/api/packet?id=${packetId}`,'owner',{...packet.state.intake,action:'intake',revision:packet.revision,ownerPhone:'3125550100',mailingCity:'Chicago',mailingState:'IL',mailingZip:'60601',propertyCity:'Skokie',documentsReviewed:true});
+    assert.equal(saved.status,200,await saved.clone().text());
+    packet=await (await api(`/api/packet?id=${packetId}`)).json();
+    const evidence=new FormData();
+    evidence.set('data',JSON.stringify({action:'evidence',revision:packet.revision,category:'corrections'}));
+    evidence.set('file',new File([fixture.bytes],'test-correction-evidence.pdf',{type:'application/pdf'}));
+    const uploaded=await api(`/api/packet?id=${packetId}`,'owner',evidence);
+    assert.equal(uploaded.status,200,await uploaded.clone().text());
+    packet=await (await api(`/api/packet?id=${packetId}`)).json();
+    assert.equal(packet.state.documents.some(doc=>doc.category==='application'),false);
+    const generated=await api(`/api/packet?id=${packetId}`,'owner',{action:'generate',revision:packet.revision});
+    assert.equal(generated.status,200,await generated.clone().text());
+    packet=await (await api(`/api/packet?id=${packetId}`)).json();
+    assert.equal(packet.state.status,'review');
+    const document=packet.state.documents.find(doc=>doc.kind==='packet');
+    const download=await api(`/api/packet?id=${packetId}&document=${document.id}`);
+    assert.equal(download.status,200);
+    const pdf=await PDFDocument.load(await download.arrayBuffer());
+    assert.match(pdf.getTitle(),/2026 Assessor appeal/);
+    assert.equal(pdf.getPageCount(),5);
+    assert.equal(pdf.getForm().getFields().length,0);
+    assert.equal((await db.prepare('SELECT count(*) AS total FROM packet_signatures').first()).total,0);
 });

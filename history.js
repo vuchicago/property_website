@@ -1,4 +1,4 @@
-import { auth, authFetch } from './auth-client.js?v=20261103-property-mailing';
+import { auth, authFetch } from './auth-client.js?v=20261103-single-family';
 
 let userAddresses = [];
 let allAppeals = [];
@@ -1089,7 +1089,7 @@ function renderAppeals(appeals, address) {
                         const addr = e.currentTarget.dataset.address;
                         if (freeAppealTester) location.href = `appeal-packet.html?property=${encodeURIComponent(selectedProperty.id)}`;
                         else {
-                                const { openAppealModal } = await import('./appeal.js?v=20261103-property-mailing');
+                                const { openAppealModal } = await import('./appeal.js?v=20261103-single-family');
                                 openAppealModal(addr, selectedProperty);
                         }
                 });

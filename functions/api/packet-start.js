@@ -2,6 +2,7 @@ import { requireFirebaseUser, jsonResponse } from './_auth.js';
 import { propertySnapshot } from './_packet_preparation.js';
 import { initialPacket } from './_packet_workflow.js';
 import { appealAccess } from './_appeal_access.js';
+import { singleFamilyEligibility } from '../../packet-scope.js';
 export async function onRequestPost({request, env}) {
     const {user,response} = await requireFirebaseUser(request);
     if (response) return response;
@@ -26,6 +27,8 @@ export async function onRequestPost({request, env}) {
         const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([user.uid,propertyId,taxYear])));
         const id = `free_${Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('')}`;
         const snapshot=await propertySnapshot({env},propertyId,user.uid);
+        const eligibility=singleFamilyEligibility(snapshot.details);
+        if(eligibility.eligible===false)return jsonResponse({error:eligibility.message},422);
         await env.DB.batch([
             env.DB.prepare(`INSERT OR IGNORE INTO appeals (transaction_id, customer_id, customer_email, property_address, property_key, payment_amount, payment_status, appeal_status)
               VALUES (?, ?, ?, ?, ?, 0, 'free', 'Pending')`).bind(id,user.uid,user.email,property.address,property.property_key || null),

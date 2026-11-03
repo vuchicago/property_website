@@ -1,4 +1,5 @@
 import { requireFirebaseUser, jsonResponse } from './_auth.js';
+import { singleFamilyEligibility } from '../../packet-scope.js';
 import { recordCheckoutAppeal } from './_appeals.js';
 import { getStripeConfig } from './_stripe.js';
 import { MAIL_FULFILLMENT_AMOUNT_CENTS } from './_packet_pricing.js';
@@ -21,6 +22,7 @@ export async function onRequestPost({request,env}) {
         const row = await env.DB.prepare('SELECT state_json, revision FROM appeal_packets WHERE transaction_id = ?').bind(packetId).first();
         const state = row && JSON.parse(row.state_json);
         if (state?.status !== 'approved' || state.intake?.agency !== 'assessor' || state.approval?.version !== state.version) return jsonResponse({error:'Review and approve your Assessor packet before purchasing fulfillment.'},409);
+        if(state.intake.singleFamilyScope!==true || singleFamilyEligibility(state.propertySnapshot?.details).eligible===false)return jsonResponse({error:'Fulfillment currently supports single-family homes with one dwelling unit only. Confirm the property scope before checkout.'},409);
         if (await paidFulfillment(env.DB,packetId,state.version,user.uid)) return jsonResponse({error:'Fulfillment is already paid for this packet version.'},409);
         // Fail before charging when either storage or migration 0031 is missing.
         await env.APPEAL_PACKETS.head('packet-service-readiness-check');

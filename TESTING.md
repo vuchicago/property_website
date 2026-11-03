@@ -54,6 +54,8 @@ These browser fixtures do not test real Firebase login, provider credentials, li
 
 ## Cloudflare Functions compilation
 
+Single-family tests reject out-of-scope records and checkout attempts. Official-form tests inspect/map synthetic fillable PDFs, preserve blank signatures, verify rendered owner/property values, reject missing fields and overlong text, and include photo-date attestations conditionally. The actual local Worker test imports a reusable template as administrator, rejects owner access to setup, saves intake, uploads personal correction evidence and generates/downloads the complete packet without an owner application upload. Browser tests cover one-time administrator setup, suggested comparisons, missing mailing fields, scope confirmation and retained downloads for older out-of-scope cases. Test templates are never published to Production.
+
 With Wrangler installed, compile the API bundle locally:
 
 ```bash

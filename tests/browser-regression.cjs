@@ -65,7 +65,8 @@ async function scenario(options = {}) {
     store.addressPosts = [];
     store.addressDeletes = [];
     store.intakes = [];
-    store.intake = {};
+    store.intake = {singleFamilyScope:true};
+    store.publishedForms=[];
     store.lookups = [];
     store.summaryRequests = 0;
     store.authAttempts = [];
@@ -96,6 +97,15 @@ async function scenario(options = {}) {
         store.authAttempts.push({path:url.pathname, method:request.method(), token:request.headers().authorization, body:request.postData()});
         if (options.alwaysUnauthorized || (options.rejectCachedToken && request.headers().authorization === 'Bearer regression-token')) return json({error:'Unauthorized'},401);
         switch (url.pathname) {
+            case '/api/admin/appeal-forms': {
+                if (!['admin','superadmin'].includes(options.role)) return json({error:'Unauthorized. Admin only.'},403);
+                const values={ownerName:'Legal owner name',primaryPin:'Primary PIN'};
+                if(request.method()==='GET')return json({year:Number(url.searchParams.get('year')),kind:url.searchParams.get('kind'),published:null,sourceUrl:'https://www.cookcountyassessoril.gov/form-document/residential-appeal-form',values});
+                const body=await new Request(request.url(),{method:'POST',headers:request.headers(),body:request.postDataBuffer()}).formData();
+                const data=JSON.parse(body.get('data'));
+                if(data.action==='inspect')return json({pages:1,fields:[{name:'ownerName',type:'PDFTextField',signature:false},{name:'Owner Signature',type:'PDFTextField',signature:true}],values});
+                store.publishedForms.push(data);return json({success:true,revision:'fixture-template-revision'});
+            }
             case '/api/appeal-access': return deferred('Access', () => store.accessFails ? json({ error: 'Test access service unavailable' }, 503) : json({ allowed: store.access, admin: ['admin', 'superadmin'].includes(options.role) }));
             case '/api/addresses': {
                 if (request.method() === 'DELETE') {
@@ -166,7 +176,8 @@ async function scenario(options = {}) {
                 const chosen = store.addresses.find(row => row.id === store.starts.at(-1)?.propertyId) || property;
                 return json({
                     appeal: { customer_name: 'Test Owner', property_address: chosen.address, payment_status: 'free' },
-                    state: { status: store.packetStatus, version: 1, taxYear: 2026, intake:store.intake, mailingConsent:options.mailingConsent ? {version:1} : undefined, documents: [{ id: 'prepared', kind: 'packet', version: 1, name: 'test-appeal.pdf' }], propertySnapshot: { address: chosen.address, pin: chosen.pin || suggestedProperty.pin } },
+                    state: { status: store.packetStatus, version: 1, taxYear: 2026, intake:store.intake, mailingConsent:options.mailingConsent ? {version:1} : undefined, documents: [{ id: 'prepared', kind: 'packet', version: 1, name: 'test-appeal.pdf' }], propertySnapshot: { address: chosen.address, pin: chosen.pin || suggestedProperty.pin,details:options.propertyDetails,comparables:options.comparables } },
+                    officialForms:options.officialForms,
                     mailingWindow:options.mailingWindow, signature:options.signature,
                     revision: 0, events: [], isOwner: true, isAdmin: Boolean(options.role === 'admin'), storageReady: true, fulfillmentPaid:Boolean(options.fulfillmentPaid)
                 });
@@ -485,7 +496,7 @@ test('unverified account remains signed in while protected appeal actions stay u
         assert.equal(s.store.starts.length, 0);
         assert.equal(await s.page.evaluate(() => sessionStorage.getItem('regression-sign-outs')), null);
         const result = await s.page.evaluate(async () => {
-            const { authFetch } = await import('/auth-client.js?v=20261103-property-mailing');
+            const { authFetch } = await import('/auth-client.js?v=20261103-single-family');
             try { await authFetch('/api/addresses'); return 'unexpected access'; } catch (error) { return error.message; }
         });
         assert.match(result, /verify your email/i);
@@ -861,6 +872,7 @@ test('appeal form saves without requiring an owner-entered deadline or calendar 
         assert.equal(await form.locator('[name="filingDeadline"]').count(),0);
         assert.equal(await form.getByRole('link',{name:/calendar/i}).count(),0);
         await form.locator('[name="ownerName"]').fill('Test Owner');
+        await form.locator('[name="ownerPhone"]').fill('3125550100');
         await form.locator('[name="mailingAddress"]').fill('123 Test Ave, Skokie IL');
         await form.locator('[name="requestedMarketValue"]').fill('200000');
         await form.locator('[name="explanation"]').fill('Similar properties have lower assessments.');
@@ -888,3 +900,69 @@ for (const status of ['upcoming','open','closed','unannounced']) {
         } finally {await s.close();}
     });
 }
+
+test('owner sees service-prepared forms and only supplies missing facts and personal evidence',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',officialForms:[{kind:'application',ready:true,missingValues:[{source:'mailingCity',label:'Mailing city'},{source:'mailingState',label:'Mailing state'},{source:'mailingZip',label:'Mailing ZIP'}]}],comparables:[1,2,3,4,5].map(n=>({pin:String(n).padStart(14,'0'),address:`${n} Comparison Ave`}))});
+    try {
+        await s.goto('/appeal-packet.html?id=free_fixture');
+        const form=s.page.locator('form[data-action="intake"]');
+        await form.waitFor();
+        assert.equal(await form.locator('[name="condo"]').count(),0);
+        assert.equal(await form.locator('[name="singleFamilyScope"]').count(),1);
+        assert.equal(await form.locator('[name="documentsReviewed"]').count(),0);
+        assert.equal(await form.locator('[name="explanation"]').inputValue(),'I request review of my property assessment for uniformity. My selected comparable properties and supporting records are included for consideration.');
+        assert.equal(await form.locator('[name="selectedComparables"]:checked').count(),5);
+        assert.equal(await s.page.locator('form[data-action="evidence"] option[value="application"]').count(),0);
+        await form.locator('[name="ownerName"]').fill('Test Owner');
+        await form.locator('[name="ownerPhone"]').fill('3125550100');
+        await form.locator('[name="mailingAddress"]').fill('99 Owner St');
+        await form.locator('[name="mailingCity"]').fill('Chicago');
+        await form.locator('[name="mailingState"]').fill('IL');
+        await form.locator('[name="mailingZip"]').fill('60601');
+        await form.locator('[name="requestedMarketValue"]').fill('200000');
+        for(const box of await form.locator('input[type="checkbox"][required]').all())await box.check();
+        const response=s.page.waitForResponse(res=>res.request().method()==='POST'&&new URL(res.url()).pathname==='/api/packet');
+        await form.getByRole('button',{name:'Save information',exact:true}).click();await response;
+        await s.page.getByRole('heading',{name:'2. We prepare your forms and supporting packet',exact:true}).waitFor();
+        assert.equal(s.store.intakes[0].mailingCity,'Chicago');
+        assert.equal(s.store.intakes[0].singleFamilyScope,true);
+        assert.equal(s.store.intakes[0].selectedComparables.length,5);
+    }finally{await s.close();}
+});
+
+test('an existing out-of-scope packet keeps downloads while new preparation and purchase stay unavailable',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'299'}});
+    try {
+        await s.goto('/appeal-packet.html?id=free_fixture');
+        await s.page.getByRole('heading',{name:'Single-family homes only',exact:true}).waitFor();
+        assert.equal(await s.page.locator('form[data-action="intake"]').count(),0);
+        assert.equal(await s.page.locator('form[data-action="generate"]').count(),0);
+        assert.equal(await s.page.locator('form[data-action="purchase"]').count(),0);
+        assert.equal(await s.page.locator('[data-document="prepared"]').count(),1);
+    }finally{await s.close();}
+});
+
+test('administrator imports a reusable template once and other accounts cannot access setup',async()=>{
+    const s=await scenario({email:'admin@example.com',access:true,role:'admin'});
+    try {
+        await s.goto('/official-forms.html');
+        const form=s.page.locator('#official-form-setup');await form.waitFor();
+        await form.locator('[name="file"]').setInputFiles({name:'official-test-fixture.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.7\nFixture only')});
+        await s.page.getByRole('button',{name:'Inspect PDF fields',exact:true}).click();
+        await s.page.waitForFunction(()=>document.getElementById('official-field-list').textContent.includes('Owner Signature'));
+        assert.ok((await form.locator('[name="mapping"]').inputValue()).includes('Owner signs after review'));
+        await form.locator('[name="mapping"]').fill(JSON.stringify({ownerName:{source:'ownerName',required:true},'Owner Signature':{skip:true,reason:'Owner signs after review'}}));
+        for(const box of await form.locator('input[type="checkbox"][required]').all())await box.check();
+        await form.getByRole('button',{name:'Publish reviewed template',exact:true}).click();
+        await s.page.waitForFunction(()=>document.getElementById('form-status').textContent.startsWith('Published reviewed template'));
+        assert.equal(s.store.publishedForms.length,1);
+        assert.equal(s.store.publishedForms[0].signaturesBlank,true);
+    }finally{await s.close();}
+    const owner=await scenario({email:'tester@example.com',access:true});
+    try {
+        await owner.goto('/official-forms.html');
+        await owner.page.waitForFunction(()=>document.getElementById('form-status').textContent.includes('Admin only'));
+        assert.equal(await owner.page.locator('#official-form-setup').isVisible(),false);
+        assert.equal(owner.store.publishedForms.length,0);
+    }finally{await owner.close();}
+});

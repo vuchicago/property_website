@@ -44,7 +44,7 @@ test('mailing rejects early dispatch, closed windows and unannounced assessment 
 
 test('owners can save complete preparation details without entering a deadline',()=>{
     const s={...packet(),status:'intake',propertySnapshot:{details:{townshipName:'Niles'},comparables:[]}};
-    const next=transitionPacket(s,{action:'intake',agency:'assessor',taxYear:2026,ownerName:'Test Owner',mailingAddress:'123 Test Ave',reason:'characteristics',explanation:'Incorrect area',individualOwner:true,noExistingAppeal:true,requestedMarketValue:200000,residentialScope:true,ownResidence:true,recordsConfirmed:true,pins:'00000000000001',selectedComparables:[]},{uid:'owner',isOwner:true,isAdmin:false},'2026-11-03T15:00:00Z');
+    const next=transitionPacket(s,{action:'intake',agency:'assessor',taxYear:2026,ownerName:'Test Owner',mailingAddress:'123 Test Ave',reason:'characteristics',explanation:'Incorrect area',individualOwner:true,noExistingAppeal:true,requestedMarketValue:200000,singleFamilyScope:true,ownResidence:true,recordsConfirmed:true,pins:'00000000000001',selectedComparables:[]},{uid:'owner',isOwner:true,isAdmin:false},'2026-11-03T15:00:00Z');
     assert.equal(next.status,'preparing');
     assert.equal(next.intake.filingDeadline,undefined);
 });

@@ -1,4 +1,4 @@
-import { auth, authFetch } from './auth-client.js?v=20261103-property-mailing';
+import { auth, authFetch } from './auth-client.js?v=20261103-single-family';
 
 const PRIMARY_SUPERADMIN_EMAIL = 'vuchicago@gmail.com';
 

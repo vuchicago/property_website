@@ -4,7 +4,7 @@ Rules checked November 3, 2026. This is the working playbook for testing an appe
 
 ## Current service scope — free preparation, optional paid fulfillment
 
-The launch service is Assessor-only. Customers choose their argument and requested value, prepare or upload their packet, review it, and download unsigned documents for free. The existing personal checklist retains Board research for reference; it is not a Board fulfillment offering.
+The launch service is Assessor-only for individually owned single-family homes with one dwelling unit, including rented single-family homes. The service aggregates the property record, suggests comparisons, prefills the applicable official forms and builds the packet. Owners confirm missing facts, choose their grounds and requested value, provide only necessary personal evidence, then review and sign. Blank forms are supplied by the preparation desk, not the owner. Free preparation and downloads remain available once the actual official templates are imported; see [OFFICIAL_FORMS_SETUP.md](OFFICIAL_FORMS_SETUP.md). The existing personal checklist retains Board research for reference; it is not a Board fulfillment offering.
 
 **The $49 fee must be confirmed paid before any DocuSign envelope is created or sent.** This fee covers DocuSign signing, printing, assembly, postage and tracking for the approved packet version. A pending checkout, checkout redirect, or client checkbox cannot unlock signing. Refunded payments cannot unlock signing or mailing. Preparation is free; DocuSign is part of paid fulfillment.
 

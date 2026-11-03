@@ -4,7 +4,7 @@ Status: implemented locally for demo configuration; not connected to an actual D
 
 ## Product contract
 
-Free preparation includes collecting facts/evidence, owner-selected grounds and value, assembling/uploading an official PDF, reviewing and downloading it. The application does not yet automatically populate every official county form. County filing remains the owner's appeal.
+Free preparation for single-family homes collects facts/evidence, owner-selected grounds and value, prefills reviewed official PDF templates, assembles the packet, and allows free review/download. Owners supply missing facts and applicable personal evidence; the preparation desk supplies reusable blank official forms. Actual PDFs must first be imported and mapped; see [OFFICIAL_FORMS_SETUP.md](OFFICIAL_FORMS_SETUP.md). County filing remains the owner's appeal.
 
 The optional **$49** purchase includes DocuSign signing, printing, assembly, postage and tracking. **Server-confirmed payment is required before creating or sending any envelope**, including demo envelopes. Payment is linked to the exact approved packet version. Checkout, browser redirects and client-supplied payment flags never establish payment. Free preparation does not incur DocuSign API calls.
 

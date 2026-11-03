@@ -72,17 +72,29 @@ test('checkout status requires ownership; complete but unpaid never records paym
     const result=await checkoutStatus(await context('owner'));
     assert.equal(result.status,200);assert.equal((await result.json()).payment_status,'unpaid');
 });
-test('checkout charges exactly $49 and records service consent metadata', async () => {
-    const environment = {DEPLOYMENT_READY:'1',APPEAL_PACKETS:{async head(){return null;}},DOCUSIGN_INTEGRATION_KEY:'fixture',DOCUSIGN_USER_ID:'fixture',DOCUSIGN_ACCOUNT_ID:'fixture',DOCUSIGN_PRIVATE_KEY:'fixture',STRIPE_MODE:'test',STRIPE_TEST_SECRET_KEY:'sk_test_fixture',STRIPE_TEST_WEBHOOK_SECRET:'whsec_fixture',DB:{prepare(sql){return {bind(){return this;},async first(){
+function checkoutEnvironment(singleFamilyScope=true,classCode='203') {
+    return {DEPLOYMENT_READY:'1',APPEAL_PACKETS:{async head(){return null;}},DOCUSIGN_INTEGRATION_KEY:'fixture',DOCUSIGN_USER_ID:'fixture',DOCUSIGN_ACCOUNT_ID:'fixture',DOCUSIGN_PRIVATE_KEY:'fixture',STRIPE_MODE:'test',STRIPE_TEST_SECRET_KEY:'sk_test_fixture',STRIPE_TEST_WEBHOOK_SECRET:'whsec_fixture',DB:{prepare(sql){return {bind(){return this;},async first(){
         if(sql.includes('FROM appeals WHERE'))return {customer_id:'owner',property_address:'123 Test',property_key:'test-key'};
-        if(sql.includes('FROM appeal_packets'))return {revision:2,state_json:JSON.stringify({status:'approved',version:1,approval:{version:1},intake:{agency:'assessor',ownerName:'Test Owner'}})};
+        if(sql.includes('FROM appeal_packets'))return {revision:2,state_json:JSON.stringify({status:'approved',version:1,approval:{version:1},propertySnapshot:{details:{classCode}},intake:{agency:'assessor',ownerName:'Test Owner',singleFamilyScope}})};
         return null;
     },async run(){return {meta:{changes:1}};}};}}};
+}
+test('checkout charges exactly $49 and records service consent metadata', async () => {
+    const environment=checkoutEnvironment();
     const result=await checkout({request:await request('owner',{packetId:'free_test',fulfillmentAccepted:true}),env:environment});
     assert.equal(result.status,200);
     assert.equal(checkoutBody.get('line_items[0][price_data][unit_amount]'),'4900');
     assert.equal(checkoutBody.get('metadata[serviceType]'),'assessor_print_mail');
     assert.equal(checkoutBody.get('metadata[serviceTermsVersion]'),'2026-11-03-fulfillment');
+});
+test('unsupported or unconfirmed property scope is rejected before Stripe can charge',async()=>{
+    const before=stripeCalls;
+    for(const environment of [checkoutEnvironment(false),checkoutEnvironment(true,'299'),checkoutEnvironment(true,'211')]) {
+        const response=await checkout({request:await request('owner',{packetId:'free_test',fulfillmentAccepted:true}),env:environment});
+        assert.equal(response.status,409);
+        assert.match((await response.json()).error,/single-family homes/);
+    }
+    assert.equal(stripeCalls,before);
 });
 test('return-page refresh cannot restore refunded orders to paid or re-notify admins', async () => {
     let insertSql;
@@ -96,7 +108,7 @@ test('free preparation remains editable without payment, while signing and maili
     const environment=env();const original=environment.DB.prepare;
     environment.DB.prepare=sql=>{if(sql.includes('FROM appeal_pilot_access'))return {bind(){return this;},async first(){return {active:1};}};if(sql.includes('FROM appeals '))return {bind(){return this;},async first(){return {transaction_id:'free_test',customer_id:'owner',payment_status:'free'};}};return original(sql);};
     const req=async input=>new Request('https://example.com/api/packet?id=free_test',{method:'POST',headers:{Authorization:`Bearer ${await token('owner')}`,'Content-Type':'application/json'},body:JSON.stringify(input)});
-    const intake={action:'intake',revision:0,agency:'assessor',taxYear:2026,ownerName:'Owner',mailingAddress:'123 Test',reason:'uniformity',explanation:'My facts',individualOwner:true,noExistingAppeal:true};
+    const intake={action:'intake',revision:0,agency:'assessor',singleFamilyScope:true,taxYear:2026,ownerName:'Owner',mailingAddress:'123 Test',reason:'uniformity',explanation:'My facts',individualOwner:true,noExistingAppeal:true};
     assert.equal((await onRequest({request:await req(intake),env:environment})).status,200);
     assert.equal((await onRequest({request:await req({action:'request_signature',revision:0}),env:environment})).status,400);
     assert.equal((await onRequest({request:await req({action:'mail',revision:0}),env:environment})).status,402);

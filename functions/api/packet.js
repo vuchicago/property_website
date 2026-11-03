@@ -5,6 +5,7 @@ import { paidFulfillment, isFreePacket } from './_fulfillment.js';
 import { initialPacket, transitionPacket } from './_packet_workflow.js';
 import { appealAccess } from './_appeal_access.js';
 import { packetMailingWindow, requireOpenMailingWindow } from './_packet_mailing.js';
+import { officialFormsStatus } from './_official_forms.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 const FILE_ACTIONS = new Set(['evidence', 'packet', 'signed_packet', 'certificate', 'mail', 'delivered', 'filed']);
@@ -69,7 +70,8 @@ export async function onRequest(context) {
                 return new Response(object.body, { headers: { 'Content-Type': doc.type, 'Content-Disposition': `attachment; filename="${doc.name}"`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' } });
             }
             const events = row ? await db.prepare('SELECT action, status, created_at FROM appeal_packet_events WHERE transaction_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 100').bind(transactionId).all() : { results: [] };
-            return json({ packetId: transactionId, fulfillmentPaid: Boolean(fulfillment), signature, appeal, state: { ...state, documents: state.documents.map(({ key, ...doc }) => doc) }, mailingWindow: free ? packetMailingWindow(state) : null, revision, isOwner: actor.isOwner, isAdmin: actor.isAdmin, storageReady: Boolean(context.env.APPEAL_PACKETS), events: events.results });
+            const officialForms=free?await officialFormsStatus(context.env.APPEAL_PACKETS,state,appeal).catch(()=>null):null;
+            return json({ packetId: transactionId, fulfillmentPaid: Boolean(fulfillment), signature, appeal, officialForms, state: { ...state, documents: state.documents.map(({ key, ...doc }) => doc) }, mailingWindow: free ? packetMailingWindow(state) : null, revision, isOwner: actor.isOwner, isAdmin: actor.isAdmin, storageReady: Boolean(context.env.APPEAL_PACKETS), events: events.results });
         }
 
         // Payment is trusted only from the server's Stripe-backed order record.
@@ -118,6 +120,7 @@ export async function onRequest(context) {
             if(input.category==='photo' && (!/^\d{4}-\d{2}-\d{2}$/.test(input.photoDate||'') || !Number.isFinite(Date.parse(input.photoDate)) || new Date(input.photoDate).toISOString().slice(0,10)!==input.photoDate || input.photoDate > new Date().toISOString().slice(0,10))) return json({error:'Enter the actual date the photograph was taken.'},400);
             input.document.category=input.category;
             if(input.category==='photo')input.document.photoDate=input.photoDate;
+            if(input.category==='photo')input.document.dateStamped=input.photoDateStamped===true || input.photoDateStamped==='yes';
         }
         if (free && input.action === 'revise' && signature?.status === 'voided') input.envelopeVoided = true;
         const next = transitionPacket(state, input, actor);
