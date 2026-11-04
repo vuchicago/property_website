@@ -8,6 +8,7 @@ const { Miniflare } = require(process.env.MINIFLARE_MODULE || 'miniflare');
 const root = path.resolve(__dirname, '..');
 const bundle = process.env.APPEAL_WORKER_BUNDLE || '/tmp/cookcounty-regression-worker/index.js';
 let worker, db, pair, jwk, packetId;
+const stripeSessions=new Map();
 
 before(async () => {
     assert.ok(fs.existsSync(bundle), 'Compile the Pages Functions bundle first; see TESTING.md.');
@@ -21,7 +22,18 @@ before(async () => {
         compatibilityDate: '2026-02-01',
         d1Databases: ['DB'],
         r2Buckets: ['APPEAL_PACKETS'],
+        bindings:{APPEAL_CHECKOUT_TESTING:'true',DEPLOYMENT_READY:'0',STRIPE_MODE:'live',STRIPE_SECRET_KEY:'sk_live_local_fixture',STRIPE_WEBHOOK_SECRET:'whsec_local_fixture',DOCUSIGN_ENV:'demo'},
         outboundService: async request => {
+            const url=new URL(request.url);
+            if(url.hostname==='api.stripe.com') {
+                if(request.method==='POST') {
+                    const body=new URLSearchParams(await request.text()),id=`cs_live_local_${stripeSessions.size+1}`;
+                    const metadata=Object.fromEntries([...body].filter(([key])=>key.startsWith('metadata[')).map(([key,value])=>[key.slice(9,-1),value]));
+                    const session={id,url:`https://checkout.stripe.com/c/pay/${id}`,client_reference_id:body.get('client_reference_id'),metadata,payment_status:'unpaid',status:'open',amount_total:Number(body.get('line_items[0][price_data][unit_amount]')),customer_details:{email:body.get('customer_email')}};
+                    stripeSessions.set(id,session);return Response.json(session);
+                }
+                return Response.json(stripeSessions.get(url.pathname.split('/').pop()) || {error:{message:'No fixture session'}});
+            }
             assert.ok(request.url.includes('www.googleapis.com/service_accounts/v1/jwk/'), 'Unexpected external request in local Worker test');
             return Response.json({ keys: [jwk] });
         }
@@ -87,6 +99,21 @@ test('local Worker denies another account and anonymous access to the appeal', a
     const summary = await api('/api/addresses?summary=1', 'stranger');
     assert.deepEqual(await summary.json(), []);
     assert.equal((await worker.dispatchFetch(`https://local.test/api/packet?id=${packetId}`)).status, 401);
+});
+
+test('free preparation-copy export works before templates exist and does not mutate the case',async()=>{
+    const before=await db.prepare('SELECT revision,state_json FROM appeal_packets WHERE transaction_id=?').bind(packetId).first();
+    const response=await api(`/api/packet?id=${packetId}&download=preparation`);
+    assert.equal(response.status,200,await response.clone().text());
+    assert.match(response.headers.get('Content-Type'),/application\/pdf/);
+    assert.match(response.headers.get('Content-Disposition'),/preparation-copy.pdf/);
+    assert.match(response.headers.get('Cache-Control'),/no-store/);
+    const {PDFDocument}=await import('../assets/vendor/pdf-lib.esm.min.js');
+    assert.match((await PDFDocument.load(await response.arrayBuffer())).getTitle(),/NOT READY TO FILE/);
+    const after=await db.prepare('SELECT revision,state_json FROM appeal_packets WHERE transaction_id=?').bind(packetId).first();
+    assert.deepEqual(after,before);
+    assert.equal((await api(`/api/packet?id=${packetId}&download=preparation`,'stranger')).status,404);
+    assert.equal(stripeSessions.size,0);
 });
 
 test('local Worker searches, saves, and reloads a property using its account-owned ID', async () => {
@@ -207,4 +234,30 @@ test('administrator imports one reusable official-form template; owner builds th
     assert.equal(pdf.getPageCount(),5);
     assert.equal(pdf.getForm().getFields().length,0);
     assert.equal((await db.prepare('SELECT count(*) AS total FROM packet_signatures').first()).total,0);
+});
+
+test('administrator payment test works with existing live Stripe configuration and never unlocks fulfillment',async()=>{
+    await db.prepare("INSERT INTO user_addresses(id,customer_id,address,property_key,email) VALUES(10,'primary','123 TEST AVE SKOKIE','123 TEST AVE SKOKIE|pin:00000000000001','vuchicago@gmail.com')").run();
+    const claims={email:'vuchicago@gmail.com'};
+    const start=await api('/api/packet-start','primary',{propertyId:10,taxYear:2026},claims);
+    assert.equal(start.status,200,await start.clone().text());
+    const id=(await start.json()).id;
+    const packet=await (await api(`/api/packet?id=${id}`,'primary',undefined,claims)).json();
+    assert.equal(packet.checkout.testing,true);assert.equal(packet.checkout.enabled,true);assert.equal(packet.checkout.mode,'live');
+    const checkout=await api('/api/create-checkout-session','primary',{packetId:id,fulfillmentAccepted:true,paymentTest:true},claims);
+    assert.equal(checkout.status,200,await checkout.clone().text());
+    const session=[...stripeSessions.values()].at(-1);
+    assert.equal(session.amount_total,4900);assert.equal(session.metadata.paymentTest,'true');
+    assert.equal((await db.prepare('SELECT count(*) AS total FROM packet_fulfillment_orders WHERE packet_id=?').bind(id).first()).total,0);
+    session.payment_status='paid';session.status='complete';
+    const returned=await api(`/api/session-status?session_id=${session.id}`,'primary',undefined,claims);
+    assert.equal(returned.status,200,await returned.clone().text());
+    assert.equal((await returned.json()).email_status,'not_sent_payment_test');
+    const row=await db.prepare('SELECT payment_status,appeal_status FROM appeals WHERE transaction_id=?').bind(session.id).first();
+    assert.equal(row.payment_status,'paid');assert.equal(row.appeal_status,'Payment Test');
+    const after=await (await api(`/api/packet?id=${id}`,'primary',undefined,claims)).json();
+    assert.equal(after.fulfillmentPaid,false);assert.equal(after.state.version,0);assert.equal(after.state.status,'intake');
+    assert.equal((await db.prepare('SELECT count(*) AS total FROM packet_signatures').first()).total,0);
+    const unauthorized=await api('/api/create-checkout-session','owner',{packetId,paymentTest:true,fulfillmentAccepted:true});
+    assert.equal(unauthorized.status,403);
 });

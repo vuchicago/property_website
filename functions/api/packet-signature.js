@@ -1,6 +1,7 @@
 import {requireFirebaseUser,jsonResponse} from './_auth.js';
 import {paidFulfillment,isFreePacket} from './_fulfillment.js';
 import {docusignClient,signatureTabs} from './_docusign.js';
+import {enabled} from './_checkout_access.js';
 const error=(message,status=400)=>Object.assign(new Error(message),{status});
 export async function onRequestPost({request,env}) {
     const {user,response}=await requireFirebaseUser(request);if(response)return response;
@@ -14,6 +15,7 @@ export async function onRequestPost({request,env}) {
         if(!appeal || (!owner&&!role))throw error('Packet not found.',404);
         if(!role && input.action!=='sync')throw error('Only the fulfillment administrator can prepare or send signing invitations.',403);
         if(!['create','recover','send','sync','void'].includes(input.action))throw error('Unknown signing action.');
+        if(['create','recover','send'].includes(input.action) && enabled(env.APPEAL_CHECKOUT_TESTING) && !enabled(env.DEPLOYMENT_READY))throw error('Payment testing does not enable DocuSign signing. Complete signing configuration before sending envelopes.',503);
         const row=await env.DB.prepare('SELECT revision, state_json FROM appeal_packets WHERE transaction_id = ?').bind(packetId).first();
         const state=row&&JSON.parse(row.state_json);version=state?.version;
         if(state && !['approved','awaiting_signature','signed'].includes(state.status))throw error('Signing actions are unavailable after dispatch or before approval.',409);

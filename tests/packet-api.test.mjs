@@ -165,3 +165,44 @@ test('administrators grant and pause tester access while other accounts cannot m
     const list=await manage({request:await request('admin'),env:{DB:db}});
     assert.equal((await list.json()).pilots[0].active,0);
 });
+
+function paymentTestEnvironment({admin=true,draft=true}={}) {
+    const environment=checkoutEnvironment();
+    Object.assign(environment,{DEPLOYMENT_READY:'0',APPEAL_CHECKOUT_TESTING:'true',STRIPE_MODE:'live',STRIPE_SECRET_KEY:'sk_live_fixture',STRIPE_WEBHOOK_SECRET:'whsec_fixture',DOCUSIGN_ENV:'demo'});
+    delete environment.STRIPE_TEST_SECRET_KEY;delete environment.STRIPE_TEST_WEBHOOK_SECRET;
+    for(const key of ['DOCUSIGN_INTEGRATION_KEY','DOCUSIGN_USER_ID','DOCUSIGN_ACCOUNT_ID','DOCUSIGN_PRIVATE_KEY'])delete environment[key];
+    const original=environment.DB.prepare,queries=[];
+    environment.DB.prepare=sql=>{
+        queries.push(sql);const statement=original(sql);
+        if(sql.includes('FROM admins'))statement.first=async()=>admin?{role:'admin'}:null;
+        if(sql.includes('FROM appeal_pilot_access'))statement.first=async()=>({active:1});
+        if(draft && sql.includes('FROM appeal_packets'))statement.first=async()=>({revision:0,state_json:JSON.stringify({status:'intake',version:0,taxYear:2026,propertySnapshot:{details:{classCode:'203'}}})});
+        return statement;
+    };
+    return {environment,queries};
+}
+test('administrator reuses live Stripe for a standalone $49 test before templates and DocuSign are ready',async()=>{
+    const {environment,queries}=paymentTestEnvironment();
+    const response=await checkout({request:await request('owner',{packetId:'free_test',fulfillmentAccepted:true,paymentTest:true}),env:environment});
+    assert.equal(response.status,200,await response.clone().text());
+    const result=await response.json();assert.equal(result.paymentTest,true);assert.equal(result.stripeMode,'live');
+    assert.equal(checkoutBody.get('line_items[0][price_data][unit_amount]'),'4900');
+    assert.equal(checkoutBody.get('metadata[serviceType]'),'checkout_test');
+    assert.equal(queries.some(sql=>sql.startsWith('INSERT OR IGNORE INTO packet_fulfillment_orders')),false);
+    assert.ok(queries.some(sql=>sql.includes("appeal_status = 'Payment Test'")));
+});
+test('payment test override cannot be used by non-administrators or to bypass packet approval',async()=>{
+    const before=stripeCalls;
+    const unauthorized=paymentTestEnvironment({admin:false});
+    assert.equal((await checkout({request:await request('owner',{packetId:'free_test',fulfillmentAccepted:true,paymentTest:true}),env:unauthorized.environment})).status,403);
+    const admin=paymentTestEnvironment();
+    assert.equal((await checkout({request:await request('owner',{packetId:'free_test',fulfillmentAccepted:true}),env:admin.environment})).status,409);
+    assert.equal(stripeCalls,before);
+});
+test('approved fulfillment can reuse existing live Stripe while administrator testing is enabled',async()=>{
+    const {environment,queries}=paymentTestEnvironment({draft:false});
+    const response=await checkout({request:await request('owner',{packetId:'free_test',fulfillmentAccepted:true}),env:environment});
+    assert.equal(response.status,200,await response.clone().text());
+    assert.equal(checkoutBody.get('metadata[paymentTest]'),'false');
+    assert.equal(queries.filter(sql=>sql.startsWith('INSERT OR IGNORE INTO packet_fulfillment_orders')).length,1);
+});

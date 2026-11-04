@@ -27,7 +27,7 @@
         </div>
 
         <script type="module">
-                import { authFetch } from './auth-client.js?v=20261103-single-family';
+                import { authFetch } from './auth-client.js?v=20261103-checkout-download';
 
                 document.addEventListener('DOMContentLoaded', async () => {
                         const statusDiv = document.getElementById('status');
@@ -48,16 +48,17 @@
 
                                 if (data.payment_status === 'paid') {
 
+                                        const paymentTest=data.metadata?.paymentTest==='true';
                                         const dbWarning = data.db_status && data.db_status.startsWith('error')
                                                 ? `<p style="color: var(--error);">Payment succeeded, but saving the appeal failed: ${escapeHtml(data.db_status)}</p>`
                                                 : '';
 
                                         statusDiv.innerHTML = `
         <h2 style="color: var(--success); margin-bottom: 1rem;">Payment Successful!</h2>
-        <p class="lead">Your DocuSign, print-and-mail order for <strong>${escapeHtml(data.metadata?.propertyAddress || 'your property')}</strong> has been received.</p>
+        <p class="lead">${paymentTest ? 'Your administrator Stripe payment test was received. This does not order signing or mailing.' : `Your DocuSign, print-and-mail order for <strong>${escapeHtml(data.metadata?.propertyAddress || 'your property')}</strong> has been received.`}</p>
         <p class="lead" style="font-size: 0.9em; color: #666;">Ref: ${escapeHtml(sessionId)}</p>
         ${dbWarning}
-        <p>Next, complete DocuSign signing and review the signed packet before authorizing mailing. Your appeal has not been filed with the county.</p>
+        <p>${paymentTest ? 'Free packet downloads remain available. This payment test does not unlock DocuSign or submit an appeal.' : 'Next, complete DocuSign signing and review the signed packet before authorizing mailing. Your appeal has not been filed with the county.'}</p>
         <div style="margin-top: 2rem;">
                 <a href="appeal-packet.html?id=${encodeURIComponent(data.metadata?.packetId || sessionId)}" class="btn btn-primary" style="margin-right: 1rem;">Continue to My Packet</a>
         </div>

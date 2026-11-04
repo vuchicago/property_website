@@ -1,6 +1,7 @@
 
 import { getStripeConfig } from './_stripe.js';
 import { MAIL_FULFILLMENT_AMOUNT_CENTS } from './_packet_pricing.js';
+import { enabled } from './_checkout_access.js';
 
 export const onRequestGet = async (context) => {
         const appealHelpAmountCents = MAIL_FULFILLMENT_AMOUNT_CENTS;
@@ -10,6 +11,8 @@ export const onRequestGet = async (context) => {
                 publishableKey: stripe.publishableKey,
                 stripeMode: stripe.mode,
                 deploymentReady: isEnabled(context.env.DEPLOYMENT_READY) && Boolean(context.env.APPEAL_PACKETS),
+                checkoutTesting:enabled(context.env.APPEAL_CHECKOUT_TESTING),
+                checkoutConfigured:Boolean(stripe.secretKey && stripe.webhookSecret && context.env.APPEAL_PACKETS),
                 appealHelpAmountCents
         }), {
                 headers: {

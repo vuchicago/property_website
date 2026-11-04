@@ -61,7 +61,8 @@ export const onRequestGet = async (context) => {
                                                 propertyPin: session.metadata?.propertyPin || null,
                                                 paymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id || null,
                                                 paymentAmount: session.amount_total,
-                                                paymentStatus: session.payment_status
+                                                paymentStatus: session.payment_status,
+                                                paymentTest:session.metadata?.paymentTest==='true'
                                         });
 
                                         dbStatus = result.dbStatus;

@@ -16,7 +16,7 @@ Signed and authorized packets wait for their township appeal window. The API res
 
 ## Limits and operational status
 
-- **Live official PDF import is still required.** The Assessor's PDF host returned HTTP 403 for the current form downloads. The code contains no recreated government application. Until an administrator imports and reviews the actual templates, owners can save their information and evidence, but generation waits for the preparation desk. Tests use synthetic PDFs in isolated storage only; these are never installed as live templates.
+- **Live official PDF import is still required.** The Assessor's PDF host returned HTTP 403 for the current form downloads. The code contains no recreated government application. Until an administrator imports and reviews the actual templates, owners can save their information/evidence and download a free preparation copy; only the complete filing packet waits for the preparation desk. The copy lists missing items, is marked not ready to file, and does not change approval or payment status. Tests use synthetic PDFs in isolated storage only; these are never installed as live templates.
 - Known condo, multi-family, mixed-use and commercial records cannot start preparation or purchase fulfillment. Existing documents remain downloadable. Unknown imported classification requires the owner's explicit single-family confirmation.
 
 - DocuSign is still configured for **demo**. Demo requires Stripe test mode and cannot dispatch real mail. Provider credentials and live setup remain necessary; this change does not enable purchases or deploy production.

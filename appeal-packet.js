@@ -1,6 +1,6 @@
-import { requirements, preparationProblems, evidenceCategories, OFFICIAL_FORM } from './packet-requirements.js?v=20261103-single-family';
-import { authFetch, onAuthUserChanged } from './auth-client.js?v=20261103-single-family';
-import { singleFamilyEligibility } from './packet-scope.js?v=20261103-single-family';
+import { requirements, preparationProblems, evidenceCategories, OFFICIAL_FORM } from './packet-requirements.js?v=20261103-checkout-download';
+import { authFetch, onAuthUserChanged } from './auth-client.js?v=20261103-checkout-download';
+import { singleFamilyEligibility } from './packet-scope.js?v=20261103-checkout-download';
 
 const labels = { intake: 'Your information', preparing: 'Preparing packet', review: 'Review packet', approved: 'Download or choose fulfillment', awaiting_signature: 'Awaiting signatures', signed: 'Signed', mailed: 'Mailed', delivered: 'Delivered by carrier', filed: 'County filing confirmed' };
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -210,6 +210,10 @@ function render() {
         html += form('intake', 'Tell us about your appeal', `${input('ownerName', 'Legal owner name', 'text', intake.ownerName || details.mailingName || appeal.customer_name)}${input('mailingAddress', 'Your complete mailing address', 'text', intake.mailingAddress || details.mailingAddress)}${input('ownerPhone','Phone number for the official application','tel',intake.ownerPhone || '')}${additionalOwnerFields(current.officialForms,intake)}<p>We use your verified account email for the application. We prefill the official forms; you review and sign the completed packet.</p><div class="packet-grid"><label>Appeal agency<select name="agency"><option value="assessor" ${intake.agency === 'assessor' ? 'selected' : ''}>Cook County Assessor</option></select></label>${input('taxYear', 'Assessment tax year', 'number', intake.taxYear || s.taxYear || new Date().getFullYear(), `min="2020" max="2100" ${s.taxYear?'readonly':''}`)}</div><label>Reason<select name="reason">${[['uniformity','Similar properties assessed lower'],['overvaluation','Market value is too high'],['characteristics','Property description is incorrect']].map(([value,label]) => `<option value="${value}" ${intake.reason === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>${input('pins','All PINs included in this appeal (comma separated)','text',intake.pins || snapshot.pin || appeal.property_pin)}${input('requestedMarketValue','Your requested fair market value ($), not assessed value','number',intake.requestedMarketValue || '', 'min="1" step="0.01"')}<p>If you choose $49 DocuSign, print and mail fulfillment, we manage the township appeal calendar. We hold your signed, authorized packet until the appeal window opens, then print, mail and provide tracking.</p>${notes('explanation', 'Your explanation and why your evidence supports the requested value', intake.explanation || (intake.reason && intake.reason !== 'uniformity' ? '' : 'I request review of my property assessment for uniformity. My selected comparable properties and supporting records are included for consideration.'))}<fieldset><legend>Which documents apply?</legend>${toggle('ownResidence','I live at this property as my own residence (leave unchecked for a rental).',intake.ownResidence)}${toggle('recentSale','There was a sale within two years before the assessment lien date, or I am relying on a sale.',intake.recentSale)}<div class="packet-sale-fields" ${intake.recentSale?'':'hidden'}>${input('purchaseDate','Purchase date','date',intake.purchaseDate || '')}${input('purchasePrice','Purchase price ($)','number',intake.purchasePrice || '', 'min="1" step="0.01"')}${input('sellerName','Seller name','text',intake.sellerName || '')}${input('saleRelationship','Relationship between buyer and seller (or none)','text',intake.saleRelationship || '')}</div>${toggle('appraisal','An existing appraisal / valuation report falls within the required disclosure period.',intake.appraisal)}${toggle('damage','My argument relies on damage, condition or vacancy.',intake.damage)}<details><summary>Additional attestation (only if requested)</summary>${toggle('affidavit','The Assessor requested an additional attestation for this appeal.',intake.affidavit)}<label>Facts for a requested attestation (only if applicable)<textarea name="attestationFacts" maxlength="10000">${escape(intake.attestationFacts || '')}</textarea></label></details></fieldset>${comparisonChoices(snapshot,intake)}${check('recordsConfirmed','I verified the assessment year, ownership, all PINs and current values against the county record. Imported data may be from an earlier year.')}${check('singleFamilyScope','This is a single-family home with one dwelling unit, not a condo, multi-family, mixed-use or commercial property.')}${check('individualOwner', 'The property is titled in my individual name. I will review and sign my prepared appeal.')}${check('noExistingAppeal', 'I have checked for existing appeals and representation; there is no conflicting filing or engagement.')}`, 'Save information');
     }
     if(intake.ownerName) html += checklistCard(s);
+    if(isOwner && free && editable && storageReady) {
+        const prepared=s.documents.find(doc=>doc.kind==='packet' && doc.version===s.version && (!s.packetId || doc.id===s.packetId));
+        html+=`<section class="packet-card" id="free-packet-download"><h2>Your free packet</h2><p>Downloads never require payment.</p>${prepared?`<button type="button" class="btn btn-primary" data-document="${escape(prepared.id)}">Download free packet</button>`:'<p>You can download your collected information and uploads now. The preparation copy lists missing forms or evidence and is marked not ready to file.</p><button type="button" class="btn btn-primary" id="download-preparation-copy">Download free preparation copy</button>'}</section>`;
+    }
     html += `<section class="packet-card"><h2>Your documents and downloads</h2>${s.documents.map(doc => `<div class="packet-document"><span>${escape(doc.name)}<br><small>${escape(evidenceCategories[doc.category] || doc.kind.replaceAll('_',' '))} · version ${doc.version}</small></span><button type="button" class="btn btn-secondary" data-document="${doc.id}">Download</button>${isOwner && preparing && doc.kind==='evidence'?`<button type="button" class="btn btn-secondary" data-remove="${doc.id}">Remove</button>`:''}</div>`).join('') || '<p>No documents uploaded yet.</p>'}</section>`;
     if (editable && storageReady && ['intake','preparing'].includes(s.status)) html += form('evidence', 'Add supporting evidence', `<label>Document type<select name="category">${Object.entries(evidenceCategories).filter(([id])=>!['application','affidavit'].includes(id)).map(([id,label])=>`<option value="${id}">${label}</option>`).join('')}</select></label><label>Photo date (for a property photo)<input type="date" name="photoDate"></label><label><input type="checkbox" name="photoDateStamped" value="yes">The photo visibly shows its capture date. Otherwise we prepare the official date attestation for you to sign.</label>${file('PDF, JPG or PNG',true)}<p>Upload complete, legible documents. Uploaded files are included in the combined PDF; remove outdated files before building.</p>`, 'Upload evidence');
     if (isOwner && editable && s.status === 'review') html += form('approve', 'Review your prepared packet', `<p>Download the current packet above and check every field and supporting document. Contact us for corrections before approving.</p>${check('confirmed','I reviewed this packet version and confirm that its information is accurate. I selected my appeal grounds and requested value. This approval is not my appeal signature.')}`, 'Confirm reviewed packet');
@@ -230,6 +234,7 @@ function render() {
     if (free && fulfillmentPaid) html += `<section class="packet-card"><h2>DocuSign signing included</h2><p>${signature ? `Envelope status: ${escape(signature.status)} · ${escape(signature.environment)}` : 'The fulfillment desk will check signature placement and send your invitation.'}</p><p>Use the signing link delivered by DocuSign to your verified account email. Signed files and the completion certificate will appear here after synchronization.</p></section>`;
     if (free && signature?.envelope_id && ['approved','awaiting_signature','signed'].includes(s.status)) html += form('ds_sync','Check signing status','<p>Checks are limited to once every 15 minutes. Completed documents are retrieved directly from DocuSign.</p>','Check DocuSign');
     if (isAdmin && editable) html += adminForms(s, storageReady, free, fulfillmentPaid, signature);
+    if(isOwner && free && editable && current.checkout?.testing) html+=form('payment_test','Test existing Stripe checkout · $49',`<p>${current.checkout.mode==='live'?'This uses your existing live Stripe setup and charges the card $49.':'This uses Stripe test mode.'} This administrator payment test does not order DocuSign or mailing and does not replace approval of the completed packet.</p>${check('testPaymentAccepted','I want to run this $49 payment test using the existing Stripe checkout.')}`,'Continue to Stripe payment test');
     html += `<section class="packet-card"><h2>Activity</h2><ul>${events.map(event => `<li>${escape(event.created_at)} UTC — ${escape(event.action.replaceAll('_',' '))}: ${escape(labels[event.status])}</li>`).join('') || '<li>Workspace created. Intake has not been submitted.</li>'}</ul></section>`;
     const workspace = document.getElementById('packet-workspace');
     workspace.innerHTML = html; workspace.hidden = false;
@@ -244,6 +249,11 @@ function render() {
     workspace.querySelectorAll('form').forEach(el => el.addEventListener('submit', submit));
     workspace.querySelectorAll('[data-remove]').forEach(el=>el.addEventListener('click',async()=>{el.disabled=true;try{const r=await authFetch(`/api/packet?id=${encodeURIComponent(selectedId)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'remove_evidence',documentId:el.dataset.remove,revision:current.revision})});const d=await r.json();if(!r.ok)throw new Error(d.error);await load();}catch(e){message(e.message,true);el.disabled=false;}}));
     workspace.querySelectorAll('[data-document]').forEach(el => el.addEventListener('click', () => download(el.dataset.document)));
+    workspace.querySelector('#download-preparation-copy')?.addEventListener('click',async event=>{
+        const button=event.currentTarget;button.disabled=true;
+        try{await downloadFile(`/api/packet?id=${encodeURIComponent(selectedId)}&download=preparation`,'assessor-preparation-copy.pdf');}
+        catch(error){message(error.message,true);}finally{button.disabled=false;}
+    });
 }
 
 function mailingQueueCard(window, free) {
@@ -289,8 +299,9 @@ async function submit(event) {
         el.querySelectorAll('[type=checkbox]').forEach(box => {if(box.name!=='selectedComparables')data[box.name] = box.checked;});
         if (data.taxYear) data.taxYear = Number(data.taxYear);
         if(data.action==='intake'){data.requestedMarketValue=Number(data.requestedMarketValue);data.selectedComparables=values.getAll('selectedComparables');}
-        if(data.action==='purchase' || data.action.startsWith('ds_')) {
+        if(data.action==='purchase' || data.action==='payment_test' || data.action.startsWith('ds_')) {
             const signing=data.action.startsWith('ds_');
+            if(data.action==='payment_test'){if(data.testPaymentAccepted!==true)throw new Error('Confirm the payment test first.');data.paymentTest=true;data.fulfillmentAccepted=true;}
             if(signing){data.action=data.action.slice(3);if(data.positions)data.positions=JSON.parse(data.positions);}
             const response=await authFetch(signing?'/api/packet-signature':'/api/create-checkout-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...data,packetId:selectedId})});
             const result=await response.json();if(!response.ok)throw new Error(result.error);
@@ -310,14 +321,19 @@ async function submit(event) {
     finally { button.disabled = false; }
 }
 
+async function downloadFile(url,filename) {
+    const response=await authFetch(url);
+    if(!response.ok) {const result=await response.json().catch(()=>null);throw new Error(result?.error || 'Could not download the packet. Please try again.');}
+    if(!(response.headers.get('Content-Type') || '').includes('application/pdf'))throw new Error('The download did not return a PDF. Please try again.');
+    const disposition=response.headers.get('Content-Disposition') || '';
+    const name=/filename="([^"\\/]+)"/.exec(disposition)?.[1] || filename;
+    const objectUrl=URL.createObjectURL(await response.blob()),link=document.createElement('a');
+    link.href=objectUrl;link.download=name;document.body.append(link);link.click();link.remove();
+    setTimeout(()=>URL.revokeObjectURL(objectUrl),30000);
+}
 async function download(id) {
-    try {
-        const response = await authFetch(`/api/packet?id=${encodeURIComponent(selectedId)}&document=${encodeURIComponent(id)}`);
-        if (!response.ok) throw new Error('Could not download the document.');
-        const url = URL.createObjectURL(await response.blob()), link = document.createElement('a');
-        link.href = url; link.download = current.state.documents.find(doc => doc.id === id)?.name || 'document.pdf'; link.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (error) { message(error.message, true); }
+    try {await downloadFile(`/api/packet?id=${encodeURIComponent(selectedId)}&document=${encodeURIComponent(id)}`,current.state.documents.find(doc=>doc.id===id)?.name || 'document.pdf');}
+    catch(error){message(error.message,true);}
 }
 
 function propertySummary(snapshot) {

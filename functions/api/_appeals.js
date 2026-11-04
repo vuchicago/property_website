@@ -9,6 +9,7 @@ export async function recordCheckoutAppeal(env, payment) {
                 ...payment,
                 paymentStatus: payment.paymentStatus || 'unpaid'
         });
+        if(payment.paymentTest===true)await markPaymentTest(env,payment);
 
         return { dbStatus: 'checkout_recorded' };
 }
@@ -23,6 +24,10 @@ export async function recordPaidAppeal(env, payment) {
         ).bind(payment.transactionId).first();
 
         await insertAppeal(env, payment);
+        if(payment.paymentTest===true) {
+                await markPaymentTest(env,payment);
+                return {dbStatus:'payment_test_recorded',emailStatus:'not_sent_payment_test'};
+        }
 
         if (payment.customerId && payment.propertyAddress) {
                 try {
@@ -71,6 +76,10 @@ export async function recordPaidAppeal(env, payment) {
                 dbStatus: 'recorded',
                 emailStatus
         };
+}
+
+async function markPaymentTest(env,payment) {
+        await env.DB.prepare("UPDATE appeals SET appeal_status = 'Payment Test' WHERE transaction_id = ? AND customer_id = ?").bind(payment.transactionId,payment.customerId).run();
 }
 
 async function notifyAdminsOfPaidAppeal(env, payment) {

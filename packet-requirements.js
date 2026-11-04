@@ -1,5 +1,5 @@
 // Shared by the browser and server. Upload presence is not county acceptance.
-import { singleFamilyEligibility } from './packet-scope.js?v=20261103-single-family';
+import { singleFamilyEligibility } from './packet-scope.js?v=20261103-checkout-download';
 export const OFFICIAL_FORM = 'https://www.cookcountyassessoril.gov/form-document/residential-appeal-form';
 export const evidenceCategories = {
     application:'Official Assessor application — prepared for you', notice:'Assessment notice (only if needed to correct imported records)',

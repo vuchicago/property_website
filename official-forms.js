@@ -1,4 +1,4 @@
-import { authFetch, onAuthUserChanged } from './auth-client.js?v=20261103-single-family';
+import { authFetch, onAuthUserChanged } from './auth-client.js?v=20261103-checkout-download';
 const form=document.getElementById('official-form-setup'),status=document.getElementById('form-status'),inspect=document.getElementById('inspect-official');
 form.elements.year.value=new Date().getFullYear();
 let revision=0;

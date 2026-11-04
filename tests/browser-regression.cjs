@@ -67,6 +67,7 @@ async function scenario(options = {}) {
     store.intakes = [];
     store.intake = {singleFamilyScope:true};
     store.publishedForms=[];
+    store.checkoutRequests=[];
     store.lookups = [];
     store.summaryRequests = 0;
     store.authAttempts = [];
@@ -97,6 +98,10 @@ async function scenario(options = {}) {
         store.authAttempts.push({path:url.pathname, method:request.method(), token:request.headers().authorization, body:request.postData()});
         if (options.alwaysUnauthorized || (options.rejectCachedToken && request.headers().authorization === 'Bearer regression-token')) return json({error:'Unauthorized'},401);
         switch (url.pathname) {
+            case '/api/create-checkout-session':
+                store.checkoutRequests.push(request.postDataJSON());
+                return json({url:new URL('/return.html?session_id=cs_fixture',base).href,stripeMode:options.checkout?.mode || 'test'});
+            case '/api/session-status': return json({status:'complete',payment_status:'paid',db_status:'payment_test_recorded',metadata:{paymentTest:'true',packetId:'free_fixture'}});
             case '/api/admin/appeal-forms': {
                 if (!['admin','superadmin'].includes(options.role)) return json({error:'Unauthorized. Admin only.'},403);
                 const values={ownerName:'Legal owner name',primaryPin:'Primary PIN'};
@@ -172,12 +177,17 @@ async function scenario(options = {}) {
                     return json({error:'Unexpected packet action'},400);
                 }
                 if (url.searchParams.has('document')) return route.fulfill({ contentType: 'application/pdf', body: '%PDF-1.7\nRegression test fixture\n%%EOF' });
+                if (url.searchParams.get('download')==='preparation') {
+                    if(store.preparationDownloadFails)return json({error:'Temporary packet download failure. Please try again.'},503);
+                    return route.fulfill({contentType:'application/pdf',headers:{'Content-Disposition':'attachment; filename="assessor-2026-preparation-copy.pdf"'},body:'%PDF-1.7\nPreparation copy test fixture\n%%EOF'});
+                }
                 if (store.packetFailsLeft > 0) { store.packetFailsLeft--; return json({ error: 'Test packet loading failure' }, 503); }
                 const chosen = store.addresses.find(row => row.id === store.starts.at(-1)?.propertyId) || property;
                 return json({
                     appeal: { customer_name: 'Test Owner', property_address: chosen.address, payment_status: 'free' },
-                    state: { status: store.packetStatus, version: 1, taxYear: 2026, intake:store.intake, mailingConsent:options.mailingConsent ? {version:1} : undefined, documents: [{ id: 'prepared', kind: 'packet', version: 1, name: 'test-appeal.pdf' }], propertySnapshot: { address: chosen.address, pin: chosen.pin || suggestedProperty.pin,details:options.propertyDetails,comparables:options.comparables } },
+                    state: { status: store.packetStatus, version: 1, taxYear: 2026, intake:store.intake, mailingConsent:options.mailingConsent ? {version:1} : undefined, documents: options.documents || [{ id: 'prepared', kind: 'packet', version: 1, name: 'test-appeal.pdf' }], propertySnapshot: { address: chosen.address, pin: chosen.pin || suggestedProperty.pin,details:options.propertyDetails,comparables:options.comparables } },
                     officialForms:options.officialForms,
+                    checkout:options.checkout,
                     mailingWindow:options.mailingWindow, signature:options.signature,
                     revision: 0, events: [], isOwner: true, isAdmin: Boolean(options.role === 'admin'), storageReady: true, fulfillmentPaid:Boolean(options.fulfillmentPaid)
                 });
@@ -496,7 +506,7 @@ test('unverified account remains signed in while protected appeal actions stay u
         assert.equal(s.store.starts.length, 0);
         assert.equal(await s.page.evaluate(() => sessionStorage.getItem('regression-sign-outs')), null);
         const result = await s.page.evaluate(async () => {
-            const { authFetch } = await import('/auth-client.js?v=20261103-single-family');
+            const { authFetch } = await import('/auth-client.js?v=20261103-checkout-download');
             try { await authFetch('/api/addresses'); return 'unexpected access'; } catch (error) { return error.message; }
         });
         assert.match(result, /verify your email/i);
@@ -965,4 +975,49 @@ test('administrator imports a reusable template once and other accounts cannot a
         assert.equal(await owner.page.locator('#official-form-setup').isVisible(),false);
         assert.equal(owner.store.publishedForms.length,0);
     }finally{await owner.close();}
+});
+
+test('free preparation copy can be downloaded before official templates or payment are available',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',documents:[],propertyDetails:{classCode:'203'},officialForms:[{kind:'application',ready:false,missingValues:[]}]});
+    try {
+        await s.goto('/appeal-packet.html?id=free_fixture');
+        const downloading=s.page.waitForEvent('download');
+        await s.page.getByRole('button',{name:'Download free preparation copy',exact:true}).click();
+        const file=await downloading;assert.equal(file.suggestedFilename(),'assessor-2026-preparation-copy.pdf');
+        assert.ok(s.store.requests.includes('/api/packet?id=free_fixture&download=preparation'));
+        assert.equal(s.store.checkoutRequests.length,0);assert.equal(s.store.signatureCalls,0);
+        assert.equal(s.store.packetStatus,'intake');
+    }finally{await s.close();}
+});
+
+test('temporary free-download failure shows the reason and permits retry without payment',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',documents:[]});
+    try {
+        s.store.preparationDownloadFails=true;
+        await s.goto('/appeal-packet.html?id=free_fixture');
+        const button=s.page.getByRole('button',{name:'Download free preparation copy',exact:true});await button.click();
+        await s.page.waitForFunction(()=>document.getElementById('packet-message').textContent.includes('Temporary packet download failure'));
+        assert.equal(await button.isEnabled(),true);
+        s.store.preparationDownloadFails=false;
+        const downloading=s.page.waitForEvent('download');await button.click();await downloading;
+        assert.equal(s.store.checkoutRequests.length,0);
+    }finally{await s.close();}
+});
+
+test('administrator can test the existing live Stripe checkout without treating it as fulfillment',async()=>{
+    const s=await scenario({email:'admin@example.com',role:'admin',access:true,packetStatus:'intake',documents:[],checkout:{testing:true,enabled:true,mode:'live'}});
+    try {
+        await s.goto('/appeal-packet.html?id=free_fixture');
+        const form=s.page.locator('form[data-action="payment_test"]');await form.waitFor();
+        assert.ok((await form.textContent()).includes('charges the card $49'));
+        await form.locator('[name="testPaymentAccepted"]').check();
+        await form.getByRole('button',{name:'Continue to Stripe payment test',exact:true}).click();
+        await s.page.waitForURL(url=>/^\/return(?:\.html)?$/.test(url.pathname)&&url.searchParams.get('session_id')==='cs_fixture');
+        await s.page.getByText('Your administrator Stripe payment test was received. This does not order signing or mailing.',{exact:true}).waitFor();
+        assert.equal(s.store.checkoutRequests.length,1);
+        assert.equal(s.store.checkoutRequests[0].paymentTest,true);
+        assert.equal(s.store.checkoutRequests[0].fulfillmentAccepted,true);
+        assert.equal(s.store.signatureCalls,0);
+        assert.equal(s.store.packetStatus,'intake');
+    }finally{await s.close();}
 });

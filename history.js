@@ -1,4 +1,4 @@
-import { auth, authFetch } from './auth-client.js?v=20261103-single-family';
+import { auth, authFetch } from './auth-client.js?v=20261103-checkout-download';
 
 let userAddresses = [];
 let allAppeals = [];
@@ -1089,7 +1089,7 @@ function renderAppeals(appeals, address) {
                         const addr = e.currentTarget.dataset.address;
                         if (freeAppealTester) location.href = `appeal-packet.html?property=${encodeURIComponent(selectedProperty.id)}`;
                         else {
-                                const { openAppealModal } = await import('./appeal.js?v=20261103-single-family');
+                                const { openAppealModal } = await import('./appeal.js?v=20261103-checkout-download');
                                 openAppealModal(addr, selectedProperty);
                         }
                 });

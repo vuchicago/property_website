@@ -87,11 +87,12 @@ async function loadOfficialForms(storage,state,appeal = {}) {
 export async function officialFormsStatus(storage,state,appeal = {}) {
     return (await loadOfficialForms(storage,state,appeal)).map(({manifest,...status})=>status);
 }
-export async function prepareOfficialForms(storage,state,appeal) {
-    const status=await loadOfficialForms(storage,state,appeal);
-    for(const form of status) {
-        if(!form.ready)throw Object.assign(new Error(`The preparation desk needs to import ${form.title} for this assessment year. You do not need to download or upload blank forms.`),{status:409});
-        if(form.missingValues.length)fail(`Please confirm: ${form.missingValues.map(item=>item.label).join(', ')}.`);
+export async function prepareOfficialForms(storage,state,appeal,{allowIncomplete=false,onMissing=()=>{}}={}) {
+    const available=await loadOfficialForms(storage,state,appeal),status=[];
+    for(const form of available) {
+        const issue=!form.ready?`The preparation desk needs to import ${form.title} for this assessment year. You do not need to download or upload blank forms.`:form.missingValues.length?`Please confirm: ${form.missingValues.map(item=>item.label).join(', ')}.`:null;
+        if(issue) {if(allowIncomplete){onMissing(issue);continue;}throw Object.assign(new Error(issue),{status:form.ready?400:409});}
+        status.push(form);
     }
     const values=officialFormValues(state,appeal),prepared=[];
     for(const entry of status) {

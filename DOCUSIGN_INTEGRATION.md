@@ -1,6 +1,6 @@
 # DocuSign fulfillment integration
 
-Status: implemented locally for demo configuration; not connected to an actual DocuSign account or deployed. Migrations 0029–0031 were applied to production D1 on November 3, 2026; see APPEAL_WORKFLOW_SCHEMA.md. All provider calls in automated tests are mocked.
+Status: framework deployed; DocuSign remains configured for demo and has not been connected to an actual sender account. Migrations 0029–0031 were applied to production D1 on November 3, 2026; see APPEAL_WORKFLOW_SCHEMA.md. All provider calls in automated tests are mocked.
 
 ## Product contract
 
@@ -9,6 +9,10 @@ Free preparation for single-family homes collects facts/evidence, owner-selected
 The optional **$49** purchase includes DocuSign signing, printing, assembly, postage and tracking. **Server-confirmed payment is required before creating or sending any envelope**, including demo envelopes. Payment is linked to the exact approved packet version. Checkout, browser redirects and client-supplied payment flags never establish payment. Free preparation does not incur DocuSign API calls.
 
 ## Configure the demo account
+
+Administrator payment testing is independent of DocuSign configuration. `APPEAL_CHECKOUT_TESTING=true` permits administrators to reuse the existing Stripe configuration even while `DEPLOYMENT_READY` is false. Production's existing credentials select **live Stripe**, so the administrator UI explicitly states that a card will be charged $49. No $99 Price is reused; the existing account/integration creates a $49 Checkout Session. Legacy credential aliases remain supported.
+
+The separate **Test existing Stripe checkout** action works on an owned draft packet. Its verified payment is labeled **Payment Test**, does not create a fulfillment-order link, sends no fulfillment notifications, and never unlocks signing or mailing. A regular fulfillment purchase still requires an approved single-family packet and links payment to that approved version. Before full rollout, disable `APPEAL_CHECKOUT_TESTING`, configure the correct payment/signing environments, and enable normal readiness. The testing override does not enable DocuSign create/send/recover while readiness remains false.
 
 1. Create a DocuSign developer/demo account and integration app. Generate an RSA keypair for JWT authentication. Keep the private key off the browser and out of Git.
 2. Record the integration key, impersonated sender user's API user ID, and API account ID from the demo account.

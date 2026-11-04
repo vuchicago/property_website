@@ -6,6 +6,7 @@ import { initialPacket, transitionPacket } from './_packet_workflow.js';
 import { appealAccess } from './_appeal_access.js';
 import { packetMailingWindow, requireOpenMailingWindow } from './_packet_mailing.js';
 import { officialFormsStatus } from './_official_forms.js';
+import { checkoutAccess } from './_checkout_access.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 const FILE_ACTIONS = new Set(['evidence', 'packet', 'signed_packet', 'certificate', 'mail', 'delivered', 'filed']);
@@ -69,9 +70,17 @@ export async function onRequest(context) {
                 if (!object) return json({ error: 'Document not found.' }, 404);
                 return new Response(object.body, { headers: { 'Content-Type': doc.type, 'Content-Disposition': `attachment; filename="${doc.name}"`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' } });
             }
+            if(url.searchParams.get('download')==='preparation') {
+                if(!free)return json({error:'Choose a self-service appeal packet.'},400);
+                if(!context.env.APPEAL_PACKETS)return json({error:'Private document storage is not configured.'},503);
+                const bytes=await assemblePacket(state,appeal,context.env.APPEAL_PACKETS,{preparationCopy:true});
+                const year=state.intake?.taxYear || state.taxYear || 'draft';
+                return new Response(bytes,{headers:{'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="assessor-${year}-preparation-copy.pdf"`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
+            }
             const events = row ? await db.prepare('SELECT action, status, created_at FROM appeal_packet_events WHERE transaction_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 100').bind(transactionId).all() : { results: [] };
             const officialForms=free?await officialFormsStatus(context.env.APPEAL_PACKETS,state,appeal).catch(()=>null):null;
-            return json({ packetId: transactionId, fulfillmentPaid: Boolean(fulfillment), signature, appeal, officialForms, state: { ...state, documents: state.documents.map(({ key, ...doc }) => doc) }, mailingWindow: free ? packetMailingWindow(state) : null, revision, isOwner: actor.isOwner, isAdmin: actor.isAdmin, storageReady: Boolean(context.env.APPEAL_PACKETS), events: events.results });
+            const checkout=free?await checkoutAccess(context.env,user).catch(()=>({enabled:false,testing:false})):null;
+            return json({ packetId: transactionId, fulfillmentPaid: Boolean(fulfillment), signature, appeal, officialForms, checkout, state: { ...state, documents: state.documents.map(({ key, ...doc }) => doc) }, mailingWindow: free ? packetMailingWindow(state) : null, revision, isOwner: actor.isOwner, isAdmin: actor.isAdmin, storageReady: Boolean(context.env.APPEAL_PACKETS), events: events.results });
         }
 
         // Payment is trusted only from the server's Stripe-backed order record.

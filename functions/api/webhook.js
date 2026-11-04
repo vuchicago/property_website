@@ -66,7 +66,8 @@ export const onRequestPost = async (context) => {
                                         propertyPin,
                                         paymentIntentId,
                                         paymentAmount,
-                                        paymentStatus
+                                        paymentStatus,
+                                        paymentTest:session.metadata?.paymentTest==='true'
                                 });
                         } else {
                                 console.error('D1 database (DB) binding not available — could not save appeal record.');

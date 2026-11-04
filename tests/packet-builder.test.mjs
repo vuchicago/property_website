@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PDFDocument } from '../assets/vendor/pdf-lib.esm.min.js';
+import { PDFDocument, PDFRawStream, decodePDFRawStream } from '../assets/vendor/pdf-lib.esm.min.js';
 import { assemblePacket } from '../functions/api/_packet_pdf.js';
 import { preparationProblems, requirements } from '../packet-requirements.js';
 import { transitionPacket } from '../functions/api/_packet_workflow.js';
@@ -40,4 +40,24 @@ test('untrusted comparison IDs fail validation; evidence changes are blocked aft
     assert.equal(transitionPacket(s,{...input,selectedComparables:['12345678901234']},actor).intake.selectedComparables.length,1);
     assert.equal(transitionPacket(s,{action:'remove_evidence',documentId:'1'},actor).documents.length,2);
     assert.throws(()=>transitionPacket({...s,status:'approved'},{action:'remove_evidence',documentId:'1'},actor),/current stage/);
+});
+
+test('free preparation copy downloads collected data before templates or evidence are ready',async()=>{
+    const state={taxYear:2026,status:'intake',version:0,documents:[],propertySnapshot:{address:'123 Test Ave',pin:'00000000000001',details:{classCode:'203',townshipName:'Niles'},capturedAt:'2026-11-03',source:'Imported county record'}};
+    const storage={get:async()=>null};
+    const bytes=await assemblePacket(state,{property_address:'123 Test Ave'},storage,{preparationCopy:true});
+    const pdf=await PDFDocument.load(bytes);
+    assert.match(pdf.getTitle(),/preparation copy - NOT READY TO FILE/);
+    const text=pdf.context.enumerateIndirectObjects().flatMap(([,object])=>{
+        if(!(object instanceof PDFRawStream))return[];
+        let content;try{content=Buffer.from(decodePDFRawStream(object).decode()).toString();}catch{return[];}
+        return [...content.matchAll(/<([a-f0-9]+)>/ig)].map(match=>Buffer.from(match[1],'hex').toString());
+    }).join('\n');
+    assert.match(text,/PREPARATION COPY - NOT READY TO FILE/);
+    assert.match(text,/needs to import/);
+    assert.ok(text.includes('00000000000001'));
+    assert.ok(text.includes('Niles'));
+    assert.ok(pdf.getPageCount()>=4);
+    assert.equal(state.version,0);assert.equal(state.status,'intake');assert.equal(state.documents.length,0);
+    await assert.rejects(()=>assemblePacket(state,{property_address:'123 Test Ave'},storage),/Complete these items/);
 });

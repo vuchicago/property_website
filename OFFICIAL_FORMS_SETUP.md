@@ -4,7 +4,7 @@ The current pilot supports individually owned single-family homes with one dwell
 
 ## One-time administrator setup
 
-The Assessor's actual blank PDFs must be imported before automatic packet generation is available. On November 3, 2026 the official PDF asset host returned HTTP 403. No county application has been recreated, guessed, or replaced by a synthetic form. Automated tests use clearly identified test PDFs in temporary local storage only.
+The Assessor's actual blank PDFs must be imported before a complete filing packet can be generated. The **free preparation copy remains downloadable immediately**, including collected data and uploads plus a cover listing missing items and marking it not ready to file. It never requires payment or changes packet approval/version. On November 3, 2026 the official PDF asset host returned HTTP 403. No county application has been recreated, guessed, or replaced by a synthetic form. Automated tests use clearly identified test PDFs in temporary local storage only.
 
 1. Sign in as an administrator and open `official-forms.html`, linked from **Free Appeal Testers** and the packet preparation desk.
 2. Choose the assessment year and form kind. Open the official source, obtain its current fillable PDF and select the file. Maximum 4 MB and 20 pages.
@@ -28,4 +28,4 @@ This is packet preparation, not an automatic SmartFile submission or a county fi
 
 The existing private `APPEAL_PACKETS` binding stores `official-forms/assessor/{year}/{kind}/published.json` and immutable revision PDFs. No database migration is needed. Only administrator accounts may inspect/publish templates; owner packet access remains protected by owner identity and pilot permissions.
 
-Template validation requires mapping coverage and explicit skips, rejects pre-signed templates, preserves blank signature blocks, and blocks missing facts or text that cannot fit the official fields. A template for one year cannot satisfy another year's case. Missing templates hold generation while retaining saved intake and uploads. No Stripe or DocuSign calls occur during import, prefilling or free PDF assembly.
+Template validation requires mapping coverage and explicit skips, rejects pre-signed templates, preserves blank signature blocks, and blocks missing facts or text that cannot fit the official fields. A template for one year cannot satisfy another year's case. Missing templates hold the complete filing packet while retaining saved intake, uploads and free preparation-copy downloads. No Stripe or DocuSign calls occur during import, prefilling or free PDF assembly.

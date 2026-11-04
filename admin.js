@@ -1,4 +1,4 @@
-import { auth, authFetch } from './auth-client.js?v=20261103-single-family';
+import { auth, authFetch } from './auth-client.js?v=20261103-checkout-download';
 
 const PRIMARY_SUPERADMIN_EMAIL = 'vuchicago@gmail.com';
 

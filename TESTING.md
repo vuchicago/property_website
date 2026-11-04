@@ -54,6 +54,8 @@ These browser fixtures do not test real Firebase login, provider credentials, li
 
 ## Cloudflare Functions compilation
 
+Free-download regressions export a preparation-copy PDF while official templates and evidence are missing, inspect its rendered warning/data, and confirm that ownership, packet version and approval remain unchanged. Browser tests save the download, retry a temporary failure, and verify that payment is never requested. Payment tests simulate the existing live Stripe account with DocuSign unconfigured, restrict the override to administrators, and check that draft payment tests stay separate from fulfillment, send no order notification and cannot unlock DocuSign. No real cards are charged by these tests. Return-page checks accept Cloudflare Pages' clean URL redirect.
+
 Single-family tests reject out-of-scope records and checkout attempts. Official-form tests inspect/map synthetic fillable PDFs, preserve blank signatures, verify rendered owner/property values, reject missing fields and overlong text, and include photo-date attestations conditionally. The actual local Worker test imports a reusable template as administrator, rejects owner access to setup, saves intake, uploads personal correction evidence and generates/downloads the complete packet without an owner application upload. Browser tests cover one-time administrator setup, suggested comparisons, missing mailing fields, scope confirmation and retained downloads for older out-of-scope cases. Test templates are never published to Production.
 
 With Wrangler installed, compile the API bundle locally:
