@@ -27,8 +27,8 @@ const property = { id: 7, address: '123 TEST AVE SKOKIE', pin: '00000000000001',
 const suggestedProperty = { id: 900002, address: '125 TEST AVE SKOKIE', pin: '00000000000002', propertyKey: '125 TEST AVE SKOKIE|pin:00000000000002' };
 const menus = {
     Products: [['Property Tax Tool', 'property-tax.html'], ['ROI Tool', 'roi-calculator.html'], ['Loan Tool', 'loan-tool.html']],
-    Solutions: [['Insurance', 'insurance.html'], ['How Taxes Work', 'how-property-taxes-work.html'], ['FAQ', 'index.html#faq']],
-    Company: [['Partners', 'partners.html'], ['Contact', 'index.html#contact']]
+    Solutions: [['How Taxes Work', 'how-property-taxes-work.html'], ['FAQ', 'index.html#faq']],
+    Company: [['Partners', 'partners.html'], ['Contact', 'contact.html']]
 };
 
 function firebaseSource(identity, options = {}) {
@@ -214,7 +214,7 @@ async function scenario(options = {}) {
                     officialForms:options.officialForms,
                     checkout:options.checkout,
                     mailingWindow:options.mailingWindow, signature:options.signature,
-                    revision: store.packetRevision, events: [], isOwner: true, isAdmin: Boolean(options.role === 'admin'), storageReady: true, fulfillmentPaid:Boolean(options.fulfillmentPaid)
+                    revision: store.packetRevision, events: options.events || [], isOwner: true, isAdmin: Boolean(options.role === 'admin'), storageReady: true, fulfillmentPaid:Boolean(options.fulfillmentPaid)
                 });
             }
             case '/api/packet-signature': store.signatureCalls++; return json({ error: 'Payment required' }, 402);
@@ -249,6 +249,8 @@ async function assertHeader(page, width) {
     assert.ok(bounds.actions.right <= width + 1, `Actions exceed ${width}px`);
     if (width > 860) {
         assert.ok(bounds.links.right <= bounds.actions.left + 1, `Menus overlap actions at ${width}px`);
+        const insurance=page.locator('.nav-links > li').last().getByRole('link',{name:'Insurance',exact:true});
+        assert.equal(await insurance.isVisible(),true);assert.equal(await insurance.getAttribute('href'),'insurance.html');
         for (const [label, links] of Object.entries(menus)) {
             const trigger = page.locator('.nav-links').getByRole('button', { name: label, exact: true });
             assert.equal(await trigger.isVisible(), true);
@@ -260,12 +262,13 @@ async function assertHeader(page, width) {
         await page.getByRole('button', { name: 'Open menu', exact: true }).click();
         assert.equal(await page.locator('.mobile-menu').isVisible(), true);
         assert.equal(await page.locator('.mobile-nav-group').count(), 3);
+        assert.equal(await page.locator('.mobile-nav-insurance').getByRole('link',{name:'Insurance',exact:true}).isVisible(),true);
         await page.keyboard.press('Escape');
         assert.equal(await page.getByRole('button', { name: 'Open menu', exact: true }).getAttribute('aria-expanded'), 'false');
     }
 }
 
-for (const route of ['/', '/property-tax.html', '/roi-calculator.html', '/loan-tool.html', '/insurance.html', '/how-property-taxes-work.html', '/partners.html', '/about-cook-county-tax-compare.html', '/privacy-policy.html', '/cook-county-property-tax-appeal.html', '/admin.html']) {
+for (const route of ['/', '/property-tax.html', '/roi-calculator.html', '/loan-tool.html', '/insurance.html', '/contact.html', '/how-property-taxes-work.html', '/partners.html', '/about-cook-county-tax-compare.html', '/privacy-policy.html', '/cook-county-property-tax-appeal.html', '/admin.html']) {
     test(`shared navigation remains usable on desktop, tablet, and mobile: ${route}`, async () => {
         const s = await scenario();
         try {
@@ -1326,5 +1329,116 @@ test('signed submission downloads the signed PDF and locks editing during fulfil
         assert.equal(await s.page.getByRole('button',{name:'Edit',exact:true}).isDisabled(),true);
         const downloading=s.page.waitForEvent('download');await s.page.getByRole('button',{name:'Download Submission',exact:true}).click();await downloading;
         assert.ok(s.store.requests.includes('/api/packet?id=free_fixture&document=signed-fixture'));assert.equal(s.store.reviseRequests,0);
+    }finally{await s.close();}
+});
+
+for(const email of [undefined,'tester@example.com'])test(`Contact opens its own form from different pages: ${email?'signed in':'anonymous'}`,async()=>{
+    const s=await scenario({email,access:Boolean(email)});
+    try {
+        for(const route of ['/','/property-tax/','/insurance.html']) {
+            await s.goto(route);await s.page.locator('.nav-links').getByRole('button',{name:'Company',exact:true}).hover();
+            await s.page.locator('.nav-links').getByRole('link',{name:'Contact',exact:true}).click();
+            await s.page.waitForURL(url=>/^\/contact(?:\.html)?\/?$/.test(url.pathname));
+            await s.page.getByRole('heading',{name:'Contact us',exact:true}).waitFor();
+            assert.equal(await s.page.locator('#contact-request').isVisible(),true);
+        }
+        const form=s.page.locator('#contact-request');
+        await form.getByLabel('Full Name',{exact:true}).fill('Test Contact');await form.getByLabel('Email',{exact:true}).fill('contact@example.com');
+        await form.getByLabel('Phone #',{exact:true}).fill('7735551234');await form.getByLabel('Address',{exact:true}).fill(property.address);
+        await form.getByLabel('Message (optional)',{exact:true}).fill('Please contact me.');
+        await form.getByRole('button',{name:'Send message',exact:true}).click();await form.getByRole('status').getByText(/Request received/).waitFor();
+        assert.equal(s.store.contacts.length,1);assert.equal(s.store.contacts[0].inquiryType,'contact');assert.equal(s.store.contacts[0].propertyAddress,property.address);
+    }finally{await s.close();}
+});
+
+test('mobile Contact navigation works from the signed-in account page',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,width:390});
+    try {
+        await s.goto('/');await s.page.getByRole('button',{name:'Open menu',exact:true}).click();
+        await s.page.locator('.mobile-menu').getByRole('link',{name:'Contact',exact:true}).click();
+        await s.page.getByRole('heading',{name:'Contact us',exact:true}).waitFor();
+        assert.equal(await s.page.getByRole('button',{name:'Open menu',exact:true}).getAttribute('aria-expanded'),'false');
+    }finally{await s.close();}
+});
+
+for(const width of [390,1440])test(`insurance form uses ordered highlighted buttons and submits all four fields at ${width}px`,async()=>{
+    const s=await scenario({width});
+    try {
+        await s.goto('/insurance.html');const form=s.page.locator('#insurance-form'),choices=form.locator('.insurance-choice');
+        assert.deepEqual(await choices.allTextContents(),['Home','Auto','Life','Business']);
+        assert.deepEqual(await form.locator('.input-group > label').allTextContents(),['Full Name','Email','Phone #','Address']);
+        assert.equal(await form.locator('[type="checkbox"]').count(),0);
+        const home=form.getByRole('button',{name:'Home',exact:true}),auto=form.getByRole('button',{name:'Auto',exact:true});
+        await home.click();assert.equal(await home.getAttribute('aria-pressed'),'true');
+        await s.page.waitForFunction(()=>{const form=document.getElementById('insurance-form');return getComputedStyle(form.querySelector('[data-insurance-type="Home Insurance"]')).backgroundColor!==getComputedStyle(form.querySelector('[data-insurance-type="Auto Insurance"]')).backgroundColor;});
+        await auto.focus();await s.page.keyboard.press('Space');assert.equal(await auto.getAttribute('aria-pressed'),'true');await s.page.keyboard.press('Space');
+        await form.getByRole('button',{name:'Business',exact:true}).click();
+        await form.getByLabel('Full Name',{exact:true}).fill('Test Insured');await form.getByLabel('Email',{exact:true}).fill('insured@example.com');
+        await form.getByLabel('Phone #',{exact:true}).fill('(773) 555-1234');await form.getByLabel('Address',{exact:true}).fill(property.address);
+        await form.screenshot({path:`/tmp/cookcounty-insurance-form-${width}.png`});
+        assert.ok(await s.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+        await form.getByRole('button',{name:'Request a Personal Consultation',exact:true}).click();await form.getByRole('status').getByText(/Request received/).waitFor();
+        const sent=s.store.contacts[0];assert.deepEqual(sent.insuranceTypes,['Home Insurance','Business Insurance']);assert.equal(sent.propertyAddress,property.address);assert.equal(sent.name,'Test Insured');
+        assert.equal(await home.getAttribute('aria-pressed'),'false');assert.equal(await form.getByLabel('Address',{exact:true}).inputValue(),'');
+    }finally{await s.close();}
+});
+
+test('insurance requires address and preserves details and selected buttons after submission failure',async()=>{
+    const s=await scenario();
+    try {
+        await s.goto('/insurance.html');const form=s.page.locator('#insurance-form');
+        await form.getByLabel('Full Name',{exact:true}).fill('Retry Owner');await form.getByLabel('Email',{exact:true}).fill('retry@example.com');await form.getByLabel('Phone #',{exact:true}).fill('7735551234');
+        await form.getByRole('button',{name:'Home',exact:true}).click();await form.getByRole('button',{name:'Request a Personal Consultation',exact:true}).click();
+        assert.equal(s.store.contacts.length,0);assert.equal(await form.getByLabel('Address',{exact:true}).evaluate(el=>el.validity.valueMissing),true);
+        await form.getByLabel('Address',{exact:true}).fill(property.address);s.store.contactFails=true;
+        await form.getByRole('button',{name:'Request a Personal Consultation',exact:true}).click();await form.getByRole('alert').getByText('Test submission failure',{exact:true}).waitFor();
+        assert.equal(await form.getByRole('button',{name:'Home',exact:true}).getAttribute('aria-pressed'),'true');assert.equal(await form.getByLabel('Address',{exact:true}).inputValue(),property.address);
+        s.store.contactFails=false;await form.getByRole('button',{name:'Request a Personal Consultation',exact:true}).click();await form.getByRole('status').getByText(/Request received/).waitFor();
+        assert.equal(s.store.contacts.length,2);
+    }finally{await s.close();}
+});
+
+test('packet header retains the logo and separates session details from account links at every width',async()=>{
+    for(const email of [undefined,'vuchicago@gmail.com']) {
+        const s=await scenario({email,access:Boolean(email),packetStatus:'intake'});
+        try {
+            await s.goto('/appeal-packet.html?id=free_fixture');
+            if(email)await s.page.locator('.packet-session-email').getByText(email,{exact:true}).waitFor();
+            else await s.page.getByRole('link',{name:'Sign in',exact:true}).waitFor();
+            const brand=s.page.getByRole('link',{name:'Cook County Tax Compare home',exact:true});assert.equal(await brand.getAttribute('href'),'index.html');
+            assert.equal(await s.page.getByRole('link',{name:'My account',exact:true}).getAttribute('href'),'index.html#user-dashboard');
+            for(const width of [320,390,900,1440]) {
+                await s.page.setViewportSize({width,height:900});
+                const bounds=await s.page.evaluate(()=>{
+                    const box=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
+                    return {logo:box('.packet-brand'),icon:box('.packet-brand svg'),nav:box('.packet-account-nav'),session:box('#packet-session'),actions:box('.packet-account-actions')};
+                });
+                assert.ok(bounds.icon.width>0&&bounds.icon.height>0);assert.ok(bounds.nav.right<=width+1);
+                assert.ok(bounds.session.right<=bounds.actions.left+1,`Session overlaps links at ${width}px`);
+                assert.ok(width<=650?bounds.logo.bottom<=bounds.nav.top:bounds.logo.right<=bounds.nav.left);
+                assert.ok(await s.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+                if(email&&[390,1440].includes(width))await s.page.locator('.packet-nav').screenshot({path:`/tmp/cookcounty-packet-account-header-${width}.png`});
+            }
+        }finally{await s.close();}
+    }
+});
+
+test('long account emails wrap without crowding the packet account button',async()=>{
+    const email='a.very.long.property.owner.account.for.testing@example.com';
+    const s=await scenario({email,access:true,width:320,packetStatus:'intake'});
+    try {
+        await s.goto('/appeal-packet.html?id=free_fixture');await s.page.locator('.packet-session-email').getByText(email,{exact:true}).waitFor();
+        const text=await s.page.locator('#packet-session').boundingBox(),actions=await s.page.locator('.packet-account-actions').boundingBox();
+        assert.ok(text.x+text.width<=actions.x);assert.ok(actions.x+actions.width<=320);
+        assert.ok(await s.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+    }finally{await s.close();}
+});
+
+test('packet activity omits routine questionnaire entries while retaining generated-packet events',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'preparing',events:[{action:'questionnaire',status:'preparing',created_at:'2026-11-04 01:02:33'},{action:'packet',status:'review',created_at:'2026-11-04 01:03:33'}]});
+    try {
+        await s.goto('/appeal-packet.html?id=free_fixture');await s.page.getByText('Activity',{exact:true}).click();
+        assert.equal(await s.page.getByText(/questionnaire:/).count(),0);
+        assert.equal(await s.page.getByText(/packet: Review packet/).isVisible(),true);
     }finally{await s.close();}
 });

@@ -78,7 +78,7 @@ export async function onRequest(context) {
                 const year=state.intake?.taxYear || state.taxYear || 'draft';
                 return new Response(bytes,{headers:{'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="assessor-${year}-preparation-copy.pdf"`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
             }
-            const events = row ? await db.prepare('SELECT action, status, created_at FROM appeal_packet_events WHERE transaction_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 100').bind(transactionId).all() : { results: [] };
+            const events = row ? await db.prepare("SELECT action, status, created_at FROM appeal_packet_events WHERE transaction_id = ? AND action <> 'questionnaire' ORDER BY created_at DESC, rowid DESC LIMIT 100").bind(transactionId).all() : { results: [] };
             const officialForms=free?await officialFormsStatus(context.env.APPEAL_PACKETS,state,appeal).catch(()=>null):null;
             const checkout=free?await checkoutAccess(context.env,user).catch(()=>({enabled:false,testing:false})):null;
             return json({ packetId: transactionId, fulfillmentPaid: Boolean(fulfillment), signature, appeal, officialForms, checkout, state: { ...state, documents: state.documents.map(({ key, ...doc }) => doc) }, mailingWindow: free ? packetMailingWindow(state) : null, revision, isOwner: actor.isOwner, isAdmin: actor.isAdmin, storageReady: Boolean(context.env.APPEAL_PACKETS), events: events.results });
@@ -134,6 +134,10 @@ export async function onRequest(context) {
         }
         if (free && input.action === 'revise' && signature?.status === 'voided') input.envelopeVoided = true;
         const next = transitionPacket(state, input, actor);
+        if(input.action==='questionnaire' && state.questionnaire?.step===next.questionnaire.step) {
+            const canonical=answers=>JSON.stringify(Object.entries(answers).sort(([a],[b])=>a.localeCompare(b)));
+            if(canonical(state.questionnaire.answers)===canonical(next.questionnaire.answers))return json({success:true,revision,questionnaire:state.questionnaire});
+        }
         if (bytes) {
             storedKey = input.document.key;
             await context.env.APPEAL_PACKETS.put(storedKey, bytes, { httpMetadata: { contentType: input.document.type } });
@@ -143,12 +147,14 @@ export async function onRequest(context) {
             ? ` AND EXISTS (SELECT 1 FROM packet_fulfillment_orders f JOIN appeals a ON a.transaction_id = f.session_id WHERE f.packet_id = appeal_packets.transaction_id AND f.packet_version = ${state.version} AND a.payment_status = 'paid' AND a.payment_amount = 4900)` : '';
         const signingGuard = free && input.action === 'revise'
             ? ` AND NOT EXISTS (SELECT 1 FROM packet_signatures s WHERE s.packet_id = appeal_packets.transaction_id AND s.packet_version = ${state.version} AND s.status != 'voided')` : '';
-        // The conditional update plus event insert form one atomic D1 batch.
-        const result = await db.batch([
+        // Progress stays in the working state; only substantive actions add activity events.
+        // The conditional update and any event insert remain one atomic D1 batch.
+        const statements = [
             db.prepare('INSERT OR IGNORE INTO appeal_packets (transaction_id, state_json) VALUES (?, ?)').bind(transactionId, JSON.stringify(initialPacket())),
-            db.prepare('UPDATE appeal_packets SET state_json = ?, revision = revision + 1, last_event_id = ?, updated_at = CURRENT_TIMESTAMP WHERE transaction_id = ? AND revision = ? AND EXISTS (SELECT 1 FROM appeals WHERE transaction_id = ? AND payment_status = ?)' + fulfillmentGuard + signingGuard).bind(JSON.stringify(next), eventId, transactionId, revision, transactionId, free ? 'free' : 'paid'),
-            db.prepare('INSERT INTO appeal_packet_events (id, transaction_id, actor_id, action, status) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM appeal_packets WHERE transaction_id = ? AND last_event_id = ?)').bind(eventId, transactionId, user.uid, input.action, next.status, transactionId, eventId)
-        ]);
+            db.prepare('UPDATE appeal_packets SET state_json = ?, revision = revision + 1, last_event_id = ?, updated_at = CURRENT_TIMESTAMP WHERE transaction_id = ? AND revision = ? AND EXISTS (SELECT 1 FROM appeals WHERE transaction_id = ? AND payment_status = ?)' + fulfillmentGuard + signingGuard).bind(JSON.stringify(next), eventId, transactionId, revision, transactionId, free ? 'free' : 'paid')
+        ];
+        if(input.action!=='questionnaire')statements.push(db.prepare('INSERT INTO appeal_packet_events (id, transaction_id, actor_id, action, status) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM appeal_packets WHERE transaction_id = ? AND last_event_id = ?)').bind(eventId, transactionId, user.uid, input.action, next.status, transactionId, eventId));
+        const result = await db.batch(statements);
         if (!result[1].meta?.changes) return json({ error: 'The case or payment changed. Refresh before saving.' }, 409);
         committed = true;
         return json({ success: true, revision:revision+1, ...(input.action==='questionnaire'?{questionnaire:next.questionnaire}:{}) });

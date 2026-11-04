@@ -1,0 +1,16 @@
+.insurance-form [hidden], .inquiry-page [hidden] { display: none !important; }
+.insurance-form, #contact-request, [data-form-alert] { scroll-margin-top:100px; }
+.insurance-fieldset .insurance-choice { width:100%; min-height:52px; padding:.85rem 1rem; border:1px solid var(--dark-200); border-radius:12px; background:var(--white); color:var(--dark-700); font:inherit; font-weight:600; cursor:pointer; text-align:center; transition:background .15s,border-color .15s,color .15s; }
+.insurance-fieldset .insurance-choice:hover { border-color:var(--primary); }
+.insurance-fieldset .insurance-choice[aria-pressed=true] { color:var(--primary); background:var(--primary-subtle); border:2px solid var(--primary); }
+.insurance-fieldset .insurance-choice:focus-visible { outline:3px solid var(--primary); outline-offset:3px; }
+.insurance-fieldset .insurance-choice:disabled { opacity:.65; cursor:wait; }
+.insurance-form .form-alert, .inquiry-page .form-alert { outline:none; }
+.inquiry-page { max-width:1120px; margin:0 auto; }
+.inquiry-layout { display:grid; grid-template-columns:1fr 1.1fr; gap:3rem; align-items:start; }
+.inquiry-copy h1 { font-size:clamp(2rem,5vw,3.4rem); margin:1rem 0; }
+.inquiry-copy p { color:var(--dark-500); line-height:1.7; margin-bottom:1.5rem; }
+.inquiry-details { display:grid; gap:1rem; overflow-wrap:anywhere; }
+.inquiry-layout .contact-form { border:1px solid var(--dark-200); border-radius:20px; padding:2rem; background:var(--white); }
+@media(max-width:760px) { .inquiry-layout { grid-template-columns:1fr; gap:1.5rem; }.inquiry-layout .contact-form { padding:1.25rem; }.insurance-fieldset { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(prefers-reduced-motion:reduce) { .insurance-fieldset .insurance-choice { transition:none; } }

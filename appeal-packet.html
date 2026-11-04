@@ -5,10 +5,19 @@
   <meta name="robots" content="noindex,nofollow">
   <title>My Appeal Packet · Cook County Tax Compare</title>
   <link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="styles.css?v=20261103-session">
-  <link rel="stylesheet" href="appeal-packet.css?v=20261103-submission-actions">
+  <link rel="stylesheet" href="appeal-packet.css?v=20261103-packet-header">
 </head>
 <body>
-  <header class="packet-nav"><a href="index.html">Cook County Tax Compare</a><nav><span id="packet-session" role="status">Restoring your session…</span><a href="index.html#user-dashboard">My account</a><a href="login.html" id="packet-sign-in" hidden>Sign in</a></nav></header>
+  <header class="packet-nav">
+    <a href="index.html" class="logo packet-brand" aria-label="Cook County Tax Compare home">
+      <span class="logo-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 21H21M4 18H20M6 18V10M10 18V10M14 18V10M18 18V10M12 3L21 10H3L12 3Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span>Cook County<br><span class="logo-accent">Tax Compare</span></span>
+    </a>
+    <nav aria-label="Account" class="packet-account-nav">
+      <span id="packet-session" role="status">Restoring your session…</span>
+      <div class="packet-account-actions"><a href="index.html#user-dashboard" class="packet-account-link">My account</a><a href="login.html" id="packet-sign-in" class="packet-account-link" hidden>Sign in</a></div>
+    </nav>
+  </header>
   <main class="packet-shell">
     <div class="packet-heading"><span class="section-badge">Prepare your own appeal</span><h1>Your property. Your appeal.</h1>
     <p>Prepare your single-family Assessor appeal for free, review your documents, and download them to submit yourself. Optional $49 fulfillment includes DocuSign signing, printing, assembly, postage and tracking.</p></div>
@@ -22,6 +31,6 @@
     <p id="packet-waitlist" hidden>Free appeal testing is currently by invitation. <a href="index.html#contact">Join the public appeal waitlist</a>.</p>
     <div id="packet-workspace" hidden></div>
   </main>
-  <script type="module" src="appeal-packet.js?v=20261103-submission-actions"></script>
+  <script type="module" src="appeal-packet.js?v=20261103-packet-header"></script>
 </body>
 </html>

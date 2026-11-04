@@ -1,8 +1,8 @@
 // Shared navigation for every page using the site header.
 const sections = [
   ['Products', [['Property Tax Tool', 'property-tax.html'], ['ROI Tool', 'roi-calculator.html'], ['Loan Tool', 'loan-tool.html']]],
-  ['Solutions', [['Insurance', 'insurance.html'], ['How Taxes Work', 'how-property-taxes-work.html'], ['FAQ', 'index.html#faq']]],
-  ['Company', [['Partners', 'partners.html'], ['Contact', 'index.html#contact']]],
+  ['Solutions', [['How Taxes Work', 'how-property-taxes-work.html'], ['FAQ', 'index.html#faq']]],
+  ['Company', [['Partners', 'partners.html'], ['Contact', 'contact.html']]],
 ];
 
 function initSiteNavigation() {
@@ -17,7 +17,7 @@ function initSiteNavigation() {
     <li class="nav-dropdown">
       <button type="button" class="nav-dropdown-trigger${links.some(([, href]) => active(href)) ? ' active' : ''}" aria-haspopup="true" aria-expanded="false" aria-controls="site-nav-menu-${index}">${title}${chevron}</button>
       <div class="nav-dropdown-menu" id="site-nav-menu-${index}">${links.map(([label, href]) => `<a href="${href}"${active(href) ? ' class="active" aria-current="page"' : ''}>${label}</a>`).join('')}</div>
-    </li>`).join('');
+    </li>`).join('') + `<li><a class="nav-insurance-link${active('insurance.html')?' active':''}" href="insurance.html"${active('insurance.html')?' aria-current="page"':''}>Insurance</a></li>`;
 
   let mobile = navbar.querySelector('#mobile-menu');
   if (!mobile) {
@@ -26,7 +26,7 @@ function initSiteNavigation() {
     mobile.className = 'mobile-menu';
     navbar.append(mobile);
   }
-  mobile.innerHTML = `<ul class="mobile-nav-links">${sections.map(([title, links]) => `<li class="mobile-nav-group"><span>${title}</span>${links.map(([label, href]) => `<a href="${href}"${active(href) ? ' class="active" aria-current="page"' : ''}>${label}</a>`).join('')}</li>`).join('')}</ul>`;
+  mobile.innerHTML = `<ul class="mobile-nav-links">${sections.map(([title, links]) => `<li class="mobile-nav-group"><span>${title}</span>${links.map(([label, href]) => `<a href="${href}"${active(href) ? ' class="active" aria-current="page"' : ''}>${label}</a>`).join('')}</li>`).join('')}<li class="mobile-nav-insurance"><a href="insurance.html"${active('insurance.html')?' class="active" aria-current="page"':''}>Insurance</a></li></ul>`;
 
   let actions = navbar.querySelector('.nav-actions');
   if (!actions) {

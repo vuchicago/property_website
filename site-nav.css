@@ -5,6 +5,9 @@
 .nav-container .logo { flex: 0 0 auto; white-space: nowrap; }
 .nav-links { flex: 0 1 auto; gap: clamp(.5rem, 1.5vw, 1.4rem); justify-content: center; }
 .nav-links .nav-dropdown-trigger { border-radius: 10px; padding: .65rem .8rem; font-weight: 600; }
+.nav-links .nav-insurance-link { display: inline-flex; border-radius: 10px; padding: .65rem .8rem; font-weight: 600; white-space: nowrap; }
+.nav-links .nav-insurance-link:hover, .nav-links .nav-insurance-link.active { background: var(--primary-subtle); color: var(--primary); }
+.mobile-nav-insurance a { display: block; padding: .9rem 1rem; font-weight: 600; }
 .nav-links .nav-dropdown-trigger:hover,
 .nav-links .nav-dropdown-trigger.active,
 .nav-dropdown.is-open > .nav-dropdown-trigger { background: var(--primary-subtle); }

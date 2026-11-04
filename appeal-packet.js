@@ -142,7 +142,13 @@ async function initializeWorkspace(user) {
     document.getElementById('packet-waitlist').hidden = true;
     signInLink.hidden = Boolean(user?.emailVerified);
     signInLink.textContent = user ? 'Verify email' : 'Sign in';
-    document.getElementById('packet-session').textContent = user ? `Signed in as ${user.email}` : 'You are signed out';
+    const session=document.getElementById('packet-session');
+    if(user) {
+        const label=document.createElement('span'),email=document.createElement('span');
+        label.className='packet-session-label';label.textContent='Signed in as';
+        email.className='packet-session-email';email.textContent=user.email;
+        session.replaceChildren(label,document.createTextNode(' '),email);
+    }else session.textContent='You are signed out';
     if (!user || !user.emailVerified) {
         current = null;
         document.getElementById('order-list').replaceChildren();
@@ -247,7 +253,7 @@ function render() {
     if (free && signature?.envelope_id && ['approved','awaiting_signature','signed'].includes(s.status)) html += form('ds_sync','Check signing status','<p>Checks are limited to once every 15 minutes. Completed documents are retrieved directly from DocuSign.</p>','Check DocuSign');
     if (isAdmin && editable) html += ownerWorkspace ? `<details class="packet-card"><summary>Administrator preparation tools</summary>${adminForms(s, storageReady, free, fulfillmentPaid, signature)}</details>` : adminForms(s, storageReady, free, fulfillmentPaid, signature);
     if(isOwner && free && editable && current.checkout?.testing) html+=form('payment_test','Test existing Stripe checkout · $49',`<p>${current.checkout.mode==='live'?'This uses your existing live Stripe setup and charges the card $49.':'This uses Stripe test mode.'} This administrator payment test does not order DocuSign or mailing and does not replace approval of the completed packet.</p>${check('testPaymentAccepted','I want to run this $49 payment test using the existing Stripe checkout.')}`,'Continue to Stripe payment test');
-    html += `<section class="packet-card"><h2>Activity</h2><ul>${events.map(event => `<li>${escape(event.created_at)} UTC — ${escape(event.action.replaceAll('_',' '))}: ${escape(labels[event.status])}</li>`).join('') || '<li>Workspace created. Intake has not been submitted.</li>'}</ul></section>`;
+    html += `<section class="packet-card"><h2>Activity</h2><ul>${events.filter(event=>event.action!=='questionnaire').map(event => `<li>${escape(event.created_at)} UTC — ${escape(event.action.replaceAll('_',' '))}: ${escape(labels[event.status])}</li>`).join('') || '<li>No submission activity yet.</li>'}</ul></section>`;
     const workspace = document.getElementById('packet-workspace');
     if(ownerWorkspace) {
         html=html.replace('<section class="packet-card"><h2>Your documents and downloads</h2>','<details class="packet-card"><summary>Saved documents and previous downloads</summary><div>');

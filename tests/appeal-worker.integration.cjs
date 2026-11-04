@@ -103,12 +103,17 @@ test('local Worker denies another account and anonymous access to the appeal', a
 
 test('guided answers persist and resume without creating an approved filing packet',async()=>{
     const before=await (await api(`/api/packet?id=${packetId}`)).json();
+    const eventCount=(await db.prepare('SELECT count(*) AS n FROM appeal_packet_events WHERE transaction_id=?').bind(packetId).first()).n;
     const saved=await api(`/api/packet?id=${packetId}`,'owner',{action:'questionnaire',revision:before.revision,step:'contact',answers:{ownerName:'Draft Owner',singleFamilyScope:true,requestedMarketValue:''}});
     assert.equal(saved.status,200,await saved.clone().text());
     const response=await saved.json();assert.equal(response.questionnaire.step,'contact');assert.equal(response.revision,before.revision+1);
     const after=await (await api(`/api/packet?id=${packetId}`)).json();
     assert.equal(after.state.status,'intake');assert.equal(after.state.version,0);assert.equal(after.state.questionnaire.answers.ownerName,'Draft Owner');
     assert.equal(after.state.intake,undefined);assert.equal(after.fulfillmentPaid,false);
+    assert.equal((await db.prepare('SELECT count(*) AS n FROM appeal_packet_events WHERE transaction_id=?').bind(packetId).first()).n,eventCount);
+    const unchanged=await api(`/api/packet?id=${packetId}`,'owner',{action:'questionnaire',revision:response.revision,step:'contact',answers:{requestedMarketValue:'',singleFamilyScope:true,ownerName:'Draft Owner'}});
+    assert.equal(unchanged.status,200,await unchanged.clone().text());assert.equal((await unchanged.json()).revision,response.revision);
+    assert.equal((await (await api(`/api/packet?id=${packetId}`)).json()).state.questionnaire.updatedAt,after.state.questionnaire.updatedAt);
     const stale=await api(`/api/packet?id=${packetId}`,'owner',{action:'questionnaire',revision:before.revision,step:'contact',answers:{ownerName:'Stale overwrite'}});
     assert.equal(stale.status,409);
     const stranger=await api(`/api/packet?id=${packetId}`,'stranger',{action:'questionnaire',revision:response.revision,step:'contact',answers:{ownerName:'Another owner'}});
@@ -309,4 +314,15 @@ test('a required property photo and capture date save before completed intake',a
     assert.equal(after.state.status,'intake');assert.equal(after.state.intake,undefined);assert.equal(after.state.version,0);
     const saved=after.state.documents.find(doc=>doc.category==='photo');assert.equal(saved.photoDate,'2025-01-01');assert.equal(saved.dateStamped,false);
     assert.ok(after.officialForms.some(form=>form.kind==='photo_attestation'));
+});
+
+test('old questionnaire activity is excluded before the history limit while submission events remain',async()=>{
+    await db.batch([
+        db.prepare("INSERT INTO appeal_packet_events(id,transaction_id,actor_id,action,status,created_at) VALUES('meaningful-history',?,'owner','packet','review','2020-01-01 00:00:00')").bind(packetId),
+        ...Array.from({length:105},(_,n)=>db.prepare("INSERT INTO appeal_packet_events(id,transaction_id,actor_id,action,status) VALUES(?,?,'owner','questionnaire','preparing')").bind(`old-draft-${n}`,packetId))
+    ]);
+    const response=await api(`/api/packet?id=${packetId}`);assert.equal(response.status,200);
+    const {events}=await response.json();
+    assert.ok(events.some(event=>event.action==='packet' && event.created_at==='2020-01-01 00:00:00'));
+    assert.equal(events.some(event=>event.action==='questionnaire'),false);
 });

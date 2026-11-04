@@ -1,6 +1,8 @@
 import { sendNotificationEmail } from './_email.js';
 
 const ADMIN_EMAIL = 'vu@cookcountytaxcompare.com';
+const INSURANCE_EMAIL = 'vnguyen1@amfam.com';
+const INSURANCE_TYPES = ['Home Insurance', 'Auto Insurance', 'Life Insurance', 'Business Insurance'];
 
 export const onRequestPost = async (context) => {
         let savedMessageId = null;
@@ -11,6 +13,7 @@ export const onRequestPost = async (context) => {
 
                 const inquiryKind = String(inquiryType || '').toLowerCase();
                 const isInsuranceInquiry = inquiryKind === 'insurance';
+                const isContactInquiry = inquiryKind === 'contact';
                 const isWaitlistInquiry = inquiryKind === 'property-tax-waitlist' || inquiryKind === 'waitlist';
                 const isPartnershipInquiry = inquiryKind === 'partnership' || inquiryKind === 'partner';
                 const normalizedType = isInsuranceInquiry
@@ -19,9 +22,12 @@ export const onRequestPost = async (context) => {
                                 ? 'Property Tax Appeal Waitlist'
                                 : isPartnershipInquiry
                                         ? 'Attorney Partnership Inquiry'
-                                        : 'Appeal Help Request';
-                const selectedInsurance = Array.isArray(insuranceTypes) && insuranceTypes.length
-                        ? insuranceTypes.join(', ')
+                                        : isContactInquiry ? 'Contact Inquiry' : 'Appeal Help Request';
+                if(isInsuranceInquiry && insuranceTypes!==undefined && (!Array.isArray(insuranceTypes) || insuranceTypes.length>4 || insuranceTypes.some(type=>!INSURANCE_TYPES.includes(type)))) {
+                        return jsonResponse({error:'Choose Home, Auto, Life or Business insurance.'},400);
+                }
+                const selectedInsurance = isInsuranceInquiry && Array.isArray(insuranceTypes) && insuranceTypes.length
+                        ? INSURANCE_TYPES.filter(type=>insuranceTypes.includes(type)).join(', ')
                         : 'Not provided';
                 const normalizedEmail = normalizeEmail(email);
                 const normalizedPhone = normalizeUsPhone(phone);
@@ -36,7 +42,7 @@ export const onRequestPost = async (context) => {
                         return jsonResponse({ error: 'Please enter a valid email address.' }, 400);
                 }
 
-                if (isInsuranceInquiry && (!normalizedEmail || !normalizedPhone)) {
+                if ((isInsuranceInquiry || isContactInquiry) && (!normalizedEmail || !normalizedPhone)) {
                         return jsonResponse({ error: 'A valid email address and 10-digit U.S. phone number are required.' }, 400);
                 }
 
@@ -46,6 +52,9 @@ export const onRequestPost = async (context) => {
 
                 if (isWaitlistInquiry && !propertyAddress) {
                         return jsonResponse({ error: 'Property address is required for the waitlist.' }, 400);
+                }
+                if((isInsuranceInquiry || isContactInquiry) && (!propertyAddress || propertyAddress.length>1000)) {
+                        return jsonResponse({error:'Please enter your address (maximum 1,000 characters).'},400);
                 }
 
                 const submittedAt = new Date().toLocaleString('en-US', {
@@ -98,9 +107,7 @@ export const onRequestPost = async (context) => {
                         message || 'No message provided'
                 ].join('\n');
 
-                // Keep every website inquiry in the same inbox, including waitlist,
-                // partnership, and insurance submissions.
-                const to = ADMIN_EMAIL;
+                const to = isInsuranceInquiry || isContactInquiry ? [ADMIN_EMAIL, INSURANCE_EMAIL] : ADMIN_EMAIL;
                 const usesCloudflareEmailApi = Boolean(
                         context.env.CLOUDFLARE_EMAIL_API_TOKEN && context.env.CLOUDFLARE_ACCOUNT_ID
                 );
