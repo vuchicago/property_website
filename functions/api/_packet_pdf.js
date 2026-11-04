@@ -4,6 +4,7 @@ import { prepareOfficialForms } from './_official_forms.js';
 import { singleFamilyEligibility } from '../../packet-scope.js';
 
 export async function assemblePacket(state, appeal, storage, {preparationCopy=false}={}) {
+    if(preparationCopy && state.questionnaire?.answers)state={...state,intake:{...state.intake,...state.questionnaire.answers,taxYear:state.intake?.taxYear || state.taxYear}};
     const problems=preparationProblems(state);
     if(singleFamilyEligibility(state.propertySnapshot?.details).eligible===false)throw Object.assign(new Error('Preparation downloads currently support single-family homes only.'),{status:400});
     if(!preparationCopy && problems.length) throw Object.assign(new Error(`Complete these items first: ${problems.join('; ')}`),{status:400});

@@ -1,6 +1,7 @@
 import { requirements, preparationProblems, evidenceCategories, OFFICIAL_FORM } from './packet-requirements.js?v=20261103-checkout-download';
 import { authFetch, onAuthUserChanged } from './auth-client.js?v=20261103-checkout-download';
 import { singleFamilyEligibility } from './packet-scope.js?v=20261103-checkout-download';
+import { mountAppealQuestions } from './appeal-questions.js?v=20261103-question-cards';
 
 const labels = { intake: 'Your information', preparing: 'Preparing packet', review: 'Review packet', approved: 'Download or choose fulfillment', awaiting_signature: 'Awaiting signatures', signed: 'Signed', mailed: 'Mailed', delivered: 'Delivered by carrier', filed: 'County filing confirmed' };
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -27,6 +28,8 @@ let currentSessionUser = null;
 let pendingPropertyId = propertyQuery ? Number(propertyQuery) : null;
 let openingRevision = null;
 let pickerAccess = null;
+let questionController=null;
+let openQuestionsOnLoad=propertyQuery!==null;
 
 async function requestJSON(url, options = {}, failure = 'Could not load your appeal.') {
     const controller = new AbortController();
@@ -126,6 +129,7 @@ async function loadPropertyPicker(revision) {
 }
 
 async function initializeWorkspace(user) {
+    questionController?.destroy();questionController=null;
     const revision = ++sessionRevision;
     pickerAccess = null;
     retryButton.hidden = true;
@@ -166,6 +170,7 @@ propertySelect.addEventListener('change', () => { startButton.disabled = !proper
 startButton.addEventListener('click', async () => {
     if (startButton.disabled) return;
     pendingPropertyId = Number(propertySelect.value);
+    openQuestionsOnLoad=true;
     retryButton.hidden = true;
     const revision = sessionRevision;
     try { await startOrResume(pendingPropertyId, revision); }
@@ -194,6 +199,7 @@ async function load() {
 }
 
 function render() {
+    questionController?.destroy();questionController=null;
     const { appeal, state: s, isAdmin, isOwner, storageReady, events, fulfillmentPaid, signature } = current;
     const free=selectedId.startsWith('free_');
     const eligibility=singleFamilyEligibility(s.propertySnapshot?.details);
@@ -201,21 +207,24 @@ function render() {
     const intake = s.intake || {};
     const snapshot=s.propertySnapshot || {}, details=snapshot.details || {};
     const preparing=['intake','preparing'].includes(s.status);
+    const guided=isOwner && free && editable && preparing;
     let html = `<section class="packet-card"><h2>${escape(appeal.property_address)}</h2><p>PIN: ${escape(intake.pins || snapshot.pin || appeal.property_pin || 'Confirm all PINs during preparation')} · Payment: ${free ? (fulfillmentPaid ? 'Fulfillment paid · preparation free' : 'Free preparation') : escape(appeal.payment_status)}</p><ol class="packet-steps">${Object.entries(labels).map(([key, label]) => `<li ${key === s.status ? 'aria-current="step"' : ''}>${label}</li>`).join('')}</ol><p><strong>${labels[s.status]}</strong> · Packet version ${s.version}</p><p class="packet-muted">A signed packet or postal tracking number is not confirmation that the county has filed your appeal.</p></section>`;
-    if(snapshot.address) html += propertySummary(snapshot);
+    if(guided)html=`<section class="packet-flow-header"><span class="packet-flow-status">${s.intake?.ownerName?'Draft saved':'Let’s get started'}</span><h2>${escape(appeal.property_address)}</h2><p>Assessment year ${s.taxYear || intake.taxYear} · Single-family Assessor appeal</p></section>`;
+    if(snapshot.address && !guided) html += propertySummary(snapshot);
     if(free && eligibility.eligible===false) html += `<section class="packet-card"><h2>Single-family homes only</h2><p>${escape(eligibility.message)} Existing documents remain available below.</p></section>`;
     if (!storageReady) html += '<p>Document uploads are not available yet. Please contact us before sending sensitive documents.</p>';
-    if (intake.ownerName) html += `<section class="packet-card"><h2>Owner instructions</h2><dl><dt>Owner</dt><dd>${escape(intake.ownerName)}</dd><dt>Agency / tax year</dt><dd>${escape(intake.agency.replaceAll('_', ' '))} / ${intake.taxYear}</dd><dt>Mailing address</dt><dd>${escape(intake.mailingAddress)}</dd><dt>Reason</dt><dd>${escape(intake.reason)}</dd></dl><pre>${escape(intake.explanation || (intake.reason && intake.reason !== 'uniformity' ? '' : 'I request review of my property assessment for uniformity. My selected comparable properties and supporting records are included for consideration.'))}</pre></section>`;
-    if (isOwner && editable && ['intake', 'preparing'].includes(s.status)) {
+    if (intake.ownerName && !guided) html += `<section class="packet-card"><h2>Owner instructions</h2><dl><dt>Owner</dt><dd>${escape(intake.ownerName)}</dd><dt>Agency / tax year</dt><dd>${escape(intake.agency.replaceAll('_', ' '))} / ${intake.taxYear}</dd><dt>Mailing address</dt><dd>${escape(intake.mailingAddress)}</dd><dt>Reason</dt><dd>${escape(intake.reason)}</dd></dl><pre>${escape(intake.explanation || (intake.reason && intake.reason !== 'uniformity' ? '' : 'I request review of my property assessment for uniformity. My selected comparable properties and supporting records are included for consideration.'))}</pre></section>`;
+    if (isOwner && editable && !guided && ['intake', 'preparing'].includes(s.status)) {
         html += form('intake', 'Tell us about your appeal', `${input('ownerName', 'Legal owner name', 'text', intake.ownerName || details.mailingName || appeal.customer_name)}${input('mailingAddress', 'Your complete mailing address', 'text', intake.mailingAddress || details.mailingAddress)}${input('ownerPhone','Phone number for the official application','tel',intake.ownerPhone || '')}${additionalOwnerFields(current.officialForms,intake)}<p>We use your verified account email for the application. We prefill the official forms; you review and sign the completed packet.</p><div class="packet-grid"><label>Appeal agency<select name="agency"><option value="assessor" ${intake.agency === 'assessor' ? 'selected' : ''}>Cook County Assessor</option></select></label>${input('taxYear', 'Assessment tax year', 'number', intake.taxYear || s.taxYear || new Date().getFullYear(), `min="2020" max="2100" ${s.taxYear?'readonly':''}`)}</div><label>Reason<select name="reason">${[['uniformity','Similar properties assessed lower'],['overvaluation','Market value is too high'],['characteristics','Property description is incorrect']].map(([value,label]) => `<option value="${value}" ${intake.reason === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>${input('pins','All PINs included in this appeal (comma separated)','text',intake.pins || snapshot.pin || appeal.property_pin)}${input('requestedMarketValue','Your requested fair market value ($), not assessed value','number',intake.requestedMarketValue || '', 'min="1" step="0.01"')}<p>If you choose $49 DocuSign, print and mail fulfillment, we manage the township appeal calendar. We hold your signed, authorized packet until the appeal window opens, then print, mail and provide tracking.</p>${notes('explanation', 'Your explanation and why your evidence supports the requested value', intake.explanation || (intake.reason && intake.reason !== 'uniformity' ? '' : 'I request review of my property assessment for uniformity. My selected comparable properties and supporting records are included for consideration.'))}<fieldset><legend>Which documents apply?</legend>${toggle('ownResidence','I live at this property as my own residence (leave unchecked for a rental).',intake.ownResidence)}${toggle('recentSale','There was a sale within two years before the assessment lien date, or I am relying on a sale.',intake.recentSale)}<div class="packet-sale-fields" ${intake.recentSale?'':'hidden'}>${input('purchaseDate','Purchase date','date',intake.purchaseDate || '')}${input('purchasePrice','Purchase price ($)','number',intake.purchasePrice || '', 'min="1" step="0.01"')}${input('sellerName','Seller name','text',intake.sellerName || '')}${input('saleRelationship','Relationship between buyer and seller (or none)','text',intake.saleRelationship || '')}</div>${toggle('appraisal','An existing appraisal / valuation report falls within the required disclosure period.',intake.appraisal)}${toggle('damage','My argument relies on damage, condition or vacancy.',intake.damage)}<details><summary>Additional attestation (only if requested)</summary>${toggle('affidavit','The Assessor requested an additional attestation for this appeal.',intake.affidavit)}<label>Facts for a requested attestation (only if applicable)<textarea name="attestationFacts" maxlength="10000">${escape(intake.attestationFacts || '')}</textarea></label></details></fieldset>${comparisonChoices(snapshot,intake)}${check('recordsConfirmed','I verified the assessment year, ownership, all PINs and current values against the county record. Imported data may be from an earlier year.')}${check('singleFamilyScope','This is a single-family home with one dwelling unit, not a condo, multi-family, mixed-use or commercial property.')}${check('individualOwner', 'The property is titled in my individual name. I will review and sign my prepared appeal.')}${check('noExistingAppeal', 'I have checked for existing appeals and representation; there is no conflicting filing or engagement.')}`, 'Save information');
     }
-    if(intake.ownerName) html += checklistCard(s);
+    if(intake.ownerName && !guided) html += checklistCard(s);
+    if(guided)html+=`<section class="packet-card packet-question-launch"><div><span class="section-badge">One question at a time</span><h2>Let’s prepare your appeal</h2><p>Confirm the details we already have, answer a few questions, and add only the evidence that applies. We assemble your answers and the available signature forms into your PDF.</p><button type="button" class="btn btn-primary" id="open-appeal-questions">${s.questionnaire || s.intake?.ownerName?'Continue my appeal':'Start questions'}</button><p class="packet-muted">Progress saves to your account. Preparation and downloads are free.</p></div><div class="packet-question-illustration" aria-hidden="true"><span>01</span><span>02</span><span>PDF</span></div></section><div id="appeal-question-host"></div>`;
     if(isOwner && free && editable && storageReady) {
-        const prepared=s.documents.find(doc=>doc.kind==='packet' && doc.version===s.version && (!s.packetId || doc.id===s.packetId));
+        const prepared=!guided && s.documents.find(doc=>doc.kind==='packet' && doc.version===s.version && (!s.packetId || doc.id===s.packetId));
         html+=`<section class="packet-card" id="free-packet-download"><h2>Your free packet</h2><p>Downloads never require payment.</p>${prepared?`<button type="button" class="btn btn-primary" data-document="${escape(prepared.id)}">Download free packet</button>`:'<p>You can download your collected information and uploads now. The preparation copy lists missing forms or evidence and is marked not ready to file.</p><button type="button" class="btn btn-primary" id="download-preparation-copy">Download free preparation copy</button>'}</section>`;
     }
     html += `<section class="packet-card"><h2>Your documents and downloads</h2>${s.documents.map(doc => `<div class="packet-document"><span>${escape(doc.name)}<br><small>${escape(evidenceCategories[doc.category] || doc.kind.replaceAll('_',' '))} · version ${doc.version}</small></span><button type="button" class="btn btn-secondary" data-document="${doc.id}">Download</button>${isOwner && preparing && doc.kind==='evidence'?`<button type="button" class="btn btn-secondary" data-remove="${doc.id}">Remove</button>`:''}</div>`).join('') || '<p>No documents uploaded yet.</p>'}</section>`;
-    if (editable && storageReady && ['intake','preparing'].includes(s.status)) html += form('evidence', 'Add supporting evidence', `<label>Document type<select name="category">${Object.entries(evidenceCategories).filter(([id])=>!['application','affidavit'].includes(id)).map(([id,label])=>`<option value="${id}">${label}</option>`).join('')}</select></label><label>Photo date (for a property photo)<input type="date" name="photoDate"></label><label><input type="checkbox" name="photoDateStamped" value="yes">The photo visibly shows its capture date. Otherwise we prepare the official date attestation for you to sign.</label>${file('PDF, JPG or PNG',true)}<p>Upload complete, legible documents. Uploaded files are included in the combined PDF; remove outdated files before building.</p>`, 'Upload evidence');
+    if (editable && !guided && storageReady && ['intake','preparing'].includes(s.status)) html += form('evidence', 'Add supporting evidence', `<label>Document type<select name="category">${Object.entries(evidenceCategories).filter(([id])=>!['application','affidavit'].includes(id)).map(([id,label])=>`<option value="${id}">${label}</option>`).join('')}</select></label><label>Photo date (for a property photo)<input type="date" name="photoDate"></label><label><input type="checkbox" name="photoDateStamped" value="yes">The photo visibly shows its capture date. Otherwise we prepare the official date attestation for you to sign.</label>${file('PDF, JPG or PNG',true)}<p>Upload complete, legible documents. Uploaded files are included in the combined PDF; remove outdated files before building.</p>`, 'Upload evidence');
     if (isOwner && editable && s.status === 'review') html += form('approve', 'Review your prepared packet', `<p>Download the current packet above and check every field and supporting document. Contact us for corrections before approving.</p>${check('confirmed','I reviewed this packet version and confirm that its information is accurate. I selected my appeal grounds and requested value. This approval is not my appeal signature.')}`, 'Confirm reviewed packet');
     if (s.status === 'awaiting_signature') html += '<section class="packet-card"><h2>Sign your documents</h2><p>Use the invitation sent directly by DocuSign. After all required signers complete it, we will verify and upload the signed packet and completion certificate.</p></section>';
     if (isOwner && editable && s.status === 'signed' && !s.mailingConsent) html += form('authorize_mail', 'Authorize mailing', `<p>Download and review the signed packet above. We will check the agency’s filing requirements before dispatch. The $49 fulfillment price includes DocuSign signing, printing, assembly, postage and tracking.</p>${check('confirmed','I authorize Cook County Tax Compare to mail this signed packet version as instructed. I understand that mailing does not guarantee timely county filing or a reduced assessment.')}`, 'Authorize mailing this packet');
@@ -223,7 +232,7 @@ function render() {
     if (s.mailingConsent && !s.mailing) html += mailingQueueCard(current.mailingWindow, free);
     if (s.mailing) html += `<section class="packet-card"><h2>Mailing record</h2><p>${escape(s.mailing.carrier)} · ${escape(s.mailing.tracking)} · Mailed ${escape(s.mailing.mailedOn)}</p><pre>${escape(s.mailing.recipient)}</pre><p>Recorded filing deadline: ${escape(s.mailing.filingDeadline)}</p></section>`;
     if (s.filing) html += `<section class="packet-card"><h2>County confirmation</h2><p>Docket: ${escape(s.filing.docket)} · Confirmed ${escape(s.filing.confirmedOn)}</p></section>`;
-    if (isOwner && free && s.status==='preparing' && storageReady) {
+    if (isOwner && free && !guided && s.status==='preparing' && storageReady) {
         const missing=preparationProblems(s);
         if(!current.officialForms?.length || current.officialForms.some(form=>!form.ready)) html += '<section class="packet-card"><h2>Official form setup in progress</h2><p>Your saved information and uploads are retained. The preparation desk will supply the official forms for this year. You do not need to download or upload blank forms.</p></section>';
         else html += form('generate','Build your appeal packet',`<p>We prefill and include the official application and any applicable official attestations, your statement, property records, comparison exhibit and supporting uploads in one PDF. Review the completed packet before signing.</p>${missing.length?`<p>Still needed: ${missing.map(escape).join('; ')}</p>`:'<p>Your checklist is complete. Build the packet, then review every page.</p>'}`,'Build PDF for review');
@@ -233,11 +242,25 @@ function render() {
     if (isOwner && free && editable && intake.singleFamilyScope===true && s.status==='approved' && !fulfillmentPaid) html += form('purchase','Optional DocuSign + print and mail · $49',`<p>You can download your packet above and submit it yourself for free. Fulfillment includes DocuSign signing, printing, assembly, postage and tracking for this version. It does not guarantee county acceptance or a reduction.</p><p>Demo pilot: signature acceptance is assumed for testing and has not been confirmed by the Assessor. Demo signing cannot be dispatched as a real appeal.</p>${check('fulfillmentAccepted','I choose the optional $49 fulfillment service for this approved packet version.')}`,'Continue to fulfillment checkout');
     if (free && fulfillmentPaid) html += `<section class="packet-card"><h2>DocuSign signing included</h2><p>${signature ? `Envelope status: ${escape(signature.status)} · ${escape(signature.environment)}` : 'The fulfillment desk will check signature placement and send your invitation.'}</p><p>Use the signing link delivered by DocuSign to your verified account email. Signed files and the completion certificate will appear here after synchronization.</p></section>`;
     if (free && signature?.envelope_id && ['approved','awaiting_signature','signed'].includes(s.status)) html += form('ds_sync','Check signing status','<p>Checks are limited to once every 15 minutes. Completed documents are retrieved directly from DocuSign.</p>','Check DocuSign');
-    if (isAdmin && editable) html += adminForms(s, storageReady, free, fulfillmentPaid, signature);
+    if (isAdmin && editable) html += guided ? `<details class="packet-card"><summary>Administrator preparation tools</summary>${adminForms(s, storageReady, free, fulfillmentPaid, signature)}</details>` : adminForms(s, storageReady, free, fulfillmentPaid, signature);
     if(isOwner && free && editable && current.checkout?.testing) html+=form('payment_test','Test existing Stripe checkout · $49',`<p>${current.checkout.mode==='live'?'This uses your existing live Stripe setup and charges the card $49.':'This uses Stripe test mode.'} This administrator payment test does not order DocuSign or mailing and does not replace approval of the completed packet.</p>${check('testPaymentAccepted','I want to run this $49 payment test using the existing Stripe checkout.')}`,'Continue to Stripe payment test');
     html += `<section class="packet-card"><h2>Activity</h2><ul>${events.map(event => `<li>${escape(event.created_at)} UTC — ${escape(event.action.replaceAll('_',' '))}: ${escape(labels[event.status])}</li>`).join('') || '<li>Workspace created. Intake has not been submitted.</li>'}</ul></section>`;
     const workspace = document.getElementById('packet-workspace');
+    if(guided) {
+        html=html.replace('<section class="packet-card"><h2>Your documents and downloads</h2>','<details class="packet-card"><summary>Saved documents and previous downloads</summary><div>');
+        const documentsEnd=html.indexOf('</section>',html.indexOf('<summary>Saved documents and previous downloads</summary>'));
+        html=html.slice(0,documentsEnd)+'</div></details>'+html.slice(documentsEnd+10);
+        html=html.replace('<section class="packet-card"><h2>Activity</h2>','<details class="packet-card"><summary>Activity</summary><div>');
+        const activityEnd=html.indexOf('</section>',html.indexOf('<summary>Activity</summary>'));
+        html=html.slice(0,activityEnd)+'</div></details>'+html.slice(activityEnd+10);
+    }
     workspace.innerHTML = html; workspace.hidden = false;
+    if(guided) {
+        questionController=createQuestionController(workspace.querySelector('#appeal-question-host'));
+        workspace.querySelector('#open-appeal-questions').addEventListener('click',()=>questionController.open());
+        if(openQuestionsOnLoad){openQuestionsOnLoad=false;questionController.open();}
+    }
+
     const reasonSelect=workspace.querySelector('[name="reason"]'), explanation=workspace.querySelector('[name="explanation"]');
     const uniformityDraft='I request review of my property assessment for uniformity. My selected comparable properties and supporting records are included for consideration.';
     if(reasonSelect && explanation)reasonSelect.addEventListener('change',()=>{if(explanation.value===uniformityDraft || !explanation.value.trim())explanation.value=reasonSelect.value==='uniformity'?uniformityDraft:'';});
@@ -246,13 +269,34 @@ function render() {
         const syncSale=()=>{saleFields.hidden=!saleToggle.checked;for(const el of saleFields.querySelectorAll('input'))el.disabled=!saleToggle.checked;};
         saleToggle.addEventListener('change',syncSale);syncSale();
     }
-    workspace.querySelectorAll('form').forEach(el => el.addEventListener('submit', submit));
+    workspace.querySelectorAll('form[data-action]').forEach(el => el.addEventListener('submit', submit));
     workspace.querySelectorAll('[data-remove]').forEach(el=>el.addEventListener('click',async()=>{el.disabled=true;try{const r=await authFetch(`/api/packet?id=${encodeURIComponent(selectedId)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'remove_evidence',documentId:el.dataset.remove,revision:current.revision})});const d=await r.json();if(!r.ok)throw new Error(d.error);await load();}catch(e){message(e.message,true);el.disabled=false;}}));
     workspace.querySelectorAll('[data-document]').forEach(el => el.addEventListener('click', () => download(el.dataset.document)));
     workspace.querySelector('#download-preparation-copy')?.addEventListener('click',async event=>{
         const button=event.currentTarget;button.disabled=true;
         try{await downloadFile(`/api/packet?id=${encodeURIComponent(selectedId)}&download=preparation`,'assessor-preparation-copy.pdf');}
         catch(error){message(error.message,true);}finally{button.disabled=false;}
+    });
+}
+
+function createQuestionController(host) {
+    const id=selectedId,revision=sessionRevision;
+    const active=()=>{if(revision!==sessionRevision || id!==selectedId)throw new Error('Your account or packet changed. Please reopen your appeal.');};
+    const post=async (data,file)=>{
+        active();let body,headers;
+        if(file){body=new FormData();body.set('data',JSON.stringify({...data,revision:current.revision}));body.set('file',file);}
+        else {body=JSON.stringify({...data,revision:current.revision});headers={'Content-Type':'application/json'};}
+        const result=await requestJSON(`/api/packet?id=${encodeURIComponent(id)}`,{method:'POST',headers,body},'Could not save your answer.');active();return result;
+    };
+    const refresh=async()=>{const data=await requestJSON(`/api/packet?id=${encodeURIComponent(id)}`);active();current=data;return data;};
+    return mountAppealQuestions(host,current,{
+        async saveDraft(answers,step){const result=await post({action:'questionnaire',answers,step});current={...current,revision:result.revision,state:{...current.state,questionnaire:result.questionnaire}};},
+        async saveIntake(answers){await post({...answers,action:'intake',agency:'assessor',taxYear:current.state.intake?.taxYear || current.state.taxYear,condo:false});return refresh();},
+        async upload({file,...data}){await post({...data,action:'evidence'},file);return refresh();},
+        async download(){active();await downloadFile(`/api/packet?id=${encodeURIComponent(id)}&download=preparation`,'assessor-preparation-copy.pdf');},
+        async generate(){await post({action:'generate'});await refresh();await downloadFile(`/api/packet?id=${encodeURIComponent(id)}&document=${encodeURIComponent(current.state.packetId)}`,'assessor-appeal.pdf');},
+        chooseProperty(){location.href='index.html#user-dashboard';},
+        finish(){if(revision===sessionRevision){render();message('Your answers and documents are saved.');}}
     });
 }
 

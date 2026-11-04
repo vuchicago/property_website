@@ -31,6 +31,25 @@ export function transitionPacket(current, input, actor, now = new Date().toISOSt
         return doc.id;
     };
     switch (input.action) {
+        case 'questionnaire': {
+            owner(); at('intake','preparing');
+            requireCondition(input.answers && typeof input.answers==='object' && !Array.isArray(input.answers),'Provide questionnaire answers.');
+            const strings={ownerName:200,mailingAddress:1000,ownerPhone:300,mailingCity:300,mailingState:300,mailingZip:300,propertyCity:300,propertyZip:300,pins:500,explanation:10000,attestationFacts:10000,purchaseDate:300,sellerName:300,saleRelationship:300,reason:40};
+            const booleans=new Set(['singleFamilyScope','recordsConfirmed','individualOwner','noExistingAppeal','ownResidence','recentSale','appraisal','damage','affidavit']);
+            const answers={};
+            for(const [key,value] of Object.entries(input.answers)) {
+                if(Object.hasOwn(strings,key)) {requireCondition(typeof value==='string' && value.length<=strings[key],'Answer is too long or invalid.');answers[key]=value;}
+                else if(booleans.has(key)) {requireCondition(typeof value==='boolean','Choose yes or no.');answers[key]=value;}
+                else if(['requestedMarketValue','purchasePrice'].includes(key)) {requireCondition(value==='' || (Number.isFinite(value) && value>=0 && value<=1e10),'Enter a valid amount.');answers[key]=value;}
+                else if(key==='selectedComparables') {
+                    const allowed=new Set((current.propertySnapshot?.comparables || []).map(item=>String(item.pin)));
+                    requireCondition(Array.isArray(value) && value.length<=20 && value.every(pin=>typeof pin==='string' && allowed.has(pin)),'Choose comparisons from this property record.');answers[key]=[...new Set(value)];
+                } else requireCondition(false,'Unknown questionnaire field.');
+            }
+            requireCondition(typeof input.step==='string' && /^[a-z_:]{1,80}$/.test(input.step),'Choose a valid questionnaire step.');
+            next.questionnaire={answers,step:input.step,updatedAt:now};
+            break;
+        }
         case 'intake':
             owner(); at('intake', 'preparing');
             requireCondition(input.agency === 'assessor', 'This service supports Cook County Assessor appeals only.');

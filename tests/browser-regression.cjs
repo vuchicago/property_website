@@ -68,6 +68,9 @@ async function scenario(options = {}) {
     store.intake = {singleFamilyScope:true};
     store.publishedForms=[];
     store.checkoutRequests=[];
+    store.questionnaire=options.questionnaire || null;
+    store.packetRevision=0;
+    store.packetDocuments=options.documents || [{id:'prepared',kind:'packet',version:1,name:'test-appeal.pdf'}];
     store.lookups = [];
     store.summaryRequests = 0;
     store.authAttempts = [];
@@ -169,10 +172,16 @@ async function scenario(options = {}) {
             case '/api/packet': {
                 if (!store.access) return json({ error: 'Free appeal testing is currently by invitation.' }, 403);
                 if (request.method() === 'POST') {
-                    const data=request.postDataJSON();
+                    let data,uploaded;
+                    if((request.headers()['content-type'] || '').startsWith('multipart/form-data')) {
+                        const body=await new Request(request.url(),{method:'POST',headers:request.headers(),body:request.postDataBuffer()}).formData();
+                        data=JSON.parse(body.get('data'));uploaded=body.get('file');
+                    } else data=request.postDataJSON();
+                    if(data.action==='questionnaire') {store.questionnaire={answers:data.answers,step:data.step};return json({success:true,revision:++store.packetRevision,questionnaire:store.questionnaire});}
+                    if(data.action==='evidence') {store.packetDocuments.push({id:`evidence-${store.packetDocuments.length}`,kind:'evidence',category:data.category,name:uploaded.name,type:uploaded.type,version:1,photoDate:data.photoDate,dateStamped:data.photoDateStamped===true});return json({success:true,revision:++store.packetRevision});}
                     if (data.action==='intake') {
                         store.intakes.push(data);store.intake=data;store.packetStatus='preparing';
-                        return json({success:true});
+                        return json({success:true,revision:++store.packetRevision});
                     }
                     return json({error:'Unexpected packet action'},400);
                 }
@@ -185,11 +194,11 @@ async function scenario(options = {}) {
                 const chosen = store.addresses.find(row => row.id === store.starts.at(-1)?.propertyId) || property;
                 return json({
                     appeal: { customer_name: 'Test Owner', property_address: chosen.address, payment_status: 'free' },
-                    state: { status: store.packetStatus, version: 1, taxYear: 2026, intake:store.intake, mailingConsent:options.mailingConsent ? {version:1} : undefined, documents: options.documents || [{ id: 'prepared', kind: 'packet', version: 1, name: 'test-appeal.pdf' }], propertySnapshot: { address: chosen.address, pin: chosen.pin || suggestedProperty.pin,details:options.propertyDetails,comparables:options.comparables } },
+                    state: { status: store.packetStatus, version: 1, taxYear: 2026, intake:store.intake, questionnaire:store.questionnaire, mailingConsent:options.mailingConsent ? {version:1} : undefined, documents: store.packetDocuments, propertySnapshot: { address: chosen.address, pin: chosen.pin || suggestedProperty.pin,details:options.propertyDetails,comparables:options.comparables } },
                     officialForms:options.officialForms,
                     checkout:options.checkout,
                     mailingWindow:options.mailingWindow, signature:options.signature,
-                    revision: 0, events: [], isOwner: true, isAdmin: Boolean(options.role === 'admin'), storageReady: true, fulfillmentPaid:Boolean(options.fulfillmentPaid)
+                    revision: store.packetRevision, events: [], isOwner: true, isAdmin: Boolean(options.role === 'admin'), storageReady: true, fulfillmentPaid:Boolean(options.fulfillmentPaid)
                 });
             }
             case '/api/packet-signature': store.signatureCalls++; return json({ error: 'Payment required' }, 402);
@@ -873,27 +882,18 @@ test('failed property deletion keeps the address and allows retry',async()=>{
     } finally {await s.close();}
 });
 
-test('appeal form saves without requiring an owner-entered deadline or calendar check',async()=>{
-    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake'});
+test('guided appeal cards save the necessary answers without a deadline or calendar check',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles'},comparables:questionComparisons});
     try {
         await s.goto('/appeal-packet.html?id=free_fixture');
-        const form=s.page.locator('form[data-action="intake"]');
-        await form.waitFor();
-        assert.equal(await form.locator('[name="filingDeadline"]').count(),0);
-        assert.equal(await form.getByRole('link',{name:/calendar/i}).count(),0);
-        await form.locator('[name="ownerName"]').fill('Test Owner');
-        await form.locator('[name="ownerPhone"]').fill('3125550100');
-        await form.locator('[name="mailingAddress"]').fill('123 Test Ave, Skokie IL');
-        await form.locator('[name="requestedMarketValue"]').fill('200000');
-        await form.locator('[name="explanation"]').fill('Similar properties have lower assessments.');
-        await form.locator('[name="ownResidence"]').check();
-        for (const checkbox of await form.locator('input[type="checkbox"][required]').all()) await checkbox.check();
-        const saved=s.page.waitForResponse(response=>new URL(response.url()).pathname==='/api/packet'&&response.request().method()==='POST');
-        await form.getByRole('button',{name:'Save information',exact:true}).click();
-        assert.equal((await saved).status(),200);
+        assert.equal(await s.page.locator('form[data-action="intake"]').count(),0);
+        const dialog=await walkAppealCards(s);
+        assert.equal(await dialog.locator('[name="filingDeadline"]').count(),0);
         assert.equal(s.store.intakes.length,1);
-        assert.equal('filingDeadline' in s.store.intakes[0],false);
         assert.equal(s.store.intakes[0].requestedMarketValue,200000);
+        assert.equal(s.store.intakes[0].singleFamilyScope,true);
+        assert.equal(s.store.intakes[0].noExistingAppeal,true);
+        assert.equal('filingDeadline' in s.store.intakes[0],false);
     } finally {await s.close();}
 });
 
@@ -911,33 +911,19 @@ for (const status of ['upcoming','open','closed','unannounced']) {
     });
 }
 
-test('owner sees service-prepared forms and only supplies missing facts and personal evidence',async()=>{
-    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',officialForms:[{kind:'application',ready:true,missingValues:[{source:'mailingCity',label:'Mailing city'},{source:'mailingState',label:'Mailing state'},{source:'mailingZip',label:'Mailing ZIP'}]}],comparables:[1,2,3,4,5].map(n=>({pin:String(n).padStart(14,'0'),address:`${n} Comparison Ave`}))});
+test('cards prefill comparisons and ask only for missing contact details before free PDF download',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles'},officialForms:[{kind:'application',title:'Official Assessor application',ready:false,missingValues:[{source:'mailingCity',label:'Mailing city'},{source:'mailingState',label:'Mailing state'},{source:'mailingZip',label:'Mailing ZIP'}]}],comparables:questionComparisons});
     try {
         await s.goto('/appeal-packet.html?id=free_fixture');
-        const form=s.page.locator('form[data-action="intake"]');
-        await form.waitFor();
-        assert.equal(await form.locator('[name="condo"]').count(),0);
-        assert.equal(await form.locator('[name="singleFamilyScope"]').count(),1);
-        assert.equal(await form.locator('[name="documentsReviewed"]').count(),0);
-        assert.equal(await form.locator('[name="explanation"]').inputValue(),'I request review of my property assessment for uniformity. My selected comparable properties and supporting records are included for consideration.');
-        assert.equal(await form.locator('[name="selectedComparables"]:checked').count(),5);
-        assert.equal(await s.page.locator('form[data-action="evidence"] option[value="application"]').count(),0);
-        await form.locator('[name="ownerName"]').fill('Test Owner');
-        await form.locator('[name="ownerPhone"]').fill('3125550100');
-        await form.locator('[name="mailingAddress"]').fill('99 Owner St');
-        await form.locator('[name="mailingCity"]').fill('Chicago');
-        await form.locator('[name="mailingState"]').fill('IL');
-        await form.locator('[name="mailingZip"]').fill('60601');
-        await form.locator('[name="requestedMarketValue"]').fill('200000');
-        for(const box of await form.locator('input[type="checkbox"][required]').all())await box.check();
-        const response=s.page.waitForResponse(res=>res.request().method()==='POST'&&new URL(res.url()).pathname==='/api/packet');
-        await form.getByRole('button',{name:'Save information',exact:true}).click();await response;
-        await s.page.getByRole('heading',{name:'2. We prepare your forms and supporting packet',exact:true}).waitFor();
+        const dialog=await walkAppealCards(s,{mailing:{mailingCity:'Chicago',mailingState:'IL',mailingZip:'60601'}});
         assert.equal(s.store.intakes[0].mailingCity,'Chicago');
-        assert.equal(s.store.intakes[0].singleFamilyScope,true);
         assert.equal(s.store.intakes[0].selectedComparables.length,5);
-    }finally{await s.close();}
+        assert.equal(await dialog.locator('[name="documentsReviewed"]').count(),0);
+        const downloading=s.page.waitForEvent('download');
+        await dialog.getByRole('button',{name:'Download PDF',exact:true}).click();
+        await downloading;
+        assert.equal(s.store.checkoutRequests.length,0);assert.equal(s.store.signatureCalls,0);
+    } finally {await s.close();}
 });
 
 test('an existing out-of-scope packet keeps downloads while new preparation and purchase stay unavailable',async()=>{
@@ -1019,5 +1005,87 @@ test('administrator can test the existing live Stripe checkout without treating 
         assert.equal(s.store.checkoutRequests[0].fulfillmentAccepted,true);
         assert.equal(s.store.signatureCalls,0);
         assert.equal(s.store.packetStatus,'intake');
+    }finally{await s.close();}
+});
+
+const questionComparisons=[1,2,3,4,5].map(n=>({pin:String(n).padStart(14,'0'),address:`${n} Comparison Ave`,homeSize:1400,yearBuilt:1965}));
+async function walkAppealCards(s,options={}) {
+    const page=s.page,dialog=page.locator('dialog.appeal-question-dialog');
+    if(!await dialog.isVisible())await page.getByRole('button',{name:/^(Start questions|Continue my appeal)$/}).click();
+    const at=title=>dialog.getByRole('heading',{name:title,exact:true}).waitFor();
+    const choose=async(key,value)=>{await dialog.locator(`[data-choice="${key}"][data-value="${value}"]`).click();};
+    const next=async()=>{await dialog.getByRole('button',{name:'Continue',exact:true}).click();};
+    await at('Is this the home you want to appeal?');await choose('singleFamilyScope',true);
+    await at('Is the property titled in your individual name?');await choose('individualOwner',true);
+    await at('Is anyone already handling this appeal?');await choose('noExistingAppeal',true);
+    await at('Do you live in this home?');await choose('ownResidence',!options.rental);
+    await at('How should the Assessor contact you?');await dialog.locator('[name="ownerName"]').fill('Test Owner');await dialog.locator('[name="ownerPhone"]').fill('3125550100');await next();
+    await at('What is your mailing address?');await dialog.locator('[name="mailingAddress"]').fill('99 Owner St');
+    for(const [name,value] of Object.entries(options.mailing || {}))await dialog.locator(`[name="${name}"]`).fill(value);
+    await next();
+    await at('Why are you appealing?');await choose('reason',options.reason || 'uniformity');
+    await at('What market value are you requesting?');await dialog.locator('[name="requestedMarketValue"]').fill('200000');await next();
+    if(!options.reason || options.reason==='uniformity') {await at('Review your suggested comparisons');assert.equal(await dialog.locator('[name="selectedComparables"]:checked').count(),5);await next();}
+    if(options.reason==='characteristics') {await at('What needs to be corrected?');await dialog.locator('[name="explanation"]').fill('The county building area is incorrect. See the measured plan.');}
+    else {await at('What would you like the Assessor to know?');if(options.reason==='overvaluation')await dialog.locator('[name="explanation"]').fill('The attached market evidence supports my requested value.');else assert.match(await dialog.locator('[name="explanation"]').inputValue(),/request review/);}
+    await next();
+    await at('Does a recent purchase apply?');await choose('recentSale',Boolean(options.recentSale));
+    if(options.recentSale) {await at('Tell us about the purchase');await dialog.locator('[name="purchaseDate"]').fill('2025-01-10');await dialog.locator('[name="purchasePrice"]').fill('200000');await dialog.locator('[name="sellerName"]').fill('Test Seller');await dialog.locator('[name="saleRelationship"]').fill('None');await next();}
+    await at('Do you have an existing appraisal to disclose?');await choose('appraisal',false);
+    await at('Does your argument rely on damage or condition?');await choose('damage',false);
+    await at('Now add only the evidence that applies');await next();
+    await page.waitForFunction(()=>document.querySelector('dialog.appeal-question-dialog #appeal-question-title')?.textContent==='Your packet is ready to review'||Boolean(document.querySelector('dialog.appeal-question-dialog #question-skip')));
+    for(let n=0;n<5;n++) {
+        if(await dialog.getByRole('heading',{name:'Your packet is ready to review',exact:true}).isVisible())break;
+        const skip=dialog.getByRole('button',{name:'Skip for now',exact:true});
+        await skip.waitFor();const oldTitle=await dialog.locator('#appeal-question-title').textContent();await skip.click();await page.waitForFunction(previous=>document.querySelector('dialog.appeal-question-dialog #appeal-question-title')?.textContent!==previous,oldTitle);
+    }
+    await at('Your packet is ready to review');return dialog;
+}
+
+test('question cards resume saved progress and preserve contact answers after reload',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',questionnaire:{step:'contact',answers:{singleFamilyScope:true,recordsConfirmed:true,individualOwner:true,noExistingAppeal:true,ownResidence:false,ownerName:'Saved Owner',ownerPhone:'3125550100'}}});
+    try {
+        await s.goto('/appeal-packet.html?id=free_fixture');
+        await s.page.getByRole('button',{name:'Continue my appeal',exact:true}).click();
+        let dialog=s.page.locator('dialog.appeal-question-dialog');
+        await dialog.getByRole('heading',{name:'How should the Assessor contact you?',exact:true}).waitFor();
+        assert.equal(await dialog.locator('[name="ownerName"]').inputValue(),'Saved Owner');
+        await dialog.locator('[name="ownerName"]').fill('Updated Owner');
+        await dialog.getByRole('button',{name:'Continue',exact:true}).click();
+        await dialog.getByRole('heading',{name:'What is your mailing address?',exact:true}).waitFor();
+        await s.page.reload();await s.page.getByRole('button',{name:'Continue my appeal',exact:true}).click();
+        dialog=s.page.locator('dialog.appeal-question-dialog');await dialog.getByRole('heading',{name:'What is your mailing address?',exact:true}).waitFor();
+        await dialog.getByRole('button',{name:'Back',exact:true}).click();
+        await dialog.getByRole('heading',{name:'How should the Assessor contact you?',exact:true}).waitFor();
+        assert.equal(await dialog.locator('[name="ownerName"]').inputValue(),'Updated Owner');
+        assert.equal(s.store.intakes.length,0);
+    }finally{await s.close();}
+});
+
+test('cards branch into purchase and rental evidence without requiring unrelated documents',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles'},comparables:questionComparisons});
+    try {
+        await s.goto('/appeal-packet.html?id=free_fixture');
+        await walkAppealCards(s,{rental:true,recentSale:true});
+        assert.equal(s.store.intakes[0].ownResidence,false);
+        assert.equal(s.store.intakes[0].purchaseDate,'2025-01-10');
+        assert.equal(s.store.intakes[0].appraisal,false);
+        assert.equal(s.store.questionnaire.step,'review');
+        assert.equal(s.store.signatureCalls,0);
+    }finally{await s.close();}
+});
+
+test('a property link opens the first question card and mobile controls stay inside the viewport',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',width:390,propertyDetails:{classCode:'203',townshipName:'Niles'}});
+    try {
+        await s.goto('/appeal-packet.html?property=7');
+        const dialog=s.page.locator('dialog.appeal-question-dialog');
+        await dialog.getByRole('heading',{name:'Is this the home you want to appeal?',exact:true}).waitFor();
+        const bounds=await dialog.boundingBox();assert.ok(bounds.x>=0 && bounds.x+bounds.width<=391);
+        await s.page.screenshot({path:'/tmp/cookcounty-question-card-mobile.png'});
+        await s.page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});
+        assert.equal(s.store.questionnaire.step,'property');
+        assert.equal(await s.page.getByRole('button',{name:'Download free preparation copy',exact:true}).isVisible(),true);
     }finally{await s.close();}
 });

@@ -80,3 +80,20 @@ test('postal delivery remains distinct from county filing',()=>{
     s=run(s,mail);s=run(s,{action:'delivered',deliveredOn:'2026-11-03',document:doc('delivery_proof')});
     assert.equal(s.status,'delivered');assert.equal(s.filing,undefined);
 });
+
+test('questionnaire progress saves partial answers without approving or submitting an appeal',()=>{
+    const initial={...initialPacket(),propertySnapshot:{comparables:[{pin:'00000000000001'}]}};
+    const next=run(initial,{action:'questionnaire',step:'contact',answers:{singleFamilyScope:true,recordsConfirmed:true,individualOwner:true,ownerName:'Test Owner',requestedMarketValue:'',selectedComparables:['00000000000001']}},owner);
+    assert.equal(next.status,'intake');assert.equal(next.version,0);assert.equal(next.intake,undefined);assert.equal(next.approval,undefined);
+    assert.equal(JSON.parse(JSON.stringify(next)).questionnaire.step,'contact');
+    assert.equal(next.questionnaire.answers.ownerName,'Test Owner');
+    assert.equal(initial.questionnaire,undefined);
+});
+test('questionnaire writes require ownership, preparation stage and bounded allowed fields',()=>{
+    const draft={action:'questionnaire',step:'contact',answers:{ownerName:'Test Owner'}};
+    assert.throws(()=>run(initialPacket(),draft,admin),/account owner/);
+    assert.throws(()=>run({...initialPacket(),status:'approved'},draft,owner),/current stage/);
+    assert.throws(()=>run(initialPacket(),{...draft,answers:{documents:[]}},owner),/Unknown questionnaire field/);
+    assert.throws(()=>run(initialPacket(),{...draft,answers:{ownerName:'a'.repeat(201)}},owner),/too long/);
+    assert.throws(()=>run(initialPacket(),{...draft,answers:{selectedComparables:['foreign']}},owner),/this property record/);
+});

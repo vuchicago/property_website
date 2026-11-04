@@ -46,11 +46,12 @@ export async function onRequest(context) {
             if(mapped)transactionId=mapped.packet_id;
         }
         if (!transactionId || transactionId.length > 255) return json({ error: 'Select a packet workspace.' }, 400);
-        const appeal = await db.prepare('SELECT transaction_id, customer_id, customer_name, customer_email, property_address, property_pin, payment_status FROM appeals WHERE transaction_id = ?').bind(transactionId).first();
+        const appeal = await db.prepare('SELECT transaction_id, customer_id, customer_name, customer_email, property_address, property_pin, payment_status, appeal_status FROM appeals WHERE transaction_id = ?').bind(transactionId).first();
         if (!appeal) return json({ error: 'Order not found.' }, 404);
         const role = await db.prepare("SELECT role FROM admins WHERE lower(email) = ? AND role IN ('admin', 'superadmin')").bind((user.email || '').toLowerCase()).first();
         const actor = { uid: user.uid, isOwner: appeal.customer_id === user.uid, isAdmin: Boolean(role) };
         if (!actor.isOwner && !actor.isAdmin) return json({ error: 'Order not found.' }, 404);
+        if(appeal.appeal_status==='Payment Test')return json({error:'This is a payment-test receipt, not a fulfillment packet. Open your original property workspace in My account.'},409);
         const row = await db.prepare('SELECT revision, state_json FROM appeal_packets WHERE transaction_id = ?').bind(transactionId).first();
         const state = row ? JSON.parse(row.state_json) : initialPacket();
         const revision = row?.revision || 0;
@@ -150,7 +151,7 @@ export async function onRequest(context) {
         ]);
         if (!result[1].meta?.changes) return json({ error: 'The case or payment changed. Refresh before saving.' }, 409);
         committed = true;
-        return json({ success: true });
+        return json({ success: true, revision:revision+1, ...(input.action==='questionnaire'?{questionnaire:next.questionnaire}:{}) });
     } catch (error) {
         console.error('Packet workflow failed:', error.message);
         return json({ error: error.status ? error.message : 'Unable to save or load the packet. Confirm the database migration and private storage are configured.' }, error.status || 500);

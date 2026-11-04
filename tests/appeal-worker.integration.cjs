@@ -101,6 +101,20 @@ test('local Worker denies another account and anonymous access to the appeal', a
     assert.equal((await worker.dispatchFetch(`https://local.test/api/packet?id=${packetId}`)).status, 401);
 });
 
+test('guided answers persist and resume without creating an approved filing packet',async()=>{
+    const before=await (await api(`/api/packet?id=${packetId}`)).json();
+    const saved=await api(`/api/packet?id=${packetId}`,'owner',{action:'questionnaire',revision:before.revision,step:'contact',answers:{ownerName:'Draft Owner',singleFamilyScope:true,requestedMarketValue:''}});
+    assert.equal(saved.status,200,await saved.clone().text());
+    const response=await saved.json();assert.equal(response.questionnaire.step,'contact');assert.equal(response.revision,before.revision+1);
+    const after=await (await api(`/api/packet?id=${packetId}`)).json();
+    assert.equal(after.state.status,'intake');assert.equal(after.state.version,0);assert.equal(after.state.questionnaire.answers.ownerName,'Draft Owner');
+    assert.equal(after.state.intake,undefined);assert.equal(after.fulfillmentPaid,false);
+    const stale=await api(`/api/packet?id=${packetId}`,'owner',{action:'questionnaire',revision:before.revision,step:'contact',answers:{ownerName:'Stale overwrite'}});
+    assert.equal(stale.status,409);
+    const stranger=await api(`/api/packet?id=${packetId}`,'stranger',{action:'questionnaire',revision:response.revision,step:'contact',answers:{ownerName:'Another owner'}});
+    assert.equal(stranger.status,404);
+});
+
 test('free preparation-copy export works before templates exist and does not mutate the case',async()=>{
     const before=await db.prepare('SELECT revision,state_json FROM appeal_packets WHERE transaction_id=?').bind(packetId).first();
     const response=await api(`/api/packet?id=${packetId}&download=preparation`);
@@ -255,6 +269,7 @@ test('administrator payment test works with existing live Stripe configuration a
     assert.equal((await returned.json()).email_status,'not_sent_payment_test');
     const row=await db.prepare('SELECT payment_status,appeal_status FROM appeals WHERE transaction_id=?').bind(session.id).first();
     assert.equal(row.payment_status,'paid');assert.equal(row.appeal_status,'Payment Test');
+    assert.equal((await api(`/api/packet?id=${session.id}`,'primary',undefined,claims)).status,409);
     const after=await (await api(`/api/packet?id=${id}`,'primary',undefined,claims)).json();
     assert.equal(after.fulfillmentPaid,false);assert.equal(after.state.version,0);assert.equal(after.state.status,'intake');
     assert.equal((await db.prepare('SELECT count(*) AS total FROM packet_signatures').first()).total,0);
