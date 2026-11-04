@@ -70,6 +70,8 @@ async function scenario(options = {}) {
     store.checkoutRequests=[];
     store.questionnaire=options.questionnaire || null;
     store.packetRevision=0;
+    store.packetVersion=1;
+    store.packetGenerated=0;
     store.packetDocuments=options.documents || [{id:'prepared',kind:'packet',version:1,name:'test-appeal.pdf'}];
     store.lookups = [];
     store.summaryRequests = 0;
@@ -177,15 +179,21 @@ async function scenario(options = {}) {
                         const body=await new Request(request.url(),{method:'POST',headers:request.headers(),body:request.postDataBuffer()}).formData();
                         data=JSON.parse(body.get('data'));uploaded=body.get('file');
                     } else data=request.postDataJSON();
+                    if(data.revision!==store.packetRevision)return json({error:'Test stale revision'},409);
+                    if(data.action==='questionnaire' && store.draftFailsLeft>0){store.draftFailsLeft--;return json({error:'Temporary answer saving failure'},503);}
                     if(data.action==='questionnaire') {store.questionnaire={answers:data.answers,step:data.step};return json({success:true,revision:++store.packetRevision,questionnaire:store.questionnaire});}
                     if(data.action==='evidence') {store.packetDocuments.push({id:`evidence-${store.packetDocuments.length}`,kind:'evidence',category:data.category,name:uploaded.name,type:uploaded.type,version:1,photoDate:data.photoDate,dateStamped:data.photoDateStamped===true});return json({success:true,revision:++store.packetRevision});}
+                    if(data.action==='generate') {store.packetGenerated++;store.packetStatus='review';store.packetVersion++;store.packetId=`generated-${store.packetGenerated}`;store.packetDocuments.push({id:store.packetId,kind:'packet',version:store.packetVersion,name:'generated-appeal.pdf'});return json({success:true,revision:++store.packetRevision});}
                     if (data.action==='intake') {
                         store.intakes.push(data);store.intake=data;store.packetStatus='preparing';
                         return json({success:true,revision:++store.packetRevision});
                     }
                     return json({error:'Unexpected packet action'},400);
                 }
-                if (url.searchParams.has('document')) return route.fulfill({ contentType: 'application/pdf', body: '%PDF-1.7\nRegression test fixture\n%%EOF' });
+                if (url.searchParams.has('document')) {
+                    if(store.packetDownloadFails)return json({error:'Temporary packet download failure. Please try again.'},503);
+                    return route.fulfill({ contentType: 'application/pdf', body: '%PDF-1.7\nRegression test fixture\n%%EOF' });
+                }
                 if (url.searchParams.get('download')==='preparation') {
                     if(store.preparationDownloadFails)return json({error:'Temporary packet download failure. Please try again.'},503);
                     return route.fulfill({contentType:'application/pdf',headers:{'Content-Disposition':'attachment; filename="assessor-2026-preparation-copy.pdf"'},body:'%PDF-1.7\nPreparation copy test fixture\n%%EOF'});
@@ -194,7 +202,7 @@ async function scenario(options = {}) {
                 const chosen = store.addresses.find(row => row.id === store.starts.at(-1)?.propertyId) || property;
                 return json({
                     appeal: { customer_name: 'Test Owner', property_address: chosen.address, payment_status: 'free' },
-                    state: { status: store.packetStatus, version: 1, taxYear: 2026, intake:store.intake, questionnaire:store.questionnaire, mailingConsent:options.mailingConsent ? {version:1} : undefined, documents: store.packetDocuments, propertySnapshot: { address: chosen.address, pin: chosen.pin || suggestedProperty.pin,details:options.propertyDetails,comparables:options.comparables } },
+                    state: { status: store.packetStatus, version: store.packetVersion, packetId:store.packetId, taxYear: 2026, intake:store.intake, questionnaire:store.questionnaire, mailingConsent:options.mailingConsent ? {version:1} : undefined, documents: store.packetDocuments, propertySnapshot: { address: chosen.address, pin: chosen.pin || suggestedProperty.pin,details:options.propertyDetails,comparables:options.comparables } },
                     officialForms:options.officialForms,
                     checkout:options.checkout,
                     mailingWindow:options.mailingWindow, signature:options.signature,
@@ -1087,5 +1095,66 @@ test('a property link opens the first question card and mobile controls stay ins
         await s.page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});
         assert.equal(s.store.questionnaire.step,'property');
         assert.equal(await s.page.getByRole('button',{name:'Download free preparation copy',exact:true}).isVisible(),true);
+    }finally{await s.close();}
+});
+
+test('evidence cards upload only the needed files and return to the PDF review card',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles'},comparables:questionComparisons});
+    try {
+        await s.goto('/appeal-packet.html?id=free_fixture');const dialog=await walkAppealCards(s,{rental:true});
+        await dialog.getByRole('button',{name:'Back',exact:true}).click();await dialog.getByRole('heading',{name:'Comparable properties and supporting records',exact:true}).waitFor();
+        await dialog.getByRole('button',{name:'Back',exact:true}).click();await dialog.getByRole('heading',{name:'Dated front photo of your property',exact:true}).waitFor();
+        await dialog.locator('[name="file"]').setInputFiles({name:'front-photo.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+yMJcAAAAASUVORK5CYII=','base64')});
+        await dialog.locator('[name="photoDate"]').fill('2026-01-01');await dialog.getByRole('button',{name:'Save and continue',exact:true}).click();
+        await dialog.getByRole('heading',{name:'Comparable properties and supporting records',exact:true}).waitFor();
+        await dialog.locator('[name="file"]').setInputFiles({name:'comparison-photos.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.7\nTest evidence fixture')});
+        await dialog.getByRole('button',{name:'Save and continue',exact:true}).click();
+        await dialog.getByRole('heading',{name:'Your packet is ready to review',exact:true}).waitFor();
+        const photo=s.store.packetDocuments.find(doc=>doc.category==='photo');assert.equal(photo.photoDate,'2026-01-01');assert.equal(photo.dateStamped,false);
+        assert.ok(s.store.packetDocuments.some(doc=>doc.category==='comparisons'));
+        assert.equal(s.store.signatureCalls,0);
+        await dialog.getByRole('button',{name:'Save and close',exact:true}).click();await dialog.waitFor({state:'hidden'});
+        assert.equal(await s.page.evaluate(()=>document.activeElement.id),'open-appeal-questions');
+    }finally{await s.close();}
+});
+
+test('a failed card save keeps the answer visible and can be retried',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',questionnaire:{step:'contact',answers:{ownerName:'Saved Owner',ownerPhone:'3125550100'}}});
+    try {
+        s.store.draftFailsLeft=1;
+        await s.goto('/appeal-packet.html?id=free_fixture');await s.page.getByRole('button',{name:'Continue my appeal',exact:true}).click();
+        const dialog=s.page.locator('dialog.appeal-question-dialog');await dialog.getByRole('heading',{name:'How should the Assessor contact you?',exact:true}).waitFor();
+        await dialog.locator('[name="ownerName"]').fill('Kept Owner');await dialog.getByRole('button',{name:'Continue',exact:true}).click();
+        await dialog.getByRole('alert').getByText(/Temporary answer saving failure/).waitFor();
+        assert.equal(await dialog.locator('[name="ownerName"]').inputValue(),'Kept Owner');
+        await dialog.getByRole('button',{name:'Continue',exact:true}).click();await dialog.getByRole('heading',{name:'What is your mailing address?',exact:true}).waitFor();
+        assert.equal(s.store.questionnaire.answers.ownerName,'Kept Owner');
+        assert.equal(s.store.intakes.length,0);
+    }finally{await s.close();}
+});
+
+test('the final question card builds and downloads the complete packet when its forms and evidence are ready',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles'},comparables:questionComparisons,officialForms:[{kind:'application',title:'Official Assessor application',ready:true,missingValues:[]}]});
+    try {
+        await s.goto('/appeal-packet.html?id=free_fixture');const dialog=await walkAppealCards(s);
+        assert.equal(await dialog.getByRole('button',{name:'Download PDF',exact:true}).count(),1);
+        const downloading=s.page.waitForEvent('download');await dialog.getByRole('button',{name:'Download PDF',exact:true}).click();await downloading;
+        await s.page.getByRole('heading',{name:'Review your prepared packet',exact:true}).waitFor();
+        assert.equal(s.store.packetGenerated,1);
+        assert.ok(s.store.requests.includes('/api/packet?id=free_fixture&document=generated-1'));
+        assert.equal(s.store.checkoutRequests.length,0);assert.equal(s.store.signatureCalls,0);
+    }finally{await s.close();}
+});
+
+test('a completed packet stays downloadable when its first card-flow download fails',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles'},comparables:questionComparisons,officialForms:[{kind:'application',title:'Official Assessor application',ready:true,missingValues:[]}]});
+    try {
+        await s.goto('/appeal-packet.html?id=free_fixture');const dialog=await walkAppealCards(s);
+        s.store.packetDownloadFails=true;await dialog.getByRole('button',{name:'Download PDF',exact:true}).click();
+        await s.page.locator('#packet-message').getByText(/Your PDF is saved.*Temporary packet download failure/).waitFor();
+        await dialog.waitFor({state:'hidden'});
+        s.store.packetDownloadFails=false;
+        const downloading=s.page.waitForEvent('download');await s.page.getByRole('button',{name:'Download free packet',exact:true}).click();await downloading;
+        assert.equal(s.store.packetGenerated,1);assert.equal(s.store.checkoutRequests.length,0);assert.equal(s.store.signatureCalls,0);
     }finally{await s.close();}
 });

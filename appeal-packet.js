@@ -1,7 +1,7 @@
 import { requirements, preparationProblems, evidenceCategories, OFFICIAL_FORM } from './packet-requirements.js?v=20261103-checkout-download';
 import { authFetch, onAuthUserChanged } from './auth-client.js?v=20261103-checkout-download';
 import { singleFamilyEligibility } from './packet-scope.js?v=20261103-checkout-download';
-import { mountAppealQuestions } from './appeal-questions.js?v=20261103-question-cards';
+import { mountAppealQuestions } from './appeal-questions.js?v=20261103-question-cards-final';
 
 const labels = { intake: 'Your information', preparing: 'Preparing packet', review: 'Review packet', approved: 'Download or choose fulfillment', awaiting_signature: 'Awaiting signatures', signed: 'Signed', mailed: 'Mailed', delivered: 'Delivered by carrier', filed: 'County filing confirmed' };
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -294,9 +294,16 @@ function createQuestionController(host) {
         async saveIntake(answers){await post({...answers,action:'intake',agency:'assessor',taxYear:current.state.intake?.taxYear || current.state.taxYear,condo:false});return refresh();},
         async upload({file,...data}){await post({...data,action:'evidence'},file);return refresh();},
         async download(){active();await downloadFile(`/api/packet?id=${encodeURIComponent(id)}&download=preparation`,'assessor-preparation-copy.pdf');},
-        async generate(){await post({action:'generate'});await refresh();await downloadFile(`/api/packet?id=${encodeURIComponent(id)}&document=${encodeURIComponent(current.state.packetId)}`,'assessor-appeal.pdf');},
+        async generate(){
+            await post({action:'generate'});await refresh();
+            try {await downloadFile(`/api/packet?id=${encodeURIComponent(id)}&document=${encodeURIComponent(current.state.packetId)}`,'assessor-appeal.pdf');}
+            catch(error) {
+                if(revision===sessionRevision && id===selectedId){render();message(`Your PDF is saved. ${error.message} Use Download free packet to try again.`,true);document.querySelector('#free-packet-download button')?.focus();}
+                throw error;
+            }
+        },
         chooseProperty(){location.href='index.html#user-dashboard';},
-        finish(){if(revision===sessionRevision){render();message('Your answers and documents are saved.');}}
+        finish(){if(revision===sessionRevision){render();message('Your answers and documents are saved.');(document.getElementById('open-appeal-questions') || document.querySelector('#free-packet-download button'))?.focus();}}
     });
 }
 

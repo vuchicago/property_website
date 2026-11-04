@@ -58,6 +58,8 @@ Free-download regressions export a preparation-copy PDF while official templates
 
 Single-family tests reject out-of-scope records and checkout attempts. Official-form tests inspect/map synthetic fillable PDFs, preserve blank signatures, verify rendered owner/property values, reject missing fields and overlong text, and include photo-date attestations conditionally. The actual local Worker test imports a reusable template as administrator, rejects owner access to setup, saves intake, uploads personal correction evidence and generates/downloads the complete packet without an owner application upload. Browser tests cover one-time administrator setup, suggested comparisons, missing mailing fields, scope confirmation and retained downloads for older out-of-scope cases. Test templates are never published to Production.
 
+Guided-card checks cover saved-property auto-opening, mobile dialog bounds, keyboard closing and focus restoration, prefilled comparisons and contact details, conditional rental/purchase evidence, upload progression, save failures and retries, and resuming after reload. The final Download PDF button is exercised with both pending forms (preparation copy) and ready forms/evidence (complete assembled packet), without payment or signature-provider calls. Workflow and real Worker tests enforce owner-only draft updates, field whitelisting, stale-revision rejection, and unchanged packet approval/version while saving answers.
+
 With Wrangler installed, compile the API bundle locally:
 
 ```bash

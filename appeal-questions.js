@@ -19,7 +19,7 @@ export function mountAppealQuestions(host,initial,callbacks) {
     const dialog=document.createElement('dialog');dialog.className='appeal-question-dialog';dialog.setAttribute('aria-labelledby','appeal-question-title');
     host.append(dialog);
     const projected=()=>({...data.state,intake:{...answers,taxYear:data.state.intake?.taxYear || data.state.taxYear}});
-    const docRows=()=>requirements(projected()).filter(row=>!row.providedBy && row.id!=='notice');
+    const docRows=()=>requirements(projected()).filter(row=>!row.providedBy || (row.id==='notice' && !row.done && !data.state.propertySnapshot?.details));
     const steps=()=>{
         const list=['property','ownership','existing','occupancy','contact','mailing','reason','value'];
         if(answers.reason==='uniformity')list.push('comparisons');
@@ -62,9 +62,9 @@ export function mountAppealQuestions(host,initial,callbacks) {
     }
     function reviewMarkup() {
         const reason={uniformity:'Similar properties',overvaluation:'Market value',characteristics:'Property details'}[answers.reason] || '';
-        const forms=data.officialForms || [],pending=!forms.length || forms.some(form=>!form.ready);
+        const forms=data.officialForms || [],pending=!forms.length || forms.some(form=>!form.ready || form.missingValues?.length);
         const incomplete=preparationProblems(projected());
-        return `<dl class="question-review">${[['Property',snapshot.address || data.appeal.property_address,'property'],['Owner',answers.ownerName,'contact'],['Grounds',reason,'reason'],['Requested value',Number(answers.requestedMarketValue).toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}),'value']].map(([label,value,step])=>`<div><dt>${label}</dt><dd>${esc(value)} <button type="button" class="question-text-button" data-edit-step="${step}">Edit</button></dd></div>`).join('')}</dl><h3>Documents to review and sign</h3><ul>${forms.map(form=>`<li>${esc(form.title)}${form.ready?' — included when complete':' — preparation desk is obtaining it'}</li>`).join('') || '<li>Official Assessor application — supplied by the preparation desk</li>'}</ul><p>Applicable official forms are appended to the PDF with signature blocks left for you. Standard DocuSign does not notarize.</p>${pending?'<p class="question-notice">Official form setup is still in progress. You can download your preparation copy now; its cover lists missing items and marks it not ready to file.</p>':''}${incomplete.length?`<details><summary>Still needed for a filing packet</summary><ul>${incomplete.map(item=>`<li>${esc(item)}</li>`).join('')}</ul></details>`:''}<button type="button" class="btn btn-primary" id="question-download">Download PDF</button>${!pending && !incomplete.length?'<button type="button" class="btn btn-secondary" id="question-build">Build complete packet and download</button>':''}<p class="packet-muted">Downloads are free. Payment is only for optional signing, printing and mailing.</p>`;
+        return `<dl class="question-review">${[['Property',snapshot.address || data.appeal.property_address,'property'],['Owner',answers.ownerName,'contact'],['Grounds',reason,'reason'],['Requested value',Number(answers.requestedMarketValue).toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}),'value']].map(([label,value,step])=>`<div><dt>${label}</dt><dd>${esc(value)} <button type="button" class="question-text-button" data-edit-step="${step}">Edit</button></dd></div>`).join('')}</dl><h3>Documents to review and sign</h3><ul>${forms.map(form=>`<li>${esc(form.title)}${form.ready?' — included when complete':' — preparation desk is obtaining it'}</li>`).join('') || '<li>Official Assessor application — supplied by the preparation desk</li>'}</ul><p>Applicable official forms are appended to the PDF with signature blocks left for you. Standard DocuSign does not notarize.</p>${pending?'<p class="question-notice">Official form setup is still in progress. You can download your preparation copy now; its cover lists missing items and marks it not ready to file.</p>':''}${incomplete.length?`<details><summary>Still needed for a filing packet</summary><ul>${incomplete.map(item=>`<li>${esc(item)}</li>`).join('')}</ul></details>`:''}<button type="button" class="btn btn-primary" id="${!pending && !incomplete.length?'question-build':'question-download'}">Download PDF</button><p class="packet-muted">Downloads are free. Payment is only for optional signing, printing and mailing.</p>`;
     }
     function collect() {
         for(const el of dialog.querySelectorAll('[name]')) {
@@ -75,14 +75,14 @@ export function mountAppealQuestions(host,initial,callbacks) {
     }
     const error=text=>{const el=dialog.querySelector('#question-error');if(el){el.textContent=text;el.focus();}};
     async function task(action) {
-        if(busy)return;busy=true;for(const button of dialog.querySelectorAll('button'))button.disabled=true;
+        if(busy)return;busy=true;dialog.setAttribute('aria-busy','true');for(const button of dialog.querySelectorAll('button,input,select,textarea'))button.disabled=true;
         try{await action();}catch(cause){error(cause.message || 'Could not save. Your answers are kept on this card. Try again.');}
-        finally{busy=false;for(const button of dialog.querySelectorAll('button'))button.disabled=false;}
+        finally{busy=false;dialog.removeAttribute('aria-busy');for(const button of dialog.querySelectorAll('button,input,select,textarea'))button.disabled=false;}
     }
     async function persist(step) {await callbacks.saveDraft(cleanAnswers(),step);}
     async function advance() {
         const screen=content();collect();
-        if(!screen.upload && !dialog.querySelector('form').reportValidity())return;
+        if(!dialog.querySelector('form').reportValidity())return;
         if(['property','ownership','existing'].includes(active) && answers[screen.choice.key]!==true){error('This workflow needs the confirmed property, individual ownership and no conflicting appeal. Choose another answer or return to My account.');return;}
         if(active==='property' && !String(answers.pins).split(/[,;\n]+/).every(pin=>/^\d{14}$/.test(pin.replace(/[-\s]/g,'')))){error('Confirm each 14-digit property PIN before continuing.');return;}
         const list=steps(),following=list.slice(list.indexOf(active)+1);
@@ -90,9 +90,9 @@ export function mountAppealQuestions(host,initial,callbacks) {
             if(active==='condition' || (active==='attestation')) {data=await callbacks.saveIntake(cleanAnswers());hasSaved=true;}
             if(screen.upload) {
                 const file=dialog.querySelector('[name="file"]').files[0];
+                if(!file)throw new Error('Choose a file, or select Skip for now to finish this item later.');
                 if(file) {
                     if(file.size>15*1024*1024)throw new Error('Choose a file of at most 15 MB.');
-                    if(!dialog.querySelector('form').reportValidity())return;
                     const photoDate=dialog.querySelector('[name="photoDate"]')?.value;
                     if(screen.upload==='photo' && !photoDate)throw new Error('Enter the date the photo was taken.');
                     data=await callbacks.upload({category:dialog.querySelector('[name="evidenceCategory"]')?.value || screen.upload,file,photoDate,photoDateStamped:dialog.querySelector('[name="photoDateStamped"]')?.checked || false});
@@ -113,10 +113,12 @@ export function mountAppealQuestions(host,initial,callbacks) {
         dialog.querySelector('#question-done')?.addEventListener('click',()=>void close());
         dialog.querySelector('#question-back')?.addEventListener('click',()=>void task(async()=>{collect();const previous=list[index-1];await persist(previous);active=previous;render();}));
         for(const button of dialog.querySelectorAll('[data-choice]'))button.onclick=()=>{
-            const key=button.dataset.choice,raw=button.dataset.value;answers[key]=raw==='true'?true:raw==='false'?false:raw;
+            const key=button.dataset.choice,raw=button.dataset.value,previousReason=answers.reason;answers[key]=raw==='true'?true:raw==='false'?false:raw;
             if(key==='singleFamilyScope' && answers[key]===false){void task(async()=>{collect();await persist('property');dialog.close();callbacks.chooseProperty();});return;}
             if(key==='singleFamilyScope' && answers[key])answers.recordsConfirmed=true;
             if(key==='reason' && answers.reason!=='uniformity' && answers.explanation===uniformityDraft)answers.explanation='';
+            if(key==='reason' && answers.reason!=='uniformity')answers.selectedComparables=[];
+            if(key==='reason' && answers.reason==='uniformity' && previousReason && previousReason!=='uniformity')answers.selectedComparables=(snapshot.comparables || []).slice(0,5).map(item=>String(item.pin));
             if(key==='recentSale' && !answers.recentSale)for(const field of ['purchaseDate','purchasePrice','sellerName','saleRelationship'])delete answers[field];
             void advance();
         };
