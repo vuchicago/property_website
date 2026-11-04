@@ -87,8 +87,9 @@ for(const preparationCopy of [false,true])test(`comparison exhibit excludes old 
 
 test('submission report renders implied values, a subject-plus-five landscape grid and real attachment page references',async()=>{
     const state=base();
+    state.service='assessor_self_service';
     state.propertySnapshot.details.townshipName='Niles';
-    const comparisons=Array.from({length:7},(_,n)=>({pin:String(n+2).padStart(14,'0'),address:`LOWER_${n}`,taxableValue:25000-n*100,homeSize:1400,yearBuilt:1965,classCode:'203'}));
+    const comparisons=Array.from({length:7},(_,n)=>({pin:String(n+2).padStart(14,'0'),address:`LOWER_${n}`,distanceMiles:(n+1)/10,taxableValue:25000-n*100,homeSize:1400,yearBuilt:1965,classCode:'203'}));
     state.propertySnapshot.comparables=[{pin:'higher',address:'EXCLUDED_HIGHER',taxableValue:40000},...comparisons];
     Object.assign(state.intake,{ownerPhone:'3125550100',mailingCity:'Chicago',mailingState:'IL',mailingZip:'60601',propertyCity:'Skokie',reason:'uniformity',explanation:'Similar homes are assessed lower.',selectedComparables:['higher',...comparisons.map(c=>c.pin)]});
     const source=await PDFDocument.create();source.addPage([300,400]);const bytes=await source.save();
@@ -100,7 +101,7 @@ test('submission report renders implied values, a subject-plus-five landscape gr
         let content;try{content=Buffer.from(decodePDFRawStream(object).decode()).toString();}catch{return[];}
         return [...content.matchAll(/<([a-f0-9]+)>/ig)].map(match=>Buffer.from(match[1],'hex').toString());
     }).join('\n');
-    for(const value of ['Current implied market value: $300,000','Requested fair market value: $200,000','Requested assessed value (10%): $20,000','Exhibit B - comparison grid','LOWER_0','LOWER_4','$250,000','Page 6','Page 7'])assert.ok(text.includes(value),value);
+    for(const value of ['Current implied market value: $300,000','Requested fair market value: $248,000','Requested assessed value (10%): $24,800','Distance from subject','0.10 mi','average implied market value of 5 selected comparisons = $248,000.00.','Exhibit B - comparison grid','LOWER_0','LOWER_4','$250,000','Page 6','Page 7'])assert.ok(text.includes(value),value);
     assert.doesNotMatch(text,/EXCLUDED_HIGHER|LOWER_5|LOWER_6|taxableValue|certifiedBuilding/);
-    assert.match(text,/not a complete market survey/);assert.match(text,/signature block/);
+    assert.match(text,/not a complete\s+market survey/);assert.match(text,/signature block/);
 });

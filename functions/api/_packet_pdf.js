@@ -2,10 +2,11 @@ import { PDFDocument, StandardFonts, rgb } from '../../assets/vendor/pdf-lib.esm
 import { preparationProblems } from '../../packet-requirements.js';
 import { prepareOfficialForms } from './_official_forms.js';
 import { singleFamilyEligibility } from '../../packet-scope.js';
-import { selectedAppealComparables, impliedMarketValue, impliedMarketValuePerSqft, RESIDENTIAL_ASSESSMENT_RATIO } from '../../packet-comparisons.js';
+import { selectedAppealComparables, comparisonAverageMarketValue, comparisonDistanceLabel, impliedMarketValue, impliedMarketValuePerSqft, RESIDENTIAL_ASSESSMENT_RATIO } from '../../packet-comparisons.js';
 
 export async function assemblePacket(state, appeal, storage, {preparationCopy=false}={}) {
     if(preparationCopy && state.questionnaire?.answers)state={...state,intake:{...state.intake,...state.questionnaire.answers,taxYear:state.intake?.taxYear || state.taxYear}};
+    if(state.service==='assessor_self_service' || state.intake?.requestedValueMethod==='comparison_average')state={...state,intake:{...state.intake,requestedMarketValue:comparisonAverageMarketValue(state)}};
     const problems=preparationProblems(state);
     if(singleFamilyEligibility(state.propertySnapshot?.details).eligible===false)throw Object.assign(new Error('Preparation downloads currently support single-family homes only.'),{status:400});
     if(!preparationCopy && problems.length) throw Object.assign(new Error(`Complete these items first: ${problems.join('; ')}`),{status:400});
@@ -72,13 +73,14 @@ export async function assemblePacket(state, appeal, storage, {preparationCopy=fa
         const subjectValue=impliedMarketValue(details.taxableValue);
         for(const [name,value] of [
             ['Address',p=>p.address],['PIN',p=>p.pin],['Township / neighborhood',p=>`${p.townshipName || 'Not available'} / ${p.neighborhoodCode || 'Not available'}`],
-            ['Property class',p=>p.classCode],['Building area (sq ft)',p=>p.homeSize],['Year built',p=>p.yearBuilt],['Bedrooms / bathrooms',p=>`${p.bedroomCount ?? '-'} / ${p.bathroomCount ?? '-'}`],['Construction',p=>p.masonryType],
+            ['Distance from subject',p=>p===properties[0]?'Reference':comparisonDistanceLabel(p,details)],['Property class',p=>p.classCode],['Building area (sq ft)',p=>p.homeSize],['Year built',p=>p.yearBuilt],['Bedrooms / bathrooms',p=>`${p.bedroomCount ?? '-'} / ${p.bathroomCount ?? '-'}`],['Construction',p=>p.masonryType],
             ['Implied market value',p=>money(impliedMarketValue(p.taxableValue))],['Implied value / sq ft',p=>money(impliedMarketValuePerSqft(p),2)],
             ['Below subject value',p=>p===properties[0]?'Reference':`${((1-impliedMarketValue(p.taxableValue)/subjectValue)*100).toFixed(1)}%`]
         ])row([name,...properties.map(value)]);
         y-=12;
         line('Calculation: implied market value = assessed value / 0.10 (Class 2 residential).',9);
-        line('Selection: lower assessed values only, retaining the imported similarity ranking. This filtered set is not a complete market survey or evidence of sale prices. No appraisal adjustments are made.',9);
+        line('Selection: lower assessed values only, using similarity-matched homes with street variety where available. Distances are straight-line miles. This filtered set is not a complete market survey or evidence of sale prices. No appraisal adjustments are made.',9);
+        if(state.service==='assessor_self_service' || i.requestedValueMethod==='comparison_average')line(`Requested value: average implied market value of ${comps.length} selected comparisons = ${money(comparisonAverageMarketValue(state),2)}.`,9);
         line('Verify the assessment year and characteristics, including land area, against current county records. Supply any required dated subject/comparable photos in the supporting evidence.',9);
     };
     const append=async doc=>{
@@ -124,7 +126,7 @@ export async function assemblePacket(state, appeal, storage, {preparationCopy=fa
     label('Grounds',({uniformity:'Lack of uniformity',overvaluation:'Overvaluation',characteristics:'Incorrect property characteristics'})[i.reason] || i.reason);
     y-=8;line('Owner statement',12,bold);line(supplied(i.explanation));
     if(i.recentSale) {line(`Purchase date: ${i.purchaseDate}`);line(`Purchase price: $${i.purchasePrice}`);line(`Seller: ${i.sellerName}`);line(`Buyer/seller relationship: ${i.saleRelationship}`);}
-    line(i.ownerName?'The taxpayer selected the grounds, requested value and supporting evidence. Review and sign all applicable official forms before submitting.':'Owner instructions are not complete. Save your appeal information before preparing a filing packet.');
+    line(i.ownerName?'The taxpayer selected the grounds and supporting evidence and reviews the requested value. Review and sign all applicable official forms before submitting.':'Owner instructions are not complete. Save your appeal information before preparing a filing packet.');
     if(state.propertySnapshot){fresh();heading('Exhibit A - subject property record','Imported county record | Owner review required');
         for(const [name,value] of [['Property',snapshot.address || appeal.property_address],['PINs',subjectPin],['Assessment year of appeal',year],['Township',details.townshipName],['Neighborhood code',details.neighborhoodCode],['Property class',details.classCode],['Building area (sq ft)',details.homeSize],['Year built',details.yearBuilt],['Bedrooms',details.bedroomCount],['Bathrooms',details.bathroomCount],['Construction',details.masonryType],['Last appeal year',details.lastAppealYear]])label(name,value);
         y-=8;line('Implied market value',12,bold);line(money(impliedMarketValue(details.taxableValue)),18,bold);

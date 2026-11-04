@@ -13,9 +13,9 @@ The main .gov pages returned HTTP 403 during direct retrieval; the Assessor's ow
 ## Report design
 
 1. Actual prefilled official application and applicable attestations, with signature blocks blank.
-2. Owner statement: property, all PINs, appeal year, township, contact details, current implied market value, owner's requested market/assessed value and grounds. The owner chooses the request; the system does not infer it from an average.
+2. Owner statement: property, all PINs, appeal year, township, contact details, current implied market value, requested market/assessed value and grounds. The self-service request is calculated as the arithmetic mean of the selected comps’ implied market values (assessed value / 0.10); the owner reviews it before signing.
 3. Exhibit A: human-readable subject characteristics, implied market value and value per building square foot, capture date and source limitations. Do not print database keys such as `taxableValue` as field labels.
-4. Exhibit B: landscape comparison grid with the subject alongside **up to five** selected comps. Include addresses, PINs, township/neighborhood, class, building area, year, bedrooms/baths, construction, implied market value, value per square foot and percentage below the subject.
+4. Exhibit B: landscape comparison grid with the subject alongside **up to five** selected comps. Include addresses, PINs, straight-line distances from the subject, township/neighborhood, class, building area, year, bedrooms/baths, construction, implied market value, value per square foot and percentage below the subject.
 5. Attachment/signature index with actual PDF page references, template source/revision and a reminder to complete the official signature/notary blocks.
 6. Original supporting PDF pages and dated color images. Generated report pages carry page numbers; official forms and uploaded pages are preserved.
 
@@ -26,3 +26,5 @@ Missing forms/evidence yield a clearly marked preparation copy. That copy does n
 ## Preview
 
 [Fictional preparation-copy PDF](examples/assessor-preparation-example.pdf). Rebuild with `node scripts/preview-assessor-packet.mjs`. It deliberately has no government templates or supporting photos and is marked not ready to file. It is not copied into the public deployment by the build script.
+
+Self-service suggestions retain only lower assessed values and prefer street variety among similarity-matched homes. Search expands up to five miles if fewer than five are available; show fewer rather than adding higher-valued or unmatched homes. Missing coordinates display “Distance unavailable.” Editable older drafts refresh once; approved and signed packets retain their captured records. No-comparison cases can download a preparation copy, with a completed filing packet blocked until the requested value and evidence are available.

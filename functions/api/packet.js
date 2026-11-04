@@ -7,6 +7,7 @@ import { appealAccess } from './_appeal_access.js';
 import { packetMailingWindow, requireOpenMailingWindow } from './_packet_mailing.js';
 import { officialFormsStatus } from './_official_forms.js';
 import { checkoutAccess } from './_checkout_access.js';
+import { refreshComparisonSnapshot } from './_packet_preparation.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 const FILE_ACTIONS = new Set(['evidence', 'packet', 'signed_packet', 'certificate', 'mail', 'delivered', 'filed']);
@@ -104,6 +105,10 @@ export async function onRequest(context) {
         if (input.revision !== revision) return json({ error: 'This case changed. Refresh before saving.' }, 409);
         // Never accept a client-provided object key or document metadata.
         delete input.document;
+        if(input.action==='refresh_comparisons') {
+            if(!actor.isOwner || !['intake','preparing'].includes(state.status))return json({error:'Comparisons can only be refreshed while preparing your own appeal.'},400);
+            input.propertySnapshot=await refreshComparisonSnapshot(db,state.propertySnapshot);
+        }
         let bytes;
         if(input.action === 'generate') {
             if(!actor.isOwner || state.status !== 'preparing') return json({error:'Save your information before building the packet.'},400);
@@ -153,7 +158,7 @@ export async function onRequest(context) {
             db.prepare('INSERT OR IGNORE INTO appeal_packets (transaction_id, state_json) VALUES (?, ?)').bind(transactionId, JSON.stringify(initialPacket())),
             db.prepare('UPDATE appeal_packets SET state_json = ?, revision = revision + 1, last_event_id = ?, updated_at = CURRENT_TIMESTAMP WHERE transaction_id = ? AND revision = ? AND EXISTS (SELECT 1 FROM appeals WHERE transaction_id = ? AND payment_status = ?)' + fulfillmentGuard + signingGuard).bind(JSON.stringify(next), eventId, transactionId, revision, transactionId, free ? 'free' : 'paid')
         ];
-        if(input.action!=='questionnaire')statements.push(db.prepare('INSERT INTO appeal_packet_events (id, transaction_id, actor_id, action, status) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM appeal_packets WHERE transaction_id = ? AND last_event_id = ?)').bind(eventId, transactionId, user.uid, input.action, next.status, transactionId, eventId));
+        if(!['questionnaire','refresh_comparisons'].includes(input.action))statements.push(db.prepare('INSERT INTO appeal_packet_events (id, transaction_id, actor_id, action, status) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM appeal_packets WHERE transaction_id = ? AND last_event_id = ?)').bind(eventId, transactionId, user.uid, input.action, next.status, transactionId, eventId));
         const result = await db.batch(statements);
         if (!result[1].meta?.changes) return json({ error: 'The case or payment changed. Refresh before saving.' }, 409);
         committed = true;

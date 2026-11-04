@@ -1,6 +1,6 @@
 import { requireOpenMailingWindow } from './_packet_mailing.js';
 import { singleFamilyEligibility } from '../../packet-scope.js';
-import { lowerValuationComparables, MAX_APPEAL_COMPARISONS } from '../../packet-comparisons.js';
+import { lowerValuationComparables, suggestedAppealComparables, comparisonAverageMarketValue, MAX_APPEAL_COMPARISONS } from '../../packet-comparisons.js';
 
 export const initialPacket = () => ({ status: 'intake', version: 0, documents: [] });
 
@@ -32,6 +32,18 @@ export function transitionPacket(current, input, actor, now = new Date().toISOSt
         return doc.id;
     };
     switch (input.action) {
+        case 'refresh_comparisons': {
+            owner();at('intake','preparing');
+            requireCondition(input.propertySnapshot?.comparisonVersion,'Comparison data is unavailable.');
+            next.propertySnapshot=input.propertySnapshot;
+            const selected=suggestedAppealComparables(next.propertySnapshot).map(item=>String(item.pin));
+            const value=comparisonAverageMarketValue({...next,intake:{selectedComparables:selected}});
+            for(const answers of [next.intake,next.questionnaire?.answers].filter(Boolean)) {
+                answers.selectedComparables=selected;
+                if(value===null)delete answers.requestedMarketValue;else answers.requestedMarketValue=value;
+            }
+            break;
+        }
         case 'questionnaire': {
             owner(); at('intake','preparing');
             requireCondition(input.answers && typeof input.answers==='object' && !Array.isArray(input.answers),'Provide questionnaire answers.');
@@ -60,15 +72,24 @@ export function transitionPacket(current, input, actor, now = new Date().toISOSt
             if(current.taxYear) requireCondition(input.taxYear === current.taxYear, 'Start a separate workspace for a different assessment year.');
             requireCondition(['uniformity', 'overvaluation', 'characteristics'].includes(input.reason), 'Select a reason for appeal.');
             if(actor.freePacket || current.service==='assessor_self_service') requireCondition(input.singleFamilyScope===true && input.condo!==true && singleFamilyEligibility(current.propertySnapshot?.details).eligible!==false,'This workflow supports single-family homes with one dwelling unit only.');
+            const automaticValue=actor.freePacket || current.service==='assessor_self_service';
+            if(automaticValue) {
+                const selected=input.selectedComparables ?? suggestedAppealComparables(current.propertySnapshot).map(item=>String(item.pin));
+                const allowed=new Set(lowerValuationComparables(current.propertySnapshot).map(item=>String(item.pin)));
+                requireCondition(Array.isArray(selected) && selected.length<=MAX_APPEAL_COMPARISONS && selected.every(pin=>allowed.has(pin)),'Choose up to five lower-valued comparisons.');
+                const value=comparisonAverageMarketValue({...current,intake:{selectedComparables:selected}});
+                input={...input,selectedComparables:selected,requestedMarketValue:value ?? undefined};
+            }
             next.intake = { agency: input.agency, taxYear: input.taxYear, ownerName: field(input.ownerName, 'Legal owner name', 200), mailingAddress: field(input.mailingAddress, 'Owner mailing address'), reason: input.reason, explanation: field(input.explanation, 'Explanation', 10000), individualOwner: true, noExistingAppeal: true, confirmedAt: now };
+            if(automaticValue)next.intake.requestedValueMethod='comparison_average';
             if(input.singleFamilyScope===true)next.intake.singleFamilyScope=true;
-            if (input.requestedMarketValue !== undefined) {
-                requireCondition(Number.isFinite(input.requestedMarketValue) && input.requestedMarketValue > 0 && input.requestedMarketValue <= 1e10, 'Enter a valid requested fair market value.');
+            if (automaticValue || input.requestedMarketValue !== undefined) {
+                requireCondition((automaticValue && input.requestedMarketValue===undefined) || (Number.isFinite(input.requestedMarketValue) && input.requestedMarketValue > 0 && input.requestedMarketValue <= 1e10), 'Enter a valid requested fair market value.');
                 requireCondition(input.singleFamilyScope === true && input.condo !== true && singleFamilyEligibility(current.propertySnapshot?.details).eligible!==false, 'This workflow supports single-family homes with one dwelling unit only.');
                 next.intake.singleFamilyScope = true;
                 requireCondition(typeof input.ownResidence === 'boolean', 'Confirm whether you live at this property.');
                 requireCondition(input.recordsConfirmed === true, 'Verify the imported data against your current assessment record.');
-                next.intake.requestedMarketValue = input.requestedMarketValue;
+                if(input.requestedMarketValue!==undefined)next.intake.requestedMarketValue = input.requestedMarketValue;
                 next.intake.pins = field(input.pins, 'All property PINs', 500);
                 requireCondition(next.intake.pins.split(/[,;\n]+/).every(pin=>pin.replace(/[-\s]/g,'').match(/^\d{14}$/)), 'Enter each 14-digit PIN, separated by commas.');
                 for(const key of ['ownResidence','recentSale','appraisal','condo','damage','affidavit','documentsReviewed','recordsConfirmed']) next.intake[key] = input[key] === true;

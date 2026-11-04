@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lowerValuationComparables, selectedAppealComparables, impliedMarketValue, impliedMarketValuePerSqft } from '../packet-comparisons.js';
+import { lowerValuationComparables, selectedAppealComparables, impliedMarketValue, impliedMarketValuePerSqft, suggestedAppealComparables, comparisonAverageMarketValue, comparisonDistance, comparisonDistanceLabel } from '../packet-comparisons.js';
 import { requirements } from '../packet-requirements.js';
 import { transitionPacket } from '../functions/api/_packet_workflow.js';
 
@@ -63,4 +63,34 @@ test('both intake and draft updates reject more than five comparisons',()=>{
     assert.throws(()=>transitionPacket(state,{action:'questionnaire',step:'comparisons',answers:{selectedComparables}},actor),/up to five/);
     const intake={action:'intake',agency:'assessor',taxYear:2026,ownerName:'Test Owner',mailingAddress:'123 Owner St',reason:'uniformity',explanation:'Comparable homes are assessed lower.',individualOwner:true,noExistingAppeal:true,requestedMarketValue:200000,singleFamilyScope:true,ownResidence:true,recordsConfirmed:true,pins:'00000000000001',selectedComparables};
     assert.throws(()=>transitionPacket(state,intake,actor),/up to five/);
+});
+
+
+test('suggestions vary streets among matched lower-valued homes and deduplicate PINs',()=>{
+    const rows=[...Array.from({length:5},(_,n)=>({...comp(String(n),20000+n*100),address:`${n+1} A AVE`})),{...comp('b',21000),address:'1 B AVE'},{...comp('c',22000),address:'1 C AVE'},comp('higher',40000)];
+    const s={details:{taxableValue:30000},comparables:[...rows,rows[0]]};
+    assert.deepEqual(suggestedAppealComparables(s).map(c=>c.pin),['0','b','c','1','2']);
+    assert.equal(suggestedAppealComparables(s,20).length,7);
+    assert.equal(comparisonAverageMarketValue({propertySnapshot:s,intake:{selectedComparables:['0','b','c','higher']}}),210000);
+    assert.equal(comparisonAverageMarketValue({propertySnapshot:s,intake:{selectedComparables:[]}}),null);
+});
+
+test('distances use provided miles or valid coordinates and never substitute missing values with zero',()=>{
+    assert.equal(comparisonDistanceLabel({distanceMiles:.126},{}),'0.13 mi');
+    assert.equal(comparisonDistanceLabel({},{}),'Distance unavailable');
+    assert.equal(comparisonDistance({latitude:42,longitude:-87.7},{latitude:42,longitude:-87.7}),0);
+    const miles=comparisonDistance({latitude:42.01,longitude:-87.7},{latitude:42,longitude:-87.7});
+    assert.ok(miles>.68 && miles<.70);
+    assert.equal(comparisonDistance({latitude:200,longitude:-87.7},{latitude:42,longitude:-87.7}),null);
+});
+
+test('self-service intake calculates the request on the server and supports preparation with no comps',()=>{
+    const state={status:'intake',version:0,documents:[],service:'assessor_self_service',propertySnapshot:snapshot()};
+    const input={action:'intake',agency:'assessor',taxYear:2026,ownerName:'Test Owner',mailingAddress:'123 Owner St',reason:'uniformity',explanation:'Comparable homes are assessed lower.',individualOwner:true,noExistingAppeal:true,requestedMarketValue:1,singleFamilyScope:true,ownResidence:true,recordsConfirmed:true,pins:'00000000000001',selectedComparables:['lower']};
+    const actor={isOwner:true,uid:'owner',freePacket:true};
+    const next=transitionPacket(state,input,actor);
+    assert.equal(next.intake.requestedMarketValue,200000);
+    assert.equal(next.intake.requestedValueMethod,'comparison_average');
+    assert.equal(transitionPacket(state,{...input,selectedComparables:[]},actor).intake.requestedMarketValue,undefined);
+    assert.throws(()=>transitionPacket({...state,status:'approved'},{action:'refresh_comparisons',propertySnapshot:{...snapshot(),comparisonVersion:'new'}},actor),/current stage/);
 });

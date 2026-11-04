@@ -108,7 +108,7 @@ test('free preparation remains editable without payment, while signing and maili
     const environment=env();const original=environment.DB.prepare;
     environment.DB.prepare=sql=>{if(sql.includes('FROM appeal_pilot_access'))return {bind(){return this;},async first(){return {active:1};}};if(sql.includes('FROM appeals '))return {bind(){return this;},async first(){return {transaction_id:'free_test',customer_id:'owner',payment_status:'free'};}};return original(sql);};
     const req=async input=>new Request('https://example.com/api/packet?id=free_test',{method:'POST',headers:{Authorization:`Bearer ${await token('owner')}`,'Content-Type':'application/json'},body:JSON.stringify(input)});
-    const intake={action:'intake',revision:0,agency:'assessor',singleFamilyScope:true,taxYear:2026,ownerName:'Owner',mailingAddress:'123 Test',reason:'uniformity',explanation:'My facts',individualOwner:true,noExistingAppeal:true};
+    const intake={action:'intake',revision:0,agency:'assessor',singleFamilyScope:true,taxYear:2026,ownerName:'Owner',mailingAddress:'123 Test',reason:'uniformity',explanation:'My facts',individualOwner:true,noExistingAppeal:true,ownResidence:true,recordsConfirmed:true,pins:'00000000000001'};
     assert.equal((await onRequest({request:await req(intake),env:environment})).status,200);
     assert.equal((await onRequest({request:await req({action:'request_signature',revision:0}),env:environment})).status,400);
     assert.equal((await onRequest({request:await req({action:'mail',revision:0}),env:environment})).status,402);

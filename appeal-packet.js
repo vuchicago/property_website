@@ -1,8 +1,8 @@
 import { requirements, preparationProblems, evidenceCategories, OFFICIAL_FORM } from './packet-requirements.js?v=20261103-market-report';
 import { authFetch, onAuthUserChanged } from './auth-client.js?v=20261103-checkout-download';
 import { singleFamilyEligibility } from './packet-scope.js?v=20261103-checkout-download';
-import { mountAppealQuestions } from './appeal-questions.js?v=20261103-early-photo';
-import { lowerValuationComparables, impliedMarketValue, MAX_APPEAL_COMPARISONS } from './packet-comparisons.js?v=20261103-market-report';
+import { mountAppealQuestions } from './appeal-questions.js?v=20261103-comparison-average';
+import { lowerValuationComparables, impliedMarketValue, MAX_APPEAL_COMPARISONS, COMPARISON_VERSION } from './packet-comparisons.js?v=20261103-comparison-average';
 
 const labels = { intake: 'Your information', preparing: 'Preparing packet', review: 'Review packet', approved: 'Download or choose fulfillment', awaiting_signature: 'Awaiting signatures', signed: 'Signed', mailed: 'Mailed', delivered: 'Delivered by carrier', filed: 'County filing confirmed' };
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -194,8 +194,14 @@ onAuthUserChanged(user => {
 
 async function load() {
     const revision = sessionRevision;
-    const data = await requestJSON(`/api/packet?id=${encodeURIComponent(selectedId)}`, {}, 'Could not load your appeal.');
+    let data = await requestJSON(`/api/packet?id=${encodeURIComponent(selectedId)}`, {}, 'Could not load your appeal.');
     if (revision !== sessionRevision) return;
+    if(data.isOwner && selectedId.startsWith('free_') && ['intake','preparing'].includes(data.state.status) && data.state.propertySnapshot?.comparisonVersion!==COMPARISON_VERSION) {
+        await requestJSON(`/api/packet?id=${encodeURIComponent(selectedId)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'refresh_comparisons',revision:data.revision})},'Could not refresh comparison data.');
+        if(revision!==sessionRevision)return;
+        data=await requestJSON(`/api/packet?id=${encodeURIComponent(selectedId)}`);
+        if(revision!==sessionRevision)return;
+    }
     current = data;
     if(data.packetId)selectedId=data.packetId;
     render();

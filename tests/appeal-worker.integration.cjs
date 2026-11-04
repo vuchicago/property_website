@@ -49,6 +49,8 @@ before(async () => {
     for (const statement of statements) await db.prepare(statement).run();
     await db.prepare("INSERT INTO appeal_pilot_access(email,invited_by) VALUES('owner@example.com','admin@example.com'),('stranger@example.com','admin@example.com')").run();
     await db.prepare("INSERT INTO property_addresses(id,pin,address,normalized_address,taxable_value,home_size,year_built,pin_proration_rate,township_name) VALUES(1,'00000000000001','123 TEST AVE SKOKIE','123 TEST AVE SKOKIE',21000,1450,1965,1,'Niles')").run();
+    await db.prepare("UPDATE property_addresses SET class_code='203',neighborhood_code='TEST',certified_land=5000,bedroom_count=3,bathroom_count=2,masonry_type=1,single_vs_multi_family=1,latitude=42,longitude=-87.7 WHERE id=1").run();
+    for(let n=0;n<5;n++)await db.prepare("INSERT INTO property_addresses(id,pin,address,normalized_address,taxable_value,home_size,year_built,pin_proration_rate,township_name,class_code,neighborhood_code,certified_land,bedroom_count,bathroom_count,masonry_type,single_vs_multi_family,latitude,longitude) VALUES(?,?,?,?,?,1450,1965,1,'Niles','203','TEST',5000,3,2,1,1,?,-87.7)").bind(500+n,String(500+n).padStart(14,'0'),`${n+1} MATCH AVE`,`${n+1} MATCH AVE`,19000+n*200,42+(n+1)*.001).run();
     await db.prepare("INSERT INTO property_addresses(id,pin,address,normalized_address,taxable_value,home_size,year_built,pin_proration_rate) VALUES(2,'00000000000002','125 TEST AVE SKOKIE','125 TEST AVE SKOKIE',22000,1500,1966,1)").run();
     await db.prepare("INSERT INTO user_addresses(id,customer_id,address,property_key,email) VALUES(7,'owner','123 TEST AVE SKOKIE','123 TEST AVE SKOKIE|pin:00000000000001','owner@example.com')").run();
     await db.prepare("WITH RECURSIVE entries(n) AS (SELECT 1000 UNION ALL SELECT n+1 FROM entries WHERE n<100999) INSERT INTO property_addresses(id,pin,address,normalized_address,taxable_value,pin_proration_rate) SELECT n,printf('%014d',n),printf('%d UNRELATED ST',n),printf('%d UNRELATED ST',n),10000,1 FROM entries").run();
@@ -87,6 +89,14 @@ test('local Worker loads saved properties, starts, opens, and resumes with 100,0
     assert.equal(data.appeal.payment_status, 'free');
     assert.equal(data.state.propertySnapshot.propertyId, 7);
     assert.equal(data.state.propertySnapshot.details.taxableValue, 21000);
+    const refreshed=await api(`/api/packet?id=${packetId}`,'owner',{action:'refresh_comparisons',revision:data.revision,propertySnapshot:{comparables:[{pin:'forged',taxableValue:1}]}});
+    assert.equal(refreshed.status,200,await refreshed.clone().text());
+    const fresh=(await (await api(`/api/packet?id=${packetId}`)).json()).state;
+    assert.equal(fresh.propertySnapshot.comparisonVersion,'lower-average-distance-v1');
+    assert.equal(fresh.propertySnapshot.comparables.length,5);
+    assert.ok(fresh.propertySnapshot.comparables.every(c=>c.pin!=='forged' && c.distanceMiles>0 && c.taxableValue<21000));
+    assert.equal(fresh.status,'intake');assert.equal(fresh.version,data.state.version);
+    assert.equal((await db.prepare("SELECT count(*) AS total FROM appeal_packet_events WHERE action='refresh_comparisons'").first()).total,0);
     const resumed = await api('/api/packet-start', 'owner', { propertyId: 7, taxYear: 2026 });
     assert.equal(resumed.status, 200);
     assert.equal((await resumed.json()).id, packetId);
@@ -191,7 +201,7 @@ test('local Worker saves intake without a deadline and preserves the packet afte
     const packet=await before.json();
     assert.equal(packet.mailingWindow.township,'Niles');
     assert.equal(packet.mailingWindow.opensOn,'2026-10-20');
-    const intake={action:'intake',revision:packet.revision,agency:'assessor',taxYear:2026,ownerName:'Test Owner',mailingAddress:'123 Test Ave',reason:'characteristics',explanation:'Incorrect area',individualOwner:true,noExistingAppeal:true,requestedMarketValue:200000,singleFamilyScope:true,ownResidence:true,recordsConfirmed:true,pins:'00000000000001',selectedComparables:[]};
+    const intake={action:'intake',revision:packet.revision,agency:'assessor',taxYear:2026,ownerName:'Test Owner',mailingAddress:'123 Test Ave',reason:'characteristics',explanation:'Incorrect area',individualOwner:true,noExistingAppeal:true,requestedMarketValue:200000,singleFamilyScope:true,ownResidence:true,recordsConfirmed:true,pins:'00000000000001',selectedComparables:packet.state.propertySnapshot.comparables.slice(0,5).map(c=>String(c.pin))};
     const saved=await api(`/api/packet?id=${packetId}`,'owner',intake);
     assert.equal(saved.status,200,await saved.clone().text());
     const unauthorized=await api('/api/addresses','stranger',{propertyId:7},{},'DELETE');
@@ -205,6 +215,8 @@ test('local Worker saves intake without a deadline and preserves the packet afte
     assert.equal(retained.status,200,await retained.clone().text());
     const data=await retained.json();
     assert.equal(data.state.intake.ownerName,'Test Owner');
+    assert.equal(data.state.intake.requestedMarketValue,194000);
+    assert.equal(data.state.intake.requestedValueMethod,'comparison_average');
     assert.equal(data.state.intake.filingDeadline,undefined);
     assert.equal(data.state.propertySnapshot.address,'123 TEST AVE SKOKIE');
     assert.equal((await db.prepare('SELECT count(*) AS total FROM appeals WHERE transaction_id=?').bind(packetId).first()).total,1);
@@ -250,7 +262,7 @@ test('administrator imports one reusable official-form template; owner builds th
     assert.equal(download.status,200);
     const pdf=await PDFDocument.load(await download.arrayBuffer());
     assert.match(pdf.getTitle(),/2026 Assessor appeal/);
-    assert.equal(pdf.getPageCount(),5);
+    assert.equal(pdf.getPageCount(),6);
     assert.equal(pdf.getForm().getFields().length,0);
     assert.equal((await db.prepare('SELECT count(*) AS total FROM packet_signatures').first()).total,0);
 });
