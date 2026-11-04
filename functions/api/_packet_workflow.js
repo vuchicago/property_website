@@ -1,5 +1,6 @@
 import { requireOpenMailingWindow } from './_packet_mailing.js';
 import { singleFamilyEligibility } from '../../packet-scope.js';
+import { lowerValuationComparables, MAX_APPEAL_COMPARISONS } from '../../packet-comparisons.js';
 
 export const initialPacket = () => ({ status: 'intake', version: 0, documents: [] });
 
@@ -42,8 +43,8 @@ export function transitionPacket(current, input, actor, now = new Date().toISOSt
                 else if(booleans.has(key)) {requireCondition(typeof value==='boolean','Choose yes or no.');answers[key]=value;}
                 else if(['requestedMarketValue','purchasePrice'].includes(key)) {requireCondition(value==='' || (Number.isFinite(value) && value>=0 && value<=1e10),'Enter a valid amount.');answers[key]=value;}
                 else if(key==='selectedComparables') {
-                    const allowed=new Set((current.propertySnapshot?.comparables || []).map(item=>String(item.pin)));
-                    requireCondition(Array.isArray(value) && value.length<=20 && value.every(pin=>typeof pin==='string' && allowed.has(pin)),'Choose comparisons from this property record.');answers[key]=[...new Set(value)];
+                    const allowed=new Set(lowerValuationComparables(current.propertySnapshot).map(item=>String(item.pin)));
+                    requireCondition(Array.isArray(value) && value.length<=MAX_APPEAL_COMPARISONS && value.every(pin=>typeof pin==='string' && allowed.has(pin)),'Choose up to five lower-valued comparisons from this property record.');answers[key]=[...new Set(value)];
                 } else requireCondition(false,'Unknown questionnaire field.');
             }
             requireCondition(typeof input.step==='string' && /^[a-z_:]{1,80}$/.test(input.step),'Choose a valid questionnaire step.');
@@ -82,8 +83,8 @@ export function transitionPacket(current, input, actor, now = new Date().toISOSt
                     next.intake.purchasePrice=Number(input.purchasePrice);
                 }
                 if(next.intake.purchaseDate)requireCondition(date(next.intake.purchaseDate,'Purchase date')<=today,'Purchase date cannot be in the future.');
-                const allowed = new Set((current.propertySnapshot?.comparables || []).map(c=>String(c.pin)));
-                requireCondition(Array.isArray(input.selectedComparables) && input.selectedComparables.every(pin=>allowed.has(pin)), 'Select comparisons from this property record.');
+                const allowed = new Set(lowerValuationComparables(current.propertySnapshot).map(c=>String(c.pin)));
+                requireCondition(Array.isArray(input.selectedComparables) && input.selectedComparables.length<=MAX_APPEAL_COMPARISONS && input.selectedComparables.every(pin=>allowed.has(pin)), 'Select up to five comparisons with a lower assessed value from this property record.');
                 next.intake.selectedComparables = [...new Set(input.selectedComparables)];
             }
             next.status = 'preparing';

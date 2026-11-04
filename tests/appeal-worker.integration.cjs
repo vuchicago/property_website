@@ -276,3 +276,37 @@ test('administrator payment test works with existing live Stripe configuration a
     const unauthorized=await api('/api/create-checkout-session','owner',{packetId,paymentTest:true,fulfillmentAccepted:true});
     assert.equal(unauthorized.status,403);
 });
+
+test('new appeal snapshots filter valuations before the 20-comparison limit',async()=>{
+    const insert=(id,value)=>db.prepare(`INSERT INTO property_addresses(id,pin,address,normalized_address,taxable_value,home_size,year_built,pin_proration_rate,township_name,class_code,neighborhood_code,certified_land,bedroom_count,bathroom_count,masonry_type,single_vs_multi_family,latitude,longitude)
+        VALUES(?,?,?,?,?,1400,1965,1,'Niles','203','LOWER_TEST',5000,3,2,'1','1',?,-87.7)`)
+        .bind(id,String(id).padStart(14,'0'),`${id} COMPARISON AVE`,`${id} COMPARISON AVE`,value,42+(id-200000)*0.00001);
+    await db.batch([insert(200000,30000),...Array.from({length:21},(_,n)=>insert(200001+n,40000)),...Array.from({length:3},(_,n)=>insert(200022+n,20000+n)),insert(200025,30000),insert(200026,null)]);
+    await db.prepare("INSERT INTO user_addresses(id,customer_id,address,property_key,email) VALUES(70,'owner','200000 COMPARISON AVE','200000 COMPARISON AVE|pin:00000000200000','owner@example.com')").run();
+    const start=await api('/api/packet-start','owner',{propertyId:70,taxYear:2026});
+    assert.equal(start.status,200,await start.clone().text());
+    const id=(await start.json()).id;
+    const packet=await (await api(`/api/packet?id=${id}`)).json();
+    assert.equal(packet.state.propertySnapshot.details.taxableValue,30000);
+    assert.deepEqual(packet.state.propertySnapshot.comparables.map(c=>c.pin),[200022,200023,200024].map(id=>String(id).padStart(14,'0')));
+    const invalid=await api(`/api/packet?id=${id}`,'owner',{action:'questionnaire',revision:packet.revision,step:'comparisons',answers:{selectedComparables:['00000000200001']}});
+    assert.equal(invalid.status,400,await invalid.clone().text());
+    const valid=await api(`/api/packet?id=${id}`,'owner',{action:'questionnaire',revision:packet.revision,step:'comparisons',answers:{selectedComparables:packet.state.propertySnapshot.comparables.map(c=>c.pin)}});
+    assert.equal(valid.status,200,await valid.clone().text());
+});
+
+test('a required property photo and capture date save before completed intake',async()=>{
+    await db.prepare("INSERT INTO user_addresses(id,customer_id,address,property_key,email) VALUES(71,'owner','123 TEST AVE SKOKIE','123 TEST AVE SKOKIE|pin:00000000000001','owner@example.com')").run();
+    // Use another year: the current-year case for this same owner/property is already in review.
+    const start=await api('/api/packet-start','owner',{propertyId:71,taxYear:2025});
+    assert.equal(start.status,200,await start.clone().text());const id=(await start.json()).id;
+    const packet=await (await api(`/api/packet?id=${id}`)).json();
+    const photo=new FormData();photo.set('data',JSON.stringify({action:'evidence',revision:packet.revision,category:'photo',photoDate:'2025-01-01',photoDateStamped:false}));
+    photo.set('file',new File([Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+yMJcAAAAASUVORK5CYII=','base64')],'front.png',{type:'image/png'}));
+    const uploaded=await api(`/api/packet?id=${id}`,'owner',photo);
+    assert.equal(uploaded.status,200,await uploaded.clone().text());
+    const after=await (await api(`/api/packet?id=${id}`)).json();
+    assert.equal(after.state.status,'intake');assert.equal(after.state.intake,undefined);assert.equal(after.state.version,0);
+    const saved=after.state.documents.find(doc=>doc.category==='photo');assert.equal(saved.photoDate,'2025-01-01');assert.equal(saved.dateStamped,false);
+    assert.ok(after.officialForms.some(form=>form.kind==='photo_attestation'));
+});

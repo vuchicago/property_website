@@ -1,4 +1,5 @@
 import { PDFDocument, PDFTextField, PDFCheckBox, PDFDropdown, PDFRadioGroup, PDFSignature, PDFName, StandardFonts } from '../../assets/vendor/pdf-lib.esm.min.js';
+import { impliedMarketValue, RESIDENTIAL_ASSESSMENT_RATIO } from '../../packet-comparisons.js';
 
 export const FORM_KINDS = {application:'Official Assessor appeal application',photo_attestation:'Official photo-date attestation',attestation:'Official attestation'};
 export const FORM_SOURCES = {application:'https://www.cookcountyassessoril.gov/form-document/residential-appeal-form',photo_attestation:'https://www.cookcountyassessoril.gov/forms',attestation:'https://www.cookcountyassessoril.gov/forms'};
@@ -63,7 +64,7 @@ export function officialFormValues(state, appeal = {}) {
     const i=state.intake || {},s=state.propertySnapshot || {},d=s.details || {};
     const pins=String(i.pins || s.pin || appeal.property_pin || '').split(/[,;\n]+/).map(pin=>pin.replace(/[-\s]/g,'')).filter(Boolean);
     const photo=(state.documents || []).find(doc=>doc.kind==='evidence'&&doc.category==='photo');
-    return {...i,taxYear:i.taxYear || state.taxYear,ownerEmail:appeal.customer_email || '',ownerPhone:i.ownerPhone || '',propertyAddress:s.address || appeal.property_address || '',propertyCity:i.propertyCity || d.city || '',propertyZip:i.propertyZip || d.zipCode || '',township:d.townshipName || '',primaryPin:pins[0] || '',allPins:pins.join(', '),classCode:d.classCode || '',assessedValue:d.taxableValue ?? '',estimatedMarketValue:d.taxableValue==null?'':d.taxableValue*10,requestedAssessedValue:i.requestedMarketValue==null?'':i.requestedMarketValue/10,
+    return {...i,taxYear:i.taxYear || state.taxYear,ownerEmail:appeal.customer_email || '',ownerPhone:i.ownerPhone || '',propertyAddress:s.address || appeal.property_address || '',propertyCity:i.propertyCity || d.city || '',propertyZip:i.propertyZip || d.zipCode || '',township:d.townshipName || '',primaryPin:pins[0] || '',allPins:pins.join(', '),classCode:d.classCode || '',assessedValue:d.taxableValue ?? '',estimatedMarketValue:impliedMarketValue(d.taxableValue) ?? '',requestedAssessedValue:i.requestedMarketValue==null?'':i.requestedMarketValue*RESIDENTIAL_ASSESSMENT_RATIO,
         reason:({uniformity:'Lack of uniformity',overvaluation:'Overvaluation',characteristics:'Incorrect property characteristics'})[i.reason] || '',singleFamily:true,owner:true,currentYearAppeal:true,residential:true,entireProperty:true,uniformity:i.reason==='uniformity',overvaluation:i.reason==='overvaluation',characteristics:i.reason==='characteristics',photoDate:photo?.photoDate || ''};
 }
 export function requiredOfficialForms(state) {

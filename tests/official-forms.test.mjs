@@ -2,12 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PDFDocument, PDFRawStream, decodePDFRawStream } from '../assets/vendor/pdf-lib.esm.min.js';
 import { singleFamilyEligibility } from '../packet-scope.js';
-import { officialFormsStatus, prepareOfficialForms, validateFormMapping, inspectOfficialForm, formManifestKey } from '../functions/api/_official_forms.js';
+import { officialFormsStatus, prepareOfficialForms, validateFormMapping, inspectOfficialForm, formManifestKey, officialFormValues } from '../functions/api/_official_forms.js';
 import { formFixture, fixtureStorage } from './official-form-fixtures.mjs';
 import { transitionPacket } from '../functions/api/_packet_workflow.js';
 
 const state=()=>({service:'assessor_self_service',taxYear:2026,status:'preparing',documents:[],propertySnapshot:{address:'123 TEST AVE',pin:'00000000000001',details:{classCode:'203',townshipName:'Niles'}},intake:{taxYear:2026,ownerName:'Test Owner',ownerPhone:'3125550100',mailingAddress:'99 Owner St',mailingCity:'Chicago',mailingState:'IL',mailingZip:'60601',propertyCity:'Skokie',pins:'00000000000001',requestedMarketValue:200000,reason:'uniformity',singleFamilyScope:true}});
 const appeal={customer_email:'owner@example.com',property_address:'123 TEST AVE'};
+test('official form values retain assessment fields and derive market values at the residential ratio',()=>{
+    const s=state();s.propertySnapshot.details.taxableValue=30000;
+    const values=officialFormValues(s,appeal);
+    assert.equal(values.assessedValue,30000);assert.equal(values.estimatedMarketValue,300000);assert.equal(values.requestedAssessedValue,20000);
+    s.propertySnapshot.details.taxableValue=null;assert.equal(officialFormValues(s,appeal).estimatedMarketValue,'');
+});
 function pdfText(pdf) {
     const chunks=[];
     for(const [,object] of pdf.context.enumerateIndirectObjects())if(object instanceof PDFRawStream) {

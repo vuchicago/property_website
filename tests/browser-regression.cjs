@@ -891,7 +891,7 @@ test('failed property deletion keeps the address and allows retry',async()=>{
 });
 
 test('guided appeal cards save the necessary answers without a deadline or calendar check',async()=>{
-    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles'},comparables:questionComparisons});
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles',taxableValue:30000},comparables:questionComparisons});
     try {
         await s.goto('/appeal-packet.html?id=free_fixture');
         assert.equal(await s.page.locator('form[data-action="intake"]').count(),0);
@@ -920,7 +920,7 @@ for (const status of ['upcoming','open','closed','unannounced']) {
 }
 
 test('cards prefill comparisons and ask only for missing contact details before free PDF download',async()=>{
-    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles'},officialForms:[{kind:'application',title:'Official Assessor application',ready:false,missingValues:[{source:'mailingCity',label:'Mailing city'},{source:'mailingState',label:'Mailing state'},{source:'mailingZip',label:'Mailing ZIP'}]}],comparables:questionComparisons});
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles',taxableValue:30000},officialForms:[{kind:'application',title:'Official Assessor application',ready:false,missingValues:[{source:'mailingCity',label:'Mailing city'},{source:'mailingState',label:'Mailing state'},{source:'mailingZip',label:'Mailing ZIP'}]}],comparables:questionComparisons});
     try {
         await s.goto('/appeal-packet.html?id=free_fixture');
         const dialog=await walkAppealCards(s,{mailing:{mailingCity:'Chicago',mailingState:'IL',mailingZip:'60601'}});
@@ -1016,7 +1016,7 @@ test('administrator can test the existing live Stripe checkout without treating 
     }finally{await s.close();}
 });
 
-const questionComparisons=[1,2,3,4,5].map(n=>({pin:String(n).padStart(14,'0'),address:`${n} Comparison Ave`,homeSize:1400,yearBuilt:1965}));
+const questionComparisons=[1,2,3,4,5].map(n=>({pin:String(n).padStart(14,'0'),address:`${n} Comparison Ave`,homeSize:1400,yearBuilt:1965,taxableValue:20000+n}));
 async function walkAppealCards(s,options={}) {
     const page=s.page,dialog=page.locator('dialog.appeal-question-dialog');
     if(!await dialog.isVisible())await page.getByRole('button',{name:/^(Start questions|Continue my appeal)$/}).click();
@@ -1027,6 +1027,14 @@ async function walkAppealCards(s,options={}) {
     await at('Is the property titled in your individual name?');await choose('individualOwner',true);
     await at('Is anyone already handling this appeal?');await choose('noExistingAppeal',true);
     await at('Do you live in this home?');await choose('ownResidence',!options.rental);
+    if(options.rental) {
+        await at('Dated front photo of your property');
+        assert.equal(s.store.intakes.length,0);
+        if(options.uploadPhoto) {
+            await dialog.locator('[name="file"]').setInputFiles({name:'front-photo.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+yMJcAAAAASUVORK5CYII=','base64')});
+            await dialog.locator('[name="photoDate"]').fill('2026-01-01');await dialog.getByRole('button',{name:'Save and continue',exact:true}).click();
+        }else await dialog.getByRole('button',{name:'Skip for now',exact:true}).click();
+    }
     await at('How should the Assessor contact you?');await dialog.locator('[name="ownerName"]').fill('Test Owner');await dialog.locator('[name="ownerPhone"]').fill('3125550100');await next();
     await at('What is your mailing address?');await dialog.locator('[name="mailingAddress"]').fill('99 Owner St');
     for(const [name,value] of Object.entries(options.mailing || {}))await dialog.locator(`[name="${name}"]`).fill(value);
@@ -1072,7 +1080,7 @@ test('question cards resume saved progress and preserve contact answers after re
 });
 
 test('cards branch into purchase and rental evidence without requiring unrelated documents',async()=>{
-    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles'},comparables:questionComparisons});
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles',taxableValue:30000},comparables:questionComparisons});
     try {
         await s.goto('/appeal-packet.html?id=free_fixture');
         await walkAppealCards(s,{rental:true,recentSale:true});
@@ -1085,7 +1093,7 @@ test('cards branch into purchase and rental evidence without requiring unrelated
 });
 
 test('a property link opens the first question card and mobile controls stay inside the viewport',async()=>{
-    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',width:390,propertyDetails:{classCode:'203',townshipName:'Niles'}});
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',width:390,propertyDetails:{classCode:'203',townshipName:'Niles',taxableValue:30000}});
     try {
         await s.goto('/appeal-packet.html?property=7');
         const dialog=s.page.locator('dialog.appeal-question-dialog');
@@ -1099,18 +1107,15 @@ test('a property link opens the first question card and mobile controls stay ins
 });
 
 test('evidence cards upload only the needed files and return to the PDF review card',async()=>{
-    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles'},comparables:questionComparisons});
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles',taxableValue:30000},comparables:questionComparisons});
     try {
-        await s.goto('/appeal-packet.html?id=free_fixture');const dialog=await walkAppealCards(s,{rental:true});
+        await s.goto('/appeal-packet.html?id=free_fixture');const dialog=await walkAppealCards(s,{rental:true,uploadPhoto:true});
         await dialog.getByRole('button',{name:'Back',exact:true}).click();await dialog.getByRole('heading',{name:'Comparable properties and supporting records',exact:true}).waitFor();
-        await dialog.getByRole('button',{name:'Back',exact:true}).click();await dialog.getByRole('heading',{name:'Dated front photo of your property',exact:true}).waitFor();
-        await dialog.locator('[name="file"]').setInputFiles({name:'front-photo.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+yMJcAAAAASUVORK5CYII=','base64')});
-        await dialog.locator('[name="photoDate"]').fill('2026-01-01');await dialog.getByRole('button',{name:'Save and continue',exact:true}).click();
-        await dialog.getByRole('heading',{name:'Comparable properties and supporting records',exact:true}).waitFor();
         await dialog.locator('[name="file"]').setInputFiles({name:'comparison-photos.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.7\nTest evidence fixture')});
         await dialog.getByRole('button',{name:'Save and continue',exact:true}).click();
         await dialog.getByRole('heading',{name:'Your packet is ready to review',exact:true}).waitFor();
         const photo=s.store.packetDocuments.find(doc=>doc.category==='photo');assert.equal(photo.photoDate,'2026-01-01');assert.equal(photo.dateStamped,false);
+        assert.equal(s.store.packetDocuments.filter(doc=>doc.category==='photo').length,1);
         assert.ok(s.store.packetDocuments.some(doc=>doc.category==='comparisons'));
         assert.equal(s.store.signatureCalls,0);
         await dialog.getByRole('button',{name:'Save and close',exact:true}).click();await dialog.waitFor({state:'hidden'});
@@ -1134,7 +1139,7 @@ test('a failed card save keeps the answer visible and can be retried',async()=>{
 });
 
 test('the final question card builds and downloads the complete packet when its forms and evidence are ready',async()=>{
-    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles'},comparables:questionComparisons,officialForms:[{kind:'application',title:'Official Assessor application',ready:true,missingValues:[]}]});
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles',taxableValue:30000},comparables:questionComparisons,officialForms:[{kind:'application',title:'Official Assessor application',ready:true,missingValues:[]}]});
     try {
         await s.goto('/appeal-packet.html?id=free_fixture');const dialog=await walkAppealCards(s);
         assert.equal(await dialog.getByRole('button',{name:'Download PDF',exact:true}).count(),1);
@@ -1147,7 +1152,7 @@ test('the final question card builds and downloads the complete packet when its 
 });
 
 test('a completed packet stays downloadable when its first card-flow download fails',async()=>{
-    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles'},comparables:questionComparisons,officialForms:[{kind:'application',title:'Official Assessor application',ready:true,missingValues:[]}]});
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles',taxableValue:30000},comparables:questionComparisons,officialForms:[{kind:'application',title:'Official Assessor application',ready:true,missingValues:[]}]});
     try {
         await s.goto('/appeal-packet.html?id=free_fixture');const dialog=await walkAppealCards(s);
         s.store.packetDownloadFails=true;await dialog.getByRole('button',{name:'Download PDF',exact:true}).click();
@@ -1156,5 +1161,84 @@ test('a completed packet stays downloadable when its first card-flow download fa
         s.store.packetDownloadFails=false;
         const downloading=s.page.waitForEvent('download');await s.page.getByRole('button',{name:'Download free packet',exact:true}).click();await downloading;
         assert.equal(s.store.packetGenerated,1);assert.equal(s.store.checkoutRequests.length,0);assert.equal(s.store.signatureCalls,0);
+    }finally{await s.close();}
+});
+
+test('comparison cards show only lower assessed values and remove disallowed older selections',async()=>{
+    const comparables=[...questionComparisons,{pin:'equal',address:'Equal Value St',taxableValue:30000},{pin:'higher',address:'Higher Value St',taxableValue:40000},{pin:'missing',address:'Missing Value St'}];
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',taxableValue:30000},comparables,questionnaire:{step:'comparisons',answers:{reason:'uniformity',selectedComparables:comparables.map(c=>c.pin)}}});
+    try {
+        await s.goto('/appeal-packet.html?id=free_fixture');await s.page.getByRole('button',{name:'Continue my appeal',exact:true}).click();
+        const dialog=s.page.locator('dialog.appeal-question-dialog');await dialog.getByRole('heading',{name:'Review your suggested comparisons',exact:true}).waitFor();
+        assert.equal(await dialog.locator('[name="selectedComparables"]').count(),5);
+        assert.equal(await dialog.locator('[name="selectedComparables"]:checked').count(),5);
+        assert.match(await dialog.textContent(),/\$300,000/);assert.match(await dialog.textContent(),/Implied market value \$200,010/);
+        assert.doesNotMatch(await dialog.textContent(),/Equal Value St|Higher Value St|Missing Value St/);
+        assert.equal(await dialog.getByRole('button',{name:'Show more comparisons',exact:true}).count(),0);
+        await dialog.getByRole('button',{name:'Continue',exact:true}).click();await dialog.getByRole('heading',{name:'What would you like the Assessor to know?',exact:true}).waitFor();
+        assert.deepEqual(s.store.questionnaire.answers.selectedComparables,questionComparisons.map(c=>c.pin));
+    }finally{await s.close();}
+});
+
+test('no eligible lower-value comparisons offers an upload without auto-selecting higher values',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',taxableValue:30000},comparables:[{pin:'higher',address:'Higher Value St',taxableValue:40000}],questionnaire:{step:'comparisons',answers:{reason:'uniformity',selectedComparables:['higher']}}});
+    try {
+        await s.goto('/appeal-packet.html?id=free_fixture');await s.page.getByRole('button',{name:'Continue my appeal',exact:true}).click();
+        const dialog=s.page.locator('dialog.appeal-question-dialog');await dialog.getByText('No comparisons with a lower assessed value are available. You can upload your own comparison exhibit in the evidence cards.',{exact:true}).waitFor();
+        assert.equal(await dialog.locator('[name="selectedComparables"]').count(),0);
+        await dialog.getByRole('button',{name:'Continue',exact:true}).click();await dialog.getByRole('heading',{name:'What would you like the Assessor to know?',exact:true}).waitFor();
+        assert.deepEqual(s.store.questionnaire.answers.selectedComparables,[]);
+    }finally{await s.close();}
+});
+
+test('top five suggestions display implied market values and require swapping before a sixth selection',async()=>{
+    const comparables=[{pin:'higher',address:'Higher Value St',taxableValue:40000},...questionComparisons,{pin:'sixth',address:'Sixth Lower Value St',taxableValue:21000}];
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',taxableValue:30000},comparables,questionnaire:{step:'comparisons',answers:{reason:'uniformity'}}});
+    try {
+        await s.goto('/appeal-packet.html?id=free_fixture');await s.page.getByRole('button',{name:'Continue my appeal',exact:true}).click();
+        const dialog=s.page.locator('dialog.appeal-question-dialog');await dialog.getByRole('heading',{name:'Review your suggested comparisons',exact:true}).waitFor();
+        assert.equal(await dialog.locator('[name="selectedComparables"]:checked').count(),5);
+        assert.match(await dialog.textContent(),/Implied market value \$200,010/);assert.doesNotMatch(await dialog.textContent(),/Higher Value St/);
+        await dialog.getByRole('button',{name:'Show more comparisons',exact:true}).click();
+        const sixth=dialog.locator('[name="selectedComparables"][value="sixth"]');await sixth.click();
+        assert.equal(await sixth.isChecked(),false);await dialog.getByRole('alert').getByText(/Choose up to five comparisons/).waitFor();
+        await dialog.locator(`[name="selectedComparables"][value="${questionComparisons[0].pin}"]`).uncheck();await sixth.check();
+        assert.equal(await dialog.locator('[name="selectedComparables"]:checked').count(),5);
+        await dialog.getByRole('button',{name:'Continue',exact:true}).click();await dialog.getByRole('heading',{name:'What would you like the Assessor to know?',exact:true}).waitFor();
+        assert.ok(s.store.questionnaire.answers.selectedComparables.includes('sixth'));
+    }finally{await s.close();}
+});
+
+test('required photo is an early card, needs a capture date, and survives reload before intake',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',questionnaire:{step:'occupancy',answers:{singleFamilyScope:true,recordsConfirmed:true,individualOwner:true,noExistingAppeal:true}}});
+    try {
+        await s.goto('/appeal-packet.html?id=free_fixture');await s.page.getByRole('button',{name:'Continue my appeal',exact:true}).click();
+        let dialog=s.page.locator('dialog.appeal-question-dialog');await dialog.locator('[data-choice="ownResidence"][data-value="false"]').click();
+        await dialog.getByRole('heading',{name:'Dated front photo of your property',exact:true}).waitFor();
+        assert.match(await dialog.locator('.question-progress').textContent(),/Card 5 of/);
+        await dialog.locator('[name="file"]').setInputFiles({name:'front.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+yMJcAAAAASUVORK5CYII=','base64')});
+        await dialog.getByRole('button',{name:'Save and continue',exact:true}).click();
+        await dialog.getByRole('alert').getByText('Enter the date the photo was taken.',{exact:true}).waitFor();
+        assert.equal(s.store.packetDocuments.some(doc=>doc.category==='photo'),false);
+        await dialog.locator('[name="photoDate"]').fill('2026-01-01');await dialog.getByRole('button',{name:'Save and continue',exact:true}).click();
+        await dialog.getByRole('heading',{name:'How should the Assessor contact you?',exact:true}).waitFor();
+        assert.equal(s.store.intakes.length,0);assert.equal(s.store.packetDocuments.find(doc=>doc.category==='photo').photoDate,'2026-01-01');
+        await s.page.reload();await s.page.getByRole('button',{name:'Continue my appeal',exact:true}).click();
+        dialog=s.page.locator('dialog.appeal-question-dialog');await dialog.getByRole('heading',{name:'How should the Assessor contact you?',exact:true}).waitFor();
+        assert.equal(s.store.packetDocuments.filter(doc=>doc.category==='photo').length,1);assert.equal(s.store.signatureCalls,0);
+    }finally{await s.close();}
+});
+
+test('a skipped early photo can be added from review without repeating the questionnaire',async()=>{
+    const s=await scenario({email:'tester@example.com',access:true,packetStatus:'intake',propertyDetails:{classCode:'203',townshipName:'Niles',taxableValue:30000},comparables:questionComparisons});
+    try {
+        await s.goto('/appeal-packet.html?id=free_fixture');const dialog=await walkAppealCards(s,{rental:true});
+        await dialog.getByRole('button',{name:'Add your property photo and date',exact:true}).click();
+        await dialog.getByRole('heading',{name:'Dated front photo of your property',exact:true}).waitFor();
+        await dialog.locator('[name="file"]').setInputFiles({name:'front.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+yMJcAAAAASUVORK5CYII=','base64')});
+        await dialog.locator('[name="photoDate"]').fill('2026-01-01');await dialog.getByRole('button',{name:'Save and continue',exact:true}).click();
+        await dialog.getByRole('heading',{name:'Your packet is ready to review',exact:true}).waitFor();
+        assert.equal(await dialog.getByRole('button',{name:'Add your property photo and date',exact:true}).count(),0);
+        assert.equal(s.store.packetDocuments.filter(doc=>doc.category==='photo').length,1);assert.equal(s.store.signatureCalls,0);
     }finally{await s.close();}
 });

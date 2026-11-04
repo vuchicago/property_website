@@ -1,7 +1,8 @@
-import { requirements, preparationProblems, evidenceCategories, OFFICIAL_FORM } from './packet-requirements.js?v=20261103-checkout-download';
+import { requirements, preparationProblems, evidenceCategories, OFFICIAL_FORM } from './packet-requirements.js?v=20261103-market-report';
 import { authFetch, onAuthUserChanged } from './auth-client.js?v=20261103-checkout-download';
 import { singleFamilyEligibility } from './packet-scope.js?v=20261103-checkout-download';
-import { mountAppealQuestions } from './appeal-questions.js?v=20261103-question-cards-final';
+import { mountAppealQuestions } from './appeal-questions.js?v=20261103-early-photo';
+import { lowerValuationComparables, impliedMarketValue, MAX_APPEAL_COMPARISONS } from './packet-comparisons.js?v=20261103-market-report';
 
 const labels = { intake: 'Your information', preparing: 'Preparing packet', review: 'Review packet', approved: 'Download or choose fulfillment', awaiting_signature: 'Awaiting signatures', signed: 'Signed', mailed: 'Mailed', delivered: 'Delivered by carrier', filed: 'County filing confirmed' };
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -270,6 +271,7 @@ function render() {
         saleToggle.addEventListener('change',syncSale);syncSale();
     }
     workspace.querySelectorAll('form[data-action]').forEach(el => el.addEventListener('submit', submit));
+    workspace.querySelectorAll('[name="selectedComparables"]').forEach(box=>box.addEventListener('change',()=>{if(workspace.querySelectorAll('[name="selectedComparables"]:checked').length>MAX_APPEAL_COMPARISONS){box.checked=false;message('Choose up to five comparisons. Uncheck one before choosing another.',true);}}));
     workspace.querySelectorAll('[data-remove]').forEach(el=>el.addEventListener('click',async()=>{el.disabled=true;try{const r=await authFetch(`/api/packet?id=${encodeURIComponent(selectedId)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'remove_evidence',documentId:el.dataset.remove,revision:current.revision})});const d=await r.json();if(!r.ok)throw new Error(d.error);await load();}catch(e){message(e.message,true);el.disabled=false;}}));
     workspace.querySelectorAll('[data-document]').forEach(el => el.addEventListener('click', () => download(el.dataset.document)));
     workspace.querySelector('#download-preparation-copy')?.addEventListener('click',async event=>{
@@ -389,10 +391,11 @@ async function download(id) {
 
 function propertySummary(snapshot) {
     const d=snapshot.details || {};
-    return `<section class="packet-card"><h2>1. Review your saved property</h2><p>${escape(snapshot.source)}</p><dl>${[['PINs',snapshot.pin],['Township',d.townshipName],['Class',d.classCode],['Building area',d.homeSize ? `${d.homeSize} sq ft`:null],['Year built',d.yearBuilt],['Imported value',money(d.taxableValue)],['Last appeal',d.lastAppealYear]].map(([label,value])=>`<dt>${label}</dt><dd>${escape(value??'Not available')}</dd>`).join('')}</dl>${snapshot.warning?`<p>${escape(snapshot.warning)}</p>`:''}</section>`;
+    return `<section class="packet-card"><h2>1. Review your saved property</h2><p>${escape(snapshot.source)}</p><dl>${[['PINs',snapshot.pin],['Township',d.townshipName],['Class',d.classCode],['Building area',d.homeSize ? `${d.homeSize} sq ft`:null],['Year built',d.yearBuilt],['Implied market value',money(impliedMarketValue(d.taxableValue))],['Last appeal',d.lastAppealYear]].map(([label,value])=>`<dt>${label}</dt><dd>${escape(value??'Not available')}</dd>`).join('')}</dl><p>Implied market value = assessed value ÷ 0.10 for Class 2 residential property.</p>${snapshot.warning?`<p>${escape(snapshot.warning)}</p>`:''}</section>`;
 }
 function comparisonChoices(snapshot,intake) {
-    return `<fieldset><legend>Your assessment comparisons</legend><p>We suggest up to five comparisons from the imported records. Review the selection and change it where needed. Uniformity claims need at least three comparisons; five are recommended. You may upload your own comparison exhibit instead.</p>${(snapshot.comparables||[]).map(c=>`<label class="packet-comparison"><input type="checkbox" name="selectedComparables" value="${escape(c.pin)}" ${(intake.selectedComparables || (snapshot.comparables || []).slice(0,5).map(item=>String(item.pin))).includes(String(c.pin))?'checked':''}><strong>${escape(c.address)}</strong><br>PIN ${escape(c.pin)} · Class ${escape(c.classCode)} · ${escape(c.homeSize??'?')} sq ft · Built ${escape(c.yearBuilt??'?')} · Imported value ${escape(money(c.taxableValue))}</label>`).join('')||'<p>No imported comparisons available. Upload your comparison exhibit with PINs and supporting records.</p>'}</fieldset>`;
+    const comparisons=lowerValuationComparables(snapshot),selected=(intake.selectedComparables || comparisons.map(item=>String(item.pin))).filter(pin=>comparisons.some(c=>String(c.pin)===pin)).slice(0,MAX_APPEAL_COMPARISONS);
+    return `<fieldset><legend>Your assessment comparisons</legend><p>Your property's implied market value is ${escape(money(impliedMarketValue(snapshot.details?.taxableValue)))}. We suggest up to five similar properties with lower assessed values. Uniformity claims need at least three comparisons; five are recommended. You may upload your own comparison exhibit instead.</p>${comparisons.map(c=>`<label class="packet-comparison"><input type="checkbox" name="selectedComparables" value="${escape(c.pin)}" ${selected.includes(String(c.pin))?'checked':''}><strong>${escape(c.address)}</strong><br>PIN ${escape(c.pin)} · Class ${escape(c.classCode)} · ${escape(c.homeSize??'?')} sq ft · Built ${escape(c.yearBuilt??'?')} · Implied market value ${escape(money(impliedMarketValue(c.taxableValue)))}</label>`).join('')||'<p>No comparisons with a lower assessed value are available. Upload your comparison exhibit with PINs and supporting records.</p>'}<p>Implied market value = assessed value ÷ 0.10. These are assessment comparisons, not sale prices; review similarity and meaningful differences.</p></fieldset>`;
 }
 function additionalOwnerFields(forms,intake) {
     const fields=new Map();

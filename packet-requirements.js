@@ -1,5 +1,6 @@
 // Shared by the browser and server. Upload presence is not county acceptance.
 import { singleFamilyEligibility } from './packet-scope.js?v=20261103-checkout-download';
+import { selectedAppealComparables } from './packet-comparisons.js?v=20261103-market-report';
 export const OFFICIAL_FORM = 'https://www.cookcountyassessoril.gov/form-document/residential-appeal-form';
 export const evidenceCategories = {
     application:'Official Assessor application — prepared for you', notice:'Assessment notice (only if needed to correct imported records)',
@@ -17,7 +18,7 @@ export function requirements(state) {
     ];
     const add=(id,detail,signature='No routine new signature or notarization')=>rows.push({id,title:evidenceCategories[id],detail,signature,done:has(id)});
     if(!p.ownResidence) add('photo','A rental is not your own residence. Include the dated front color photo required by the Assessor. Check its date against the assessment lien date.');
-    if(p.reason==='uniformity') rows.push({id:'comparisons',title:'Comparable properties and supporting records',detail:'Select at least three suitable properties or upload your own comparison exhibit. For a property you do not occupy, include required comparable front photos.',signature:'No routine new signature or notarization',done:(p.selectedComparables?.length>=3 || has('comparisons')) && (p.ownResidence || has('comparisons'))});
+    if(p.reason==='uniformity') rows.push({id:'comparisons',title:'Comparable properties and supporting records',detail:'Select at least three suitable lower-valued properties or upload your own comparison exhibit. For a property you do not occupy, include required comparable front photos.',signature:'No routine new signature or notarization',done:(selectedAppealComparables(state).length>=3 || has('comparisons')) && (p.ownResidence || has('comparisons'))});
     if(p.reason==='overvaluation') rows.push({id:'market',title:'Market-value evidence',detail:'Provide sale records, a complete appraisal, or a supported market-comparison exhibit. Assessment comparisons alone do not establish sale value.',signature:'Preserve existing author certifications',done:has('sale')||has('appraisal')||has('comparisons')});
     if(p.reason==='characteristics') add('corrections','Upload measurements, plans, photos or other records supporting each requested correction.');
     if(p.recentSale) add('sale','Include applicable contract, closing statement, deed and transfer records for a sale within the agency lookback period.');

@@ -5,7 +5,7 @@ import { assemblePacket } from '../functions/api/_packet_pdf.js';
 import { preparationProblems, requirements } from '../packet-requirements.js';
 import { transitionPacket } from '../functions/api/_packet_workflow.js';
 import { fixtureStorage } from './official-form-fixtures.mjs';
-const base = () => ({status:'preparing',version:0,propertySnapshot:{source:'Imported records; verify year',capturedAt:'2026-11-03',details:{homeSize:1400},comparables:[{pin:'12345678901234',address:'123 Test',homeSize:1400}]},intake:{ownerName:'Test Owner',mailingAddress:'123 Test',taxYear:2026,reason:'characteristics',explanation:'The county area is wrong. See measured plan.',requestedMarketValue:200000,pins:'12345678901234',recordsConfirmed:true,documentsReviewed:true,singleFamilyScope:true,ownResidence:true,selectedComparables:[]},documents:['application','notice','corrections'].map((category,n)=>({id:String(n),key:String(n),kind:'evidence',category,name:`${category}.pdf`,type:'application/pdf',size:100}))});
+const base = () => ({status:'preparing',version:0,propertySnapshot:{source:'Imported records; verify year',capturedAt:'2026-11-03',details:{homeSize:1400,taxableValue:30000},comparables:[{pin:'12345678901234',address:'123 Test',homeSize:1400,taxableValue:20000}]},intake:{ownerName:'Test Owner',mailingAddress:'123 Test',taxYear:2026,reason:'characteristics',explanation:'The county area is wrong. See measured plan.',requestedMarketValue:200000,pins:'12345678901234',recordsConfirmed:true,documentsReviewed:true,singleFamilyScope:true,ownResidence:true,selectedComparables:[]},documents:['application','notice','corrections'].map((category,n)=>({id:String(n),key:String(n),kind:'evidence',category,name:`${category}.pdf`,type:'application/pdf',size:100}))});
 test('rental and conditional evidence cannot be omitted from packet assembly',()=>{
     const s=base(); assert.deepEqual(preparationProblems(s),[]);
     s.intake.ownResidence=false;s.intake.appraisal=true;s.intake.affidavit=true;
@@ -36,7 +36,7 @@ test('missing or corrupt evidence fails instead of silently producing an incompl
 test('untrusted comparison IDs fail validation; evidence changes are blocked after review',()=>{
     const s=base(), actor={isOwner:true,uid:'owner'};
     const input={action:'intake',...s.intake,agency:'assessor',individualOwner:true,noExistingAppeal:true,selectedComparables:['forged']};
-    assert.throws(()=>transitionPacket(s,input,actor),/Select comparisons/);
+    assert.throws(()=>transitionPacket(s,input,actor),/Select .*comparisons/);
     assert.equal(transitionPacket(s,{...input,selectedComparables:['12345678901234']},actor).intake.selectedComparables.length,1);
     assert.equal(transitionPacket(s,{action:'remove_evidence',documentId:'1'},actor).documents.length,2);
     assert.throws(()=>transitionPacket({...s,status:'approved'},{action:'remove_evidence',documentId:'1'},actor),/current stage/);
@@ -60,4 +60,47 @@ test('free preparation copy downloads collected data before templates or evidenc
     assert.ok(pdf.getPageCount()>=4);
     assert.equal(state.version,0);assert.equal(state.status,'intake');assert.equal(state.documents.length,0);
     await assert.rejects(()=>assemblePacket(state,{property_address:'123 Test Ave'},storage),/Complete these items/);
+});
+
+for(const preparationCopy of [false,true])test(`comparison exhibit excludes old equal/higher/missing-value selections in ${preparationCopy?'preparation copies':'complete packets'}`,async()=>{
+    const state=base();
+    Object.assign(state.intake,{ownerPhone:'3125550100',mailingCity:'Chicago',mailingState:'IL',mailingZip:'60601',propertyCity:'Skokie',selectedComparables:['lower','equal','higher','missing']});
+    state.propertySnapshot.details.townshipName='Niles';
+    state.propertySnapshot.comparables=[
+        {pin:'lower',address:'LOWER VALUE AVENUE',taxableValue:20000},
+        {pin:'equal',address:'EQUAL VALUE AVENUE',taxableValue:30000},
+        {pin:'higher',address:'HIGHER VALUE AVENUE',taxableValue:40000},
+        {pin:'missing',address:'MISSING VALUE AVENUE',taxableValue:null}
+    ];
+    const source=await PDFDocument.create();source.addPage();const bytes=await source.save();
+    const storage=await fixtureStorage(async()=>({arrayBuffer:async()=>bytes}));
+    const pdf=await PDFDocument.load(await assemblePacket(state,{property_address:'123 Test',customer_email:'owner@example.com'},storage,{preparationCopy}));
+    const text=pdf.context.enumerateIndirectObjects().flatMap(([,object])=>{
+        if(!(object instanceof PDFRawStream))return[];
+        let content;try{content=Buffer.from(decodePDFRawStream(object).decode()).toString();}catch{return[];}
+        return [...content.matchAll(/<([a-f0-9]+)>/ig)].map(match=>Buffer.from(match[1],'hex').toString());
+    }).join('\n');
+    assert.match(text,/LOWER VALUE AVENUE/);
+    assert.doesNotMatch(text,/EQUAL VALUE AVENUE|HIGHER VALUE AVENUE|MISSING VALUE AVENUE/);
+    assert.deepEqual(state.intake.selectedComparables,['lower','equal','higher','missing']);
+});
+
+test('submission report renders implied values, a subject-plus-five landscape grid and real attachment page references',async()=>{
+    const state=base();
+    state.propertySnapshot.details.townshipName='Niles';
+    const comparisons=Array.from({length:7},(_,n)=>({pin:String(n+2).padStart(14,'0'),address:`LOWER_${n}`,taxableValue:25000-n*100,homeSize:1400,yearBuilt:1965,classCode:'203'}));
+    state.propertySnapshot.comparables=[{pin:'higher',address:'EXCLUDED_HIGHER',taxableValue:40000},...comparisons];
+    Object.assign(state.intake,{ownerPhone:'3125550100',mailingCity:'Chicago',mailingState:'IL',mailingZip:'60601',propertyCity:'Skokie',reason:'uniformity',explanation:'Similar homes are assessed lower.',selectedComparables:['higher',...comparisons.map(c=>c.pin)]});
+    const source=await PDFDocument.create();source.addPage([300,400]);const bytes=await source.save();
+    const pdf=await PDFDocument.load(await assemblePacket(state,{property_address:'123 Test',customer_email:'owner@example.com'},await fixtureStorage(async()=>({arrayBuffer:async()=>bytes}))));
+    assert.equal(pdf.getPageCount(),7);
+    assert.equal(pdf.getPages().filter(page=>page.getWidth()===792&&page.getHeight()===612).length,1);
+    const text=pdf.context.enumerateIndirectObjects().flatMap(([,object])=>{
+        if(!(object instanceof PDFRawStream))return[];
+        let content;try{content=Buffer.from(decodePDFRawStream(object).decode()).toString();}catch{return[];}
+        return [...content.matchAll(/<([a-f0-9]+)>/ig)].map(match=>Buffer.from(match[1],'hex').toString());
+    }).join('\n');
+    for(const value of ['Current implied market value: $300,000','Requested fair market value: $200,000','Requested assessed value (10%): $20,000','Exhibit B - comparison grid','LOWER_0','LOWER_4','$250,000','Page 6','Page 7'])assert.ok(text.includes(value),value);
+    assert.doesNotMatch(text,/EXCLUDED_HIGHER|LOWER_5|LOWER_6|taxableValue|certifiedBuilding/);
+    assert.match(text,/not a complete market survey/);assert.match(text,/signature block/);
 });

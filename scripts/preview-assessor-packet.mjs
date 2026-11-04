@@ -1,0 +1,10 @@
+// Fictional preparation-copy preview only; never publishes templates or contacts providers.
+import { writeFile } from 'node:fs/promises';
+import { assemblePacket } from '../functions/api/_packet_pdf.js';
+
+const comps=Array.from({length:5},(_,n)=>({pin:String(n+2).padStart(14,'0'),address:`${125+n*2} EXAMPLE AVE, SKOKIE, IL 60076`,taxableValue:29000-n*500,homeSize:1380+n*15,yearBuilt:1963+n,bedroomCount:3,bathroomCount:2,classCode:'203',townshipName:'Niles',neighborhoodCode:'EXAMPLE',masonryType:'Brick'}));
+const state={status:'preparing',version:0,taxYear:2026,documents:[],propertySnapshot:{address:'123 EXAMPLE AVE, SKOKIE, IL 60076',pin:'00000000000001',capturedAt:'2026-11-03',source:'FICTIONAL EXAMPLE ONLY. Values and characteristics are illustrative; these are not verified property records.',details:{taxableValue:32000,homeSize:1400,yearBuilt:1965,bedroomCount:3,bathroomCount:2,classCode:'203',townshipName:'Niles',neighborhoodCode:'EXAMPLE',masonryType:'Brick'},comparables:comps},intake:{agency:'assessor',taxYear:2026,ownerName:'Example Owner - FICTIONAL',ownerPhone:'312-555-0100',mailingAddress:'99 SAMPLE STREET',mailingCity:'Skokie',mailingState:'IL',mailingZip:'60076',pins:'00000000000001',reason:'uniformity',requestedMarketValue:285000,explanation:'I request review for lack of uniformity. The selected nearby properties have similar building areas, construction, ages and class codes. Their lower assessments imply lower market values at the residential 10% assessment level. I request the stated value based on the attached comparison grid. This narrative and all data in this example are fictional.',singleFamilyScope:true,recordsConfirmed:true,individualOwner:true,noExistingAppeal:true,ownResidence:false,selectedComparables:comps.map(c=>c.pin)}};
+const bytes=await assemblePacket(state,{property_address:state.propertySnapshot.address,customer_email:'example@example.invalid'},{get:async()=>null},{preparationCopy:true});
+const output=process.argv[2] || 'examples/assessor-preparation-example.pdf';
+await writeFile(output,bytes);
+console.log(`Fictional preparation-copy preview written to ${output}`);

@@ -60,6 +60,12 @@ Single-family tests reject out-of-scope records and checkout attempts. Official-
 
 Guided-card checks cover saved-property auto-opening, mobile dialog bounds, keyboard closing and focus restoration, prefilled comparisons and contact details, conditional rental/purchase evidence, upload progression, save failures and retries, and resuming after reload. The final Download PDF button is exercised with both pending forms (preparation copy) and ready forms/evidence (complete assembled packet), without payment or signature-provider calls. Workflow and real Worker tests enforce owner-only draft updates, field whitelisting, stale-revision rejection, and unchanged packet approval/version while saving answers.
 
+Early-photo checks place a required photo/date card immediately after occupancy, reject a missing capture date without losing the selected file, persist the photo before completed intake, resume after reload, avoid a second photo request, and return directly to review when adding a previously skipped photo. The actual Worker confirms the private upload and date-attestation requirement without changing the intake stage or packet version.
+
+Comparison regressions exclude equal, higher, missing and invalid assessed values from suggestions, saved selections, evidence completion and both PDF outputs. They cover older drafts and no qualifying matches. A real D1 snapshot test puts 21 higher-valued candidates ahead of lower-valued candidates to verify filtering precedes the snapshot limit.
+
+Report checks verify the 10% implied-market-value calculation, missing-value handling, consistent official-form fields, a subject-plus-five landscape grid, output filtering before the five-comp cap, signature reminders, actual attachment page references and preserved uploaded page dimensions. The browser prevents a sixth selection until an existing choice is removed. Generate the fictional, non-filing preview with `node scripts/preview-assessor-packet.mjs`; see [ASSESSOR_SUBMISSION_FORMAT.md](ASSESSOR_SUBMISSION_FORMAT.md).
+
 With Wrangler installed, compile the API bundle locally:
 
 ```bash

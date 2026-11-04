@@ -82,7 +82,7 @@ test('postal delivery remains distinct from county filing',()=>{
 });
 
 test('questionnaire progress saves partial answers without approving or submitting an appeal',()=>{
-    const initial={...initialPacket(),propertySnapshot:{comparables:[{pin:'00000000000001'}]}};
+    const initial={...initialPacket(),propertySnapshot:{details:{taxableValue:30000},comparables:[{pin:'00000000000001',taxableValue:20000}]}};
     const next=run(initial,{action:'questionnaire',step:'contact',answers:{singleFamilyScope:true,recordsConfirmed:true,individualOwner:true,ownerName:'Test Owner',requestedMarketValue:'',selectedComparables:['00000000000001']}},owner);
     assert.equal(next.status,'intake');assert.equal(next.version,0);assert.equal(next.intake,undefined);assert.equal(next.approval,undefined);
     assert.equal(JSON.parse(JSON.stringify(next)).questionnaire.step,'contact');
