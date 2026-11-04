@@ -62,6 +62,8 @@ Guided-card checks cover saved-property auto-opening, mobile dialog bounds, keyb
 
 Early-photo checks place a required photo/date card immediately after occupancy, reject a missing capture date without losing the selected file, persist the photo before completed intake, resume after reload, avoid a second photo request, and return directly to review when adding a previously skipped photo. The actual Worker confirms the private upload and date-attestation requirement without changing the intake stage or packet version.
 
+Submission-action checks cover the minimal draft card, adjacent Download Submission/Edit buttons on mobile and desktop, editing and rebuilding with retained answers/files and reset approval, retry after a failed Edit, and downloading the signed PDF while editing is locked. Drafts and revisions do not expose a stale packet as the current completed submission.
+
 Comparison regressions exclude equal, higher, missing and invalid assessed values from suggestions, saved selections, evidence completion and both PDF outputs. They cover older drafts and no qualifying matches. A real D1 snapshot test puts 21 higher-valued candidates ahead of lower-valued candidates to verify filtering precedes the snapshot limit.
 
 Report checks verify the 10% implied-market-value calculation, missing-value handling, consistent official-form fields, a subject-plus-five landscape grid, output filtering before the five-comp cap, signature reminders, actual attachment page references and preserved uploaded page dimensions. The browser prevents a sixth selection until an existing choice is removed. Generate the fictional, non-filing preview with `node scripts/preview-assessor-packet.mjs`; see [ASSESSOR_SUBMISSION_FORMAT.md](ASSESSOR_SUBMISSION_FORMAT.md).
