@@ -22,7 +22,7 @@ for(const form of document.querySelectorAll('form[data-inquiry-form]')) {
             const response=await fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});
             const data=await response.json().catch(()=>({}));if(!response.ok || data.success!==true)throw new Error(data.error || 'Your request could not be sent. Please try again.');
             form.reset();for(const choice of choices)choice.setAttribute('aria-pressed','false');
-            show(data.emailSent===false?'Request received. We will be in touch soon.':'Request sent. We will be in touch soon.',true);
+            show(data.emailSent===false?'Request received and saved. Email notification could not be sent. You do not need to submit again.':'Request sent. We will be in touch soon.',true);
         }catch(error){show(error.name==='AbortError'?'The request took too long. Please try again.':error.message || 'Your request could not be sent. Please try again.',false);}
         finally{clearTimeout(timeout);busy=false;form.removeAttribute('aria-busy');for(const control of controls)control.disabled=false;submit.textContent=original;}
     });

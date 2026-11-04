@@ -108,8 +108,9 @@ export async function sendNotificationEmail(env, email) {
                 return sendWithResend(env.RESEND_API_KEY, email);
         }
 
-        console.warn('No outbound email provider is configured.');
-        return { skipped: true, reason: 'email_not_configured' };
+        const reason=cloudflareApiToken && !env.CLOUDFLARE_ACCOUNT_ID?'cloudflare_email_account_id_missing':'email_not_configured';
+        console.warn(reason==='cloudflare_email_account_id_missing'?'Cloudflare email API token is set, but CLOUDFLARE_ACCOUNT_ID is missing.':'No outbound email provider is configured.');
+        return { skipped: true, reason };
 }
 
 async function sendWithResend(apiKey, email) {

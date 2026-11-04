@@ -114,3 +114,41 @@ test('Cloudflare REST delivery sends both recipients and retains the request on 
         }
     }finally{globalThis.fetch=original;}
 });
+
+
+test('Cloudflare token without an account ID saves an actionable error instead of claiming delivery',async()=>{
+    const original=globalThis.fetch;
+    try {
+        globalThis.fetch=async()=>{throw new Error('No provider request should be made without an account ID.');};
+        for(const inquiryType of ['contact','insurance']) {
+            const context=fixture({...entry,inquiryType,phone:'7735551234'},{configured:false});
+            context.env.CLOUDFLARE_EMAIL_API_TOKEN='local_fixture';
+            const response=await onRequestPost(context);
+            assert.equal(response.status,200);
+            const body=await response.json();assert.equal(body.captured,true);assert.equal(body.emailSent,false);
+            assert.equal(context.writes[1].args[1],'cloudflare_email_account_id_missing');
+        }
+    }finally{globalThis.fetch=original;}
+});
+
+test('the deployed account variable enables the existing Cloudflare token for both forms',async()=>{
+    const {readFile}=await import('node:fs/promises');
+    const config=JSON.parse(await readFile(new URL('../wrangler.jsonc',import.meta.url),'utf8'));
+    assert.match(config.vars.CLOUDFLARE_ACCOUNT_ID,/^[a-f0-9]{32}$/);
+    const original=globalThis.fetch;
+    try {
+        for(const inquiryType of ['contact','insurance']) {
+            const context=fixture({...entry,inquiryType,phone:'7735551234'},{configured:false});
+            context.env={...context.env,...config.vars,CLOUDFLARE_EMAIL_API_TOKEN:'local_fixture'};
+            let called=false;
+            globalThis.fetch=async(url,options)=>{
+                called=true;assert.equal(url,`https://api.cloudflare.com/client/v4/accounts/${config.vars.CLOUDFLARE_ACCOUNT_ID}/email/sending/send`);
+                const outgoing=JSON.parse(options.body);
+                assert.deepEqual(outgoing.to,['vu@cookcountytaxcompare.com','vnguyen1@amfam.com']);
+                return Response.json({success:true,result:{delivered:[],queued:outgoing.to,permanent_bounces:[]}});
+            };
+            const result=await (await onRequestPost(context)).json();
+            assert.equal(called,true);assert.equal(result.emailSent,true);assert.equal(context.writes[1].args[0],1);
+        }
+    }finally{globalThis.fetch=original;}
+});

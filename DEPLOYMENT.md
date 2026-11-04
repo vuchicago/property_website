@@ -189,7 +189,7 @@ Cloudflare Email Routing forwards inbound mail only. The contact form is outboun
 For Cloudflare Email Sending, set:
 
 ```bash
-CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id
+CLOUDFLARE_ACCOUNT_ID=215a936bbe84f807d69a113fbbd125fe
 CLOUDFLARE_EMAIL_API_TOKEN=your_email_sending_api_token
 ADMIN_NOTIFICATION_EMAIL=vu@cookcountytaxcompare.com
 NOTIFICATION_FROM_EMAIL="Cook County Tax Compare <notifications@inquiry.cookcountytaxcompare.com>"
@@ -205,7 +205,9 @@ STRIPE_LIVE_PUBLISHABLE_KEY=pk_live_...
 STRIPE_LIVE_WEBHOOK_SECRET=whsec_...
 ```
 
-All contact, waitlist, partnership, and insurance form notifications go to `vu@cookcountytaxcompare.com`, with every submitted form field and the visitor's email as Reply-To. Contact form recipients are not overridden by `ADMIN_NOTIFICATION_EMAIL`, `PARTNERSHIP_NOTIFICATION_EMAIL`, or `INSURANCE_NOTIFICATION_EMAIL`. Configure Cloudflare Email Routing to forward this inbox to the verified destination `vuchicago@gmail.com`. Outbound Email Sending must also be configured; inbound forwarding alone cannot send form notifications. Submissions are backed up in `contact_messages`, including email delivery errors.
+All contact, waitlist, partnership, and insurance form notifications go to `vu@cookcountytaxcompare.com`. Contact and Insurance also notify `vnguyen1@amfam.com`, with every submitted form field and the visitor's email as Reply-To. Contact form recipients are not overridden by `ADMIN_NOTIFICATION_EMAIL`, `PARTNERSHIP_NOTIFICATION_EMAIL`, or `INSURANCE_NOTIFICATION_EMAIL`. Configure Cloudflare Email Routing to forward this inbox to the verified destination `vuchicago@gmail.com`. Outbound Email Sending must also be configured; inbound forwarding alone cannot send form notifications. Submissions are backed up in `contact_messages`, including email delivery errors.
+
+`CLOUDFLARE_ACCOUNT_ID` is a non-secret account identifier and is now included in `wrangler.jsonc` so Git deployments retain it. The email API-token secret alone is insufficient: without the account ID, neither form can send notifications. Keep `CLOUDFLARE_EMAIL_API_TOKEN` as a secret in both Production and Preview; do not add its value to source control. After publishing, test Contact and Insurance separately and verify the delivery status in `contact_messages`. `email_not_configured` indicates no usable provider; `cloudflare_email_account_id_missing` identifies a token present without its account ID. Provider errors are saved in `email_error`; `email_sent=1` means the provider accepted/queued the request, not proof of inbox delivery. Previously saved messages are not automatically resent.
 
 For Resend instead, set:
 

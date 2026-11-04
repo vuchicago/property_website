@@ -168,7 +168,7 @@ async function scenario(options = {}) {
             case '/api/address-lookup': store.lookups.push(url.searchParams.get('q')); return json({suggestions:[suggestedProperty]});
             case '/api/contact':
                 store.contacts.push(request.postDataJSON());
-                return store.contactFails ? json({ error: 'Test submission failure' }, 503) : json({ success: true, captured: true, emailSent: false });
+                return store.contactFails ? json({ error: 'Test submission failure' }, 503) : json({ success: true, captured: true, emailSent: Boolean(options.emailSent) });
             case '/api/packet-start':
                 if (!store.access) return json({ error:'Free appeal testing is currently by invitation.' },403);
                 store.starts.push(request.postDataJSON());
@@ -1472,5 +1472,19 @@ test('older editable comparison records refresh once without signing out or chan
         assert.equal(s.store.packetRevision,1);assert.equal(s.store.packetStatus,'intake');
         await s.page.reload();await s.page.getByRole('button',{name:'Prepare my appeal',exact:true}).waitFor();
         assert.equal(s.store.packetRevision,1);
+    }finally{await s.close();}
+});
+
+
+for(const page of ['contact','insurance'])for(const emailSent of [false,true])test(`${page} confirmation distinguishes saved requests from sent notifications: ${emailSent}`,async()=>{
+    const s=await scenario({emailSent});
+    try {
+        await s.goto(`/${page}.html`);const form=s.page.locator('form[data-inquiry-form]');
+        await form.getByLabel('Full Name',{exact:true}).fill('Delivery Test');await form.getByLabel('Email',{exact:true}).fill('test@example.com');
+        await form.getByLabel('Phone #',{exact:true}).fill('7735551234');await form.getByLabel('Address',{exact:true}).fill(property.address);
+        await form.locator('[type="submit"]').click();const status=form.getByRole('status');await status.waitFor();
+        if(emailSent) {assert.match(await status.textContent(),/Request sent/);assert.doesNotMatch(await status.textContent(),/could not/);}
+        else {assert.match(await status.textContent(),/received and saved/);assert.match(await status.textContent(),/Email notification could not be sent/);assert.match(await status.textContent(),/do not need to submit again/);}
+        assert.equal(s.store.contacts.length,1);
     }finally{await s.close();}
 });
